@@ -34,7 +34,7 @@ def group_norm(features):
 #######################################################################
 
 class Backbone(nn.Module, ABC_Model):
-    def __init__(self, model_name, num_classes=20, mode='fix', segmentation=False):
+    def __init__(self, model_name, num_classes=20, mode='fix', dilated=False):
         super().__init__()
 
         self.mode = mode
@@ -53,7 +53,7 @@ class Backbone(nn.Module, ABC_Model):
 
             self.model.load_state_dict(state_dict)
         else:
-            if segmentation:
+            if dilated:
                 dilation, dilated = 4, True
             else:
                 dilation, dilated = 2, False
@@ -73,8 +73,8 @@ class Backbone(nn.Module, ABC_Model):
         self.stage5 = nn.Sequential(self.model.layer4)
 
 class Classifier(Backbone):
-    def __init__(self, model_name, num_classes=20, mode='fix'):
-        super().__init__(model_name, num_classes, mode)
+    def __init__(self, model_name, num_classes=20, mode='fix', dilated=False):
+        super().__init__(model_name, num_classes, mode, dilated)
         
         self.classifier = nn.Conv2d(2048, num_classes, 1, bias=False)
         self.num_classes = num_classes
@@ -255,7 +255,7 @@ class AffinityNet(Backbone):
 
 class DeepLabv3_Plus(Backbone):
     def __init__(self, model_name, num_classes=21, mode='fix', use_group_norm=False):
-        super().__init__(model_name, num_classes, mode, segmentation=False)
+        super().__init__(model_name, num_classes, mode, dilated=False)
         
         if use_group_norm:
             norm_fn_for_extra_modules = group_norm
@@ -284,7 +284,7 @@ class DeepLabv3_Plus(Backbone):
 
 class Seg_Model(Backbone):
     def __init__(self, model_name, num_classes=21):
-        super().__init__(model_name, num_classes, mode='fix', segmentation=False)
+        super().__init__(model_name, num_classes, mode='fix', dilated=False)
         
         self.classifier = nn.Conv2d(2048, num_classes, 1, bias=False)
     

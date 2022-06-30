@@ -45,14 +45,17 @@ def shannon_entropy_loss(logits, activation=torch.sigmoid, epsilon=1e-5):
     v = activation(logits)
     return -torch.sum(v * torch.log(v+epsilon), dim=1).mean()
 
-def make_cam(x, epsilon=1e-5):
+def make_cam(x, epsilon=1e-5, global_norm=False):
     # relu(x) = max(x, 0)
     x = F.relu(x)
     
     b, c, h, w = x.size()
 
-    flat_x = x.view(b, c, (h * w))
-    max_value = flat_x.max(axis=-1)[0].view((b, c, 1, 1))
+    if global_norm:
+        max_value = x.max()
+    else:
+        flat_x = x.view(b, c, (h * w))
+        max_value = flat_x.max(axis=-1)[0].view((b, c, 1, 1))
     
     return F.relu(x - epsilon) / (max_value + epsilon)
 

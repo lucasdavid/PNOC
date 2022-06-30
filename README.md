@@ -8,13 +8,15 @@ The official implementation of "Puzzle-CAM: Improved localization via matching p
 - Accepted to ICIP 2021
 - Please cite our paper if the code is helpful to your research. [arxiv](https://arxiv.org/abs/2101.11253)
 ```
-@inproceedings{jo2021puzzle,
-  title={Puzzle-CAM: Improved localization via matching partial and full features},
+@INPROCEEDINGS{9506058,
   author={Jo, Sanghyun and Yu, In-Jae},
   booktitle={2021 IEEE International Conference on Image Processing (ICIP)},
-  pages={639--643},
+  title={Puzzle-CAM: Improved Localization Via Matching Partial And Full Features},
   year={2021},
-  organization={IEEE}
+  volume={},
+  number={},
+  pages={639-643},
+  doi={10.1109/ICIP42928.2021.9506058}
 }
 ```
 
@@ -84,7 +86,7 @@ python3 evaluate.py --experiment_name DeepLabv3+@ResNeSt-101@Fix@GN@val@scale=0.
 ```
 
 ## 5. Results
-Qualitative segmentation results on the PASCAL VOC 2012 validation set. 
+Qualitative segmentation results on the PASCAL VOC 2012 validation set.
 Top: original images. Middle: ground truth. Bottom: prediction of the segmentation model trained using the pseudo-labels from Puzzle-CAM.
 ![Overall architecture](./res/results.PNG)
 
@@ -98,7 +100,7 @@ Top: original images. Middle: ground truth. Bottom: prediction of the segmentati
 - "experiments.zip" includes all of trained weights and training logs (Puzzle-CAM, AffinityNet, and DeepLabv3+).
 [experiments.zip](https://drive.google.com/file/d/1cmvj-ptZRYOeA7USXZ-ZmdfeaaYDBPmz/view?usp=sharing)
 
-- Release the final masks by our models. 
+- Release the final masks by our models.
 
 | Model                  | val | test |
 |:----------------------:|:---:|:----:|
