@@ -44,17 +44,30 @@ class MCARResnet(nn.Module):
     self.image_normalization_mean = [0.485, 0.456, 0.406]
     self.image_normalization_std = [0.229, 0.224, 0.225]
 
-  def forward(self, inputs, inference: bool = False):
+  def forward(self, inputs, inference: bool = False, cams: bool = False):
+    outputs = []
+
     # global stream
     b, c, h, w = inputs.size()
     ga = self.features(inputs)
-    gf = feats_pooling(ga, method=self.ps, sh=int(h / 32), sw=int(w / 32))
-    gf = self.convclass(gf)  #bxcx1x1
+    
+    if cams:
+      cams = self.convclass(ga)  #bxcx1x1
+      gf = feats_pooling(cams, method=self.ps, sh=int(h / 32), sw=int(w / 32))
+      gs = torch.sigmoid(gf)  #bxcx1x1
+      gs = gs.view(gs.size(0), -1)  #bxc
+
+      outputs = [cams]
+    else:
+      gf = feats_pooling(ga, method=self.ps, sh=int(h / 32), sw=int(w / 32))
+      gf = self.convclass(gf)  #bxcx1x1
+    
     gs = torch.sigmoid(gf)  #bxcx1x1
     gs = gs.view(gs.size(0), -1)  #bxc
+    outputs.insert(0, gs)
 
     if inference:
-        return gs
+        return outputs
 
     # from global to local
     camscore = self.convclass(ga.detach())
