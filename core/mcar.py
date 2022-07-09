@@ -20,7 +20,7 @@ def feats_pooling(x, method='avg', sh=8, sw=8):
 
 class MCARResnet(nn.Module):
 
-  def __init__(self, model, num_classes, ps, topN, threshold, vis=False):
+  def __init__(self, model, num_classes, ps, topN, threshold, vis=False, inference_mode=False, with_cams=False, with_logits=False):
     super(MCARResnet, self).__init__()
     self.features = nn.Sequential(
       model.conv1,
@@ -43,30 +43,32 @@ class MCARResnet(nn.Module):
     # image normalization
     self.image_normalization_mean = [0.485, 0.456, 0.406]
     self.image_normalization_std = [0.229, 0.224, 0.225]
+    
+    self.inference_mode = inference_mode
+    self.with_logits = with_logits
+    self.with_cams = with_cams
 
-  def forward(self, inputs, inference: bool = False, cams: bool = False):
-    outputs = []
-
+  def forward(self, inputs):
     # global stream
     b, c, h, w = inputs.size()
     ga = self.features(inputs)
     
-    if cams:
-      cams = self.convclass(ga)  #bxcx1x1
-      gf = feats_pooling(cams, method=self.ps, sh=int(h / 32), sw=int(w / 32))
-      gs = torch.sigmoid(gf)  #bxcx1x1
+    if self.with_cams:
+      cs = self.convclass(ga)  #bchw
+      gf = feats_pooling(cs, method=self.ps, sh=int(h / 32), sw=int(w / 32))  #bc11
+      if not self.with_logits:
+        gs = torch.sigmoid(gf)
       gs = gs.view(gs.size(0), -1)  #bxc
-
-      outputs = [cams]
+      outputs = [gs, cs]
     else:
       gf = feats_pooling(ga, method=self.ps, sh=int(h / 32), sw=int(w / 32))
-      gf = self.convclass(gf)  #bxcx1x1
-    
-    gs = torch.sigmoid(gf)  #bxcx1x1
-    gs = gs.view(gs.size(0), -1)  #bxc
-    outputs.insert(0, gs)
+      gf = self.convclass(gf)  #bc11
+      if not self.with_logits:
+        gs = torch.sigmoid(gf)  #bc11
+      gs = gs.view(gs.size(0), -1)  #bc
+      outputs = [gs]
 
-    if inference:
+    if self.inference_mode:
         return outputs
 
     # from global to local
@@ -134,14 +136,20 @@ class MCARResnet(nn.Module):
     ]
 
 
-def mcar_resnet50(num_classes, ps, topN, threshold, pretrained=True, vis=False):
+def mcar_resnet50(
+    num_classes, ps, topN, threshold, pretrained=True, vis=False,
+    inference_mode=False, with_cams=False, with_logits=False
+):
   model = models.resnet50(pretrained=pretrained)
-  return MCARResnet(model, num_classes, ps, topN, threshold, vis)
+  return MCARResnet(model, num_classes, ps, topN, threshold, vis, inference_mode, with_cams, with_logits)
 
 
-def mcar_resnet101(num_classes, ps, topN, threshold, pretrained=True, vis=False):
+def mcar_resnet101(
+    num_classes, ps, topN, threshold, pretrained=True,
+    vis=False, inference_mode=False, with_cams=False, with_logits=False
+):
   model = models.resnet101(pretrained=pretrained)
-  return MCARResnet(model, num_classes, ps, topN, threshold, vis)
+  return MCARResnet(model, num_classes, ps, topN, threshold, vis, inference_mode, with_cams, with_logits)
 
 
 def obj_loc(score, threshold):

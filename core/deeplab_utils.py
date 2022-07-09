@@ -28,10 +28,8 @@ class ASPPModule(nn.Module):
                 m.bias.data.zero_()
 
 class ASPP(nn.Module):
-    def __init__(self, output_stride, norm_fn):
+    def __init__(self, inplanes, output_stride, norm_fn):
         super().__init__()
-
-        inplanes = 2048
 
         if output_stride == 16:
             dilations = [1, 6, 12, 18]

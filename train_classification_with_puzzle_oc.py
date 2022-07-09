@@ -209,9 +209,18 @@ if __name__ == '__main__':
   log_func()
 
   # Ordinary Classifier.
-  oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode)
-  print(f'Loading OC-CSE weights from `{args.oc_pretrained}`')
-  oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
+  print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
+  if args.oc_architecture == 'mcar':
+    ps = 'avg'
+    topN = 4
+    threshold = 0.5
+    oc_nn = mcar_resnet101(classes, ps, topN, threshold, inference_mode=True, with_logits=True)
+    ckpt = torch.load(args.oc_pretrained)
+    oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
+  else:
+    oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode)
+    oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
+
   oc_nn = oc_nn.cuda()
   oc_nn.eval()
   for child in oc_nn.children():
@@ -367,11 +376,6 @@ if __name__ == '__main__':
     tiled_images = tile_features(images, args.num_pieces)
     tiled_logits, tiled_features = model(tiled_images, with_cam=True)
     re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
-
-    # Losses
-    # if args.level == 'cam':
-    #   features = make_cam(features)
-    #   re_features = make_cam(re_features)
 
     class_loss = class_loss_fn(logits, labels).mean()
 
