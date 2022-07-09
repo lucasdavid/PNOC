@@ -100,3 +100,11 @@ def update_focal_factor(
   focal_factor[valid] = (momentum * focal_factor + (1-momentum)*cf)[valid]
 
   return focal_factor
+
+
+def images_with_masked_objects(images, features, label_mask):
+  mask = features[label_mask == 1, :, :].unsqueeze(1)
+  mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
+  mask = F.relu(mask)
+  mask = mask / (mask.max() + 1e-5)
+  return images * (1 - mask)

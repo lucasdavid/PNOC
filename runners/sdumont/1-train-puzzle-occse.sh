@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-puzzle
+#SBATCH -J poc-rs101-rand
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=16:00:00
+#SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -33,36 +33,43 @@ cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
 SOURCE=train_classification_with_puzzle_oc.py
+LOGS_DIR=$SCRATCH/logs/puzzle
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest269
+ARCHITECTURE=resnest101
 DILATED=false
-OC_ARCHITECTURE=resnest269
-OC_PRETRAINED=experiments/models/ResNeSt269.pth
-EPOCHS=20
-BATCH_SIZE=16
+OC_ARCHITECTURE=resnest101
+OC_PRETRAINED=experiments/models/resnest101@randaug.pth
+EPOCHS=15
+BATCH_SIZE=32
 OC_INIT=0.3
 OC_ALPHA=1.0
 OC_STRATEGY=random
-TAG=ResNeSt269@PuzzleOc-2
+OC_FOCAL_GAMMA=5.0
+MODE=normal
+REG=none
+TAG=$ARCHITECTURE@puzzleoc
 
 CUDA_VISIBLE_DEVICES=0,1,2,3            \
     $PY $SOURCE                         \
     --max_epoch $EPOCHS                 \
     --batch_size $BATCH_SIZE            \
     --architecture $ARCHITECTURE        \
-    --re_loss_option masking            \
-    --re_loss L1_Loss                   \
+    --regularization $REG               \
+    --mode $MODE                        \
+    --alpha 4.00                        \
+    --alpha_schedule 0.5                \
     --oc-architecture $OC_ARCHITECTURE  \
     --oc-pretrained $OC_PRETRAINED      \
-    --alpha 4.00                        \
-    --alpha_schedule 0.50               \
+    --oc-strategy $OC_STRATEGY          \
     --oc-alpha $OC_ALPHA                \
     --oc-alpha-init $OC_INIT            \
     --oc-alpha-schedule 1.0             \
+    --oc-focal-gamma $OC_FOCAL_GAMMA    \
     --tag $TAG                          \
     --dilated $DILATED                  \
     --data_dir $DATA_DIR

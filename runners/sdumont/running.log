@@ -1,0 +1,6 @@
+10570297  train      resnet269-vanilla-kernel_usage  done
+10570393  train      resnet50-puzzleoc-kernel_usage  diverged
+10570393  inference  resnet50-puzzleoc               done
+10570769  train      resnest101-vanilla-randaug      done
+10570993  train      resnest101-puzzleoc             done
+10571225  train      resnet101-mcar                  ongoing

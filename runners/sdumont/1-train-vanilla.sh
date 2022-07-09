@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-puzzle
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/van-%j.out
 #SBATCH --time=16:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -35,9 +35,15 @@ module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
 PY=python3.9
-SOURCE=train.py
+SOURCE=train_classification.py
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 $PY train_classification.py \
-    --architecture resnest269 \
-    --tag ResNeSt269 \
+ARCHITECTURE=resnest101
+AUGMENT=colorjitter_randaugment
+TAG=$ARCHITECTURE@randaug
+
+CUDA_VISIBLE_DEVICES=0,1,2,3         \
+    $PY $SOURCE                      \
+    --architecture $ARCHITECTURE     \
+    --augment $AUGMENT               \
+    --tag $TAG                       \
     --data_dir $SCRATCH/datasets/VOCdevkit/VOC2012/

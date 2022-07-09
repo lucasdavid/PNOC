@@ -47,7 +47,9 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
@@ -57,6 +59,7 @@ parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)
+parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
@@ -67,7 +70,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.1, type=float)
+parser.add_argument('--print_ratio', default=1.0, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -90,6 +93,7 @@ parser.add_argument('--re_loss_option', default='masking', type=str)  # 'none', 
 # parser.add_argument('--branches', default='0,0,0,0,0,1', type=str)
 
 parser.add_argument('--alpha', default=1.0, type=float)
+parser.add_argument('--alpha_init', default=0., type=float)
 parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
 parser.add_argument('--oc-alpha', default=1.0, type=float)
@@ -99,6 +103,12 @@ parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
 if __name__ == '__main__':
   # Arguments
   args = parser.parse_args()
+
+  print('Train Configuration')
+  pad = max(map(len, vars(args))) + 1
+  for k, v in vars(args).items():
+    print(f'{k.ljust(pad)}: {v}')
+  print('===================')
 
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
@@ -153,13 +163,11 @@ if __name__ == '__main__':
   train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
 
   train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
+  # valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
 
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
-  valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
   log_func('[i] mean values is {}'.format(imagenet_mean))
   log_func('[i] std values is {}'.format(imagenet_std))
@@ -170,6 +178,7 @@ if __name__ == '__main__':
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
+  first_iteration = args.first_epoch * val_iteration
   max_iteration = args.max_epoch * val_iteration
 
   log_func('[i] log_iteration : {:,}'.format(log_iteration))
@@ -177,7 +186,16 @@ if __name__ == '__main__':
   log_func('[i] max_iteration : {:,}'.format(max_iteration))
 
   # Network
-  model = Classifier(args.architecture, classes, mode=args.mode, dilated=args.dilated)
+  model = Classifier(
+    args.architecture,
+    classes,
+    mode=args.mode,
+    dilated=args.dilated,
+    regularization=args.regularization,
+  )
+  if args.restore:
+    print(f'Restoring weights from {args.restore}')
+    model.load_state_dict(torch.load(args.restore), strict=True)
   param_groups = model.get_parameter_groups(print_fn=None)
 
   gap_fn = model.global_average_pooling_2d
@@ -186,6 +204,7 @@ if __name__ == '__main__':
   model.train()
 
   log_func('[i] Architecture is {}'.format(args.architecture))
+  log_func('[i] Regularization is {}'.format(args.regularization))
   log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
   log_func()
 
@@ -229,28 +248,11 @@ if __name__ == '__main__':
   log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
   log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
-  optimizer = PolyOptimizer(
-    [
-      {
-        'params': param_groups[0],
-        'lr': args.lr,
-        'weight_decay': args.wd
-      },
-      {
-        'params': param_groups[1],
-        'lr': 2 * args.lr,
-        'weight_decay': 0
-      },
-      {
-        'params': param_groups[2],
-        'lr': 10 * args.lr,
-        'weight_decay': args.wd
-      },
-      {
-        'params': param_groups[3],
-        'lr': 20 * args.lr,
-        'weight_decay': 0
-      },
+  optimizer = PolyOptimizer([
+      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
+      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
+      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
+      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0},
     ],
     lr=args.lr,
     momentum=0.9,
@@ -265,7 +267,10 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha', 'oc_alpha', 'oc_class_loss'])
+  train_meter = Average_Meter([
+    'loss', 'class_loss', 'p_class_loss', 're_loss',
+    'alpha', 'oc_alpha', 'oc_class_loss'
+  ])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
@@ -351,7 +356,7 @@ if __name__ == '__main__':
 
   loss_option = args.loss_option.split('_')
 
-  for iteration in range(max_iteration):
+  for iteration in range(first_iteration, max_iteration):
     images, labels = train_iterator.get()
     images, labels = images.cuda(), labels.cuda()
 
@@ -376,54 +381,25 @@ if __name__ == '__main__':
       p_class_loss = torch.zeros(1).cuda()
 
     if 're' in loss_option:
-      if args.re_loss_option == 'masking':
-        class_mask = labels.unsqueeze(2).unsqueeze(3)
-        re_loss = re_loss_fn(features, re_features) * class_mask
-        re_loss = re_loss.mean()
-      elif args.re_loss_option == 'selection':
-        re_loss = 0.
-        for b_index in range(labels.size()[0]):
-          class_indices = labels[b_index].nonzero(as_tuple=True)
-          selected_features = features[b_index][class_indices]
-          selected_re_features = re_features[b_index][class_indices]
-
-          re_loss_per_feature = re_loss_fn(selected_features, selected_re_features).mean()
-          re_loss += re_loss_per_feature
-        re_loss /= labels.size()[0]
-      else:
-        re_loss = re_loss_fn(features, re_features).mean()
+      class_mask = labels.unsqueeze(2).unsqueeze(3)
+      re_loss = re_loss_fn(features, re_features) * class_mask
+      re_loss = re_loss.mean()
     else:
       re_loss = torch.zeros(1).cuda()
 
-    if 'conf' in loss_option:
-      conf_loss = shannon_entropy_loss(tiled_logits)
-    else:
-      conf_loss = torch.zeros(1).cuda()
-    
     # OC-CSE
     _, label_mask, label_remain = occse.split_label(labels, choices, focal_factor, args.oc_strategy)
-    mask = features[label_mask == 1, :, :].unsqueeze(1)
-    mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
-    mask = F.relu(mask)
-    mask = mask / (mask.max() + 1e-5)
-    cl_logits = oc_nn(images * (1 - mask))
+    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, label_mask))
     oc_class_loss = class_loss_fn(cl_logits, label_remain).mean()
 
     # Scheduling
-    ap = (min(args.alpha * iteration / (max_iteration * args.alpha_schedule), args.alpha)
-          if args.alpha_schedule != 0.0
-          else args.alpha)
-    ao = (min(args.oc_alpha_init + (args.oc_alpha-args.oc_alpha_init) * iteration
-              / (max_iteration * args.oc_alpha_schedule),
-              args.oc_alpha)
-          if args.oc_alpha_schedule != 0.0
-          else args.oc_alpha)
+    ap = linear_schedule(iteration, max_iteration, args.alpha_init, args.alpha, args.alpha_schedule)
+    ao = linear_schedule(iteration, max_iteration, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
 
     loss = (
       class_loss
       + p_class_loss
       + ap * re_loss
-      + conf_loss
       + ao * oc_class_loss
     )
 
@@ -446,7 +422,6 @@ if __name__ == '__main__':
         'class_loss': class_loss.item(),
         'p_class_loss': p_class_loss.item(),
         're_loss': re_loss.item(),
-        'conf_loss': conf_loss.item(),
         'alpha': ap,
         'oc_alpha': ao,
         'oc_class_loss': oc_class_loss.item(),
@@ -455,7 +430,7 @@ if __name__ == '__main__':
 
     # For Log
     if (iteration + 1) % log_iteration == 0:
-      loss, class_loss, p_class_loss, re_loss, conf_loss, ap, ao, oc_class_loss = train_meter.get(clear=True)
+      loss, class_loss, p_class_loss, re_loss, ap, ao, oc_class_loss = train_meter.get(clear=True)
       learning_rate = float(get_learning_rate_from_optimizer(optimizer))
 
       data = {
@@ -466,16 +441,17 @@ if __name__ == '__main__':
         'class_loss': class_loss,
         'p_class_loss': p_class_loss,
         're_loss': re_loss,
-        'conf_loss': conf_loss,
         'oc_alpha': ao,
         'oc_class_loss': oc_class_loss,
         'time': train_timer.tok(clear=True),
+        'focal_factor': focal_factor.cpu().detach().numpy().tolist()
       }
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
       log_func(
-        'iteration     = {iteration:,}\n'
+        '\niteration     = {iteration:,}\n'
+        'time          = {time:.0f} sec\n'
         'learning_rate = {learning_rate:.4f}\n'
         'alpha         = {alpha:.2f}\n'
         'loss          = {loss:.4f}\n'
@@ -484,8 +460,7 @@ if __name__ == '__main__':
         're_loss       = {re_loss:.4f}\n'
         'oc_class_loss = {oc_class_loss:.4f}\n'
         'oc_alpha      = {oc_alpha:.4f}\n'
-        'conf_loss     = {conf_loss:.4f}\n'
-        'time          = {time:.0f} sec'
+        'focal_factor  = {focal_factor}'
         .format(**data)
       )
 
@@ -493,7 +468,6 @@ if __name__ == '__main__':
       writer.add_scalar('Train/class_loss', class_loss, iteration)
       writer.add_scalar('Train/p_class_loss', p_class_loss, iteration)
       writer.add_scalar('Train/re_loss', re_loss, iteration)
-      writer.add_scalar('Train/conf_loss', conf_loss, iteration)
       writer.add_scalar('Train/learning_rate', learning_rate, iteration)
       writer.add_scalar('Train/alpha', ap, iteration)
       writer.add_scalar('Train/oc_alpha', ao, iteration)
@@ -506,9 +480,6 @@ if __name__ == '__main__':
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
 
-        save_model_fn()
-        log_func('[i] save model')
-
       data = {
         'iteration': iteration + 1,
         'threshold': threshold,
@@ -520,17 +491,20 @@ if __name__ == '__main__':
       write_json(data_path, data_dic)
 
       log_func(
-        'iteration       = {iteration:,}\n'
+        '\niteration       = {iteration:,}\n'
+        'time            = {time:.0f} sec'
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
         'best_train_mIoU = {best_train_mIoU:.2f}%\n'
-        'time            = {time:.0f} sec'
         .format(**data)
       )
 
       writer.add_scalar('Evaluation/threshold', threshold, iteration)
       writer.add_scalar('Evaluation/train_mIoU', mIoU, iteration)
       writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, iteration)
+
+      save_model_fn()
+      log_func('[i] save model')
 
   write_json(data_path, data_dic)
   writer.close()

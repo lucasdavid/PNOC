@@ -6,24 +6,22 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchvision import models
 import torch.utils.model_zoo as model_zoo
-
-from .arch_resnet import resnet
-from .arch_resnest import resnest
-from .abc_modules import ABC_Model
-
-from .deeplab_utils import ASPP, Decoder
-from .aff_utils import PathIndex
-from .puzzle_utils import tile_features, merge_features
-
 from tools.ai.torch_utils import resize_for_tensors
+from torchvision import models
 
+from . import regularizers
+from .abc_modules import ABC_Model
+from .aff_utils import PathIndex
+from .arch_resnest import resnest
+from .arch_resnet import resnet
+from .deeplab_utils import ASPP, Decoder
+from .puzzle_utils import merge_features, tile_features
 #######################################################################
 # Normalization
 #######################################################################
 from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+
 
 class FixedBatchNorm(nn.BatchNorm2d):
     def forward(self, x):
@@ -73,11 +71,20 @@ class Backbone(nn.Module, ABC_Model):
         self.stage5 = nn.Sequential(self.model.layer4)
 
 class Classifier(Backbone):
-    def __init__(self, model_name, num_classes=20, mode='fix', dilated=False):
+    def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, regularization=None):
         super().__init__(model_name, num_classes, mode, dilated)
-        
-        self.classifier = nn.Conv2d(2048, num_classes, 1, bias=False)
+
         self.num_classes = num_classes
+        self.regularization = regularization
+
+        if not regularization or regularization.lower() == 'none':
+            self.classifier = nn.Conv2d(2048, num_classes, 1, bias=False)
+        elif regularization.lower() in ('kernel_usage', 'ku'):
+            self.classifier = regularizers.Conv2dKU(2048, num_classes, 1, bias=False)
+        elif regularization.lower() in ('minmax', 'minmaxcam'):
+            self.classifier = regularizers.MinMaxConv2d(2048, num_classes, 1, bias=False)
+        else:
+            raise ValueError(f'Unknown regularization strategy {regularization}.')
 
         self.initialize([self.classifier])
     

@@ -21,3 +21,12 @@ class PolyOptimizer(torch.optim.SGD):
         super().step(closure)
 
         self.global_step += 1
+
+
+def linear_schedule(step, max_step, a_0=0., a_n=1.0, rate=1.0, contraint=min):
+    if rate == 0:
+        return a_n
+
+    rate = a_0 + (a_n - a_0) * step / (max_step * rate)
+    rate = contraint(rate, a_n)
+    return rate
