@@ -58,8 +58,8 @@ class Backbone(nn.Module, ABC_Model):
       self.features_out_channels = 4096
 
       self.model = resnet38d.ResNet38d()
-      state_dict = torch.load('./experiments/models/resnet_38d.params')
-      self.model.load_state_dict(state_dict)
+      state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
+      self.model.load_state_dict(state_dict, strict=True)
 
       self.stage1 = nn.Sequential(self.model.conv1a)
       self.stage2 = nn.Sequential(self.model.b2, self.model.b2_1, self.model.b2_2)
@@ -67,8 +67,7 @@ class Backbone(nn.Module, ABC_Model):
       self.stage4 = nn.Sequential(self.model.b4, self.model.b4_1, self.model.b4_2,
                                   self.model.b4_3, self.model.b4_4, self.model.b4_5)
       self.stage5 = nn.Sequential(self.model.b5, self.model.b5_1, self.model.b5_2,
-                                  self.model.b6, self.model.b7, self.model.bn7, F.relu)
-      
+                                  self.model.b6, self.model.b7, self.model.bn7, nn.ReLU())
     else:
       self.features_out_channels = 2048
 

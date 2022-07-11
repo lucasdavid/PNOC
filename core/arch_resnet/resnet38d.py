@@ -188,11 +188,7 @@ class ResNet38d(nn.Module):
 
     self.b6 = ResBlock_bot(1024, 2048, stride=1, dilation=4, dropout=0.3)
     self.b7 = ResBlock_bot(2048, 4096, dilation=4, dropout=0.5)
-
     self.bn7 = nn.BatchNorm2d(4096)
-
-    torch.nn.init.xavier_uniform_(self.fc8.weight)
-    # self.not_training = [self.conv1a, self.b2, self.b2_1, self.b2_2]
 
   def forward(self, x):
     x = self.conv1a(x)

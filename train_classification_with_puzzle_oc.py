@@ -85,8 +85,6 @@ parser.add_argument('--num_pieces', default=4, type=int)
 # 'cl_pcl_re_conf'
 parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
 
-parser.add_argument('--level', default='feature', type=str)
-
 parser.add_argument('--re_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
 parser.add_argument('--re_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
 
@@ -141,20 +139,16 @@ if __name__ == '__main__':
   if 'randaugment' in args.augment:
     train_transforms.append(RandAugmentMC(n=2, m=10))
 
-  train_transform = transforms.Compose(train_transforms + \
-      [
-          Normalize(imagenet_mean, imagenet_std),
-          RandomCrop(args.image_size),
-          Transpose()
-      ]
-                                      )
-  test_transform = transforms.Compose(
-    [
-      Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-      Top_Left_Crop_For_Segmentation(args.image_size),
-      Transpose_For_Segmentation()
-    ]
-  )
+  train_transform = transforms.Compose(train_transforms + [
+    Normalize(imagenet_mean, imagenet_std),
+    RandomCrop(args.image_size),
+    Transpose()
+  ])
+  test_transform = transforms.Compose([
+    Normalize_For_Segmentation(imagenet_mean, imagenet_std),
+    Top_Left_Crop_For_Segmentation(args.image_size),
+    Transpose_For_Segmentation()
+  ])
 
   meta_dic = read_json('./data/VOC_2012.json')
   class_names = np.asarray(meta_dic['class_names'])
@@ -210,7 +204,7 @@ if __name__ == '__main__':
 
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
-  if args.oc_architecture == 'mcar':
+  if 'mcar' in args.oc_architecture:
     ps = 'avg'
     topN = 4
     threshold = 0.5
@@ -237,9 +231,6 @@ if __name__ == '__main__':
     log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
     oc_nn = nn.DataParallel(oc_nn)
-
-    # for sync bn
-    # patch_replication_callback(model)
 
   load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
   save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
@@ -379,17 +370,10 @@ if __name__ == '__main__':
 
     class_loss = class_loss_fn(logits, labels).mean()
 
-    if 'pcl' in loss_option:
-      p_class_loss = class_loss_fn(gap_fn(re_features), labels).mean()
-    else:
-      p_class_loss = torch.zeros(1).cuda()
+    p_class_loss = class_loss_fn(gap_fn(re_features), labels).mean()
 
-    if 're' in loss_option:
-      class_mask = labels.unsqueeze(2).unsqueeze(3)
-      re_loss = re_loss_fn(features, re_features) * class_mask
-      re_loss = re_loss.mean()
-    else:
-      re_loss = torch.zeros(1).cuda()
+    class_mask = labels.unsqueeze(2).unsqueeze(3)
+    re_loss = (re_loss_fn(features, re_features) * class_mask).mean()
 
     # OC-CSE
     _, label_mask, label_remain = occse.split_label(labels, choices, focal_factor, args.oc_strategy)
@@ -420,19 +404,17 @@ if __name__ == '__main__':
       gamma=args.oc_focal_gamma
     )
 
-    train_meter.add(
-      {
-        'loss': loss.item(),
-        'class_loss': class_loss.item(),
-        'p_class_loss': p_class_loss.item(),
-        're_loss': re_loss.item(),
-        'alpha': ap,
-        'oc_alpha': ao,
-        'oc_class_loss': oc_class_loss.item(),
-      }
-    )
+    # region logging
+    train_meter.add({
+      'loss': loss.item(),
+      'class_loss': class_loss.item(),
+      'p_class_loss': p_class_loss.item(),
+      're_loss': re_loss.item(),
+      'alpha': ap,
+      'oc_alpha': ao,
+      'oc_class_loss': oc_class_loss.item(),
+    })
 
-    # For Log
     if (iteration + 1) % log_iteration == 0:
       loss, class_loss, p_class_loss, re_loss, ap, ao, oc_class_loss = train_meter.get(clear=True)
       learning_rate = float(get_learning_rate_from_optimizer(optimizer))
@@ -476,8 +458,9 @@ if __name__ == '__main__':
       writer.add_scalar('Train/alpha', ap, iteration)
       writer.add_scalar('Train/oc_alpha', ao, iteration)
       writer.add_scalar('Train/oc_class_loss', oc_class_loss, iteration)
+      # endregion
 
-    # Evaluation
+    # region evaluation
     if (iteration + 1) % val_iteration == 0:
       threshold, mIoU = evaluate(train_loader_for_seg)
 
@@ -509,6 +492,7 @@ if __name__ == '__main__':
 
       save_model_fn()
       log_func('[i] save model')
+    # endregion
 
   write_json(data_path, data_dic)
   writer.close()
