@@ -59,17 +59,15 @@ class MCARResnet(nn.Module):
       if not self.with_logits:
         gs = torch.sigmoid(gs)
       gs = gs.view(gs.size(0), -1)  #bxc
-      outputs = [gs, cs]
     else:
       gf = feats_pooling(ga, method=self.ps, sh=int(h / 32), sw=int(w / 32))
       gs = gf = self.convclass(gf)  #bc11
       if not self.with_logits:
         gs = torch.sigmoid(gf)  #bc11
       gs = gs.view(gs.size(0), -1)  #bc
-      outputs = [gs]
 
     if self.inference_mode:
-        return outputs
+        return gs
 
     # from global to local
     camscore = self.convclass(ga.detach())

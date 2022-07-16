@@ -143,10 +143,10 @@ if __name__ == '__main__':
   name_list = df['filename'].values
 
   if args.mode == 'png':
-    loglist = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
-    print('mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(loglist['mIoU'], loglist['fp_all'], loglist['fn_all']))
+    report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
+    print('mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(report['mIoU'], report['fp_all'], report['fn_all']))
   elif args.mode == 'rw':
-    th_list = np.arange(args.min_th, args.max_th, args.step_th).tolist()
+    thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
 
     over_activation = 1.60
     under_activation = 0.60
@@ -154,20 +154,20 @@ if __name__ == '__main__':
     mIoU_list = []
     FP_list = []
 
-    for th in th_list:
-      args.threshold = th
-      loglist = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
+    for t in thresholds:
+      args.threshold = t
+      report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
 
-      mIoU, FP = loglist['mIoU'], loglist['fp_all']
+      mIoU, FP = report['mIoU'], report['fp_all']
 
-      print('Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(th, mIoU, FP))
+      print('Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t, mIoU, FP))
 
       FP_list.append(FP)
       mIoU_list.append(mIoU)
 
     best_index = np.argmax(mIoU_list)
-    best_th = th_list[best_index]
-    best_mIoU = mIoU_list[best_index]
+    threshold_ = thresholds[best_index]
+    miou_ = mIoU_list[best_index]
     best_FP = FP_list[best_index]
 
     over_FP = best_FP * over_activation
@@ -179,43 +179,45 @@ if __name__ == '__main__':
     under_loss_list = [np.abs(FP - under_FP) for FP in FP_list]
 
     over_index = np.argmin(over_loss_list)
-    over_th = th_list[over_index]
+    over_th = thresholds[over_index]
     over_mIoU = mIoU_list[over_index]
     over_FP = FP_list[over_index]
 
     under_index = np.argmin(under_loss_list)
-    under_th = th_list[under_index]
+    under_th = thresholds[under_index]
     under_mIoU = mIoU_list[under_index]
     under_FP = FP_list[under_index]
 
-    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(best_th, best_mIoU, best_FP))
+    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_, miou_, best_FP))
     print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, over_FP))
     print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, under_FP))
   else:
     if args.threshold is None:
-      th_list = np.arange(args.min_th, args.max_th, args.step_th).tolist()
+      thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
 
-      best_th = 0
-      best_mIoU = 0
+      threshold_ = 0
+      miou_ = 0
 
-      for th in th_list:
-        args.threshold = th
-        loglist = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
+      for t in thresholds:
+        args.threshold = t
+        report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
         print(
           'Th={:.2f}, mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(
-            args.threshold, loglist['mIoU'], loglist['fp_all'], loglist['fn_all']
+            args.threshold, report['mIoU'], report['fp_all'], report['fn_all']
           )
         )
 
-        if loglist['mIoU'] > best_mIoU:
-          best_th = th
-          best_mIoU = loglist['mIoU']
+        if report['mIoU'] > miou_:
+          threshold_ = t
+          miou_ = report['mIoU']
+          iou_ = report
 
-      print('Best Th={:.2f}, mIoU={:.3f}%'.format(best_th, best_mIoU))
+      print(f'Best Th={threshold_:.2f}, mIoU={miou_:.3f}%')
+      print(*(f'{k}\t{v}' for k, v in iou_.items()), sep='\n')
     else:
-      loglist = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
+      report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
       print(
         'Th={:.2f}, mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(
-          args.threshold, loglist['mIoU'], loglist['fp_all'], loglist['fn_all']
+          args.threshold, report['mIoU'], report['fp_all'], report['fn_all']
         )
       )

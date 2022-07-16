@@ -40,12 +40,12 @@ SOURCE=train_classification_with_puzzle_oc.py
 LOGS_DIR=$SCRATCH/logs/puzzle
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnet38d
-DILATED=true
+ARCHITECTURE=resnest101
+DILATED=false
 OC_ARCHITECTURE=mcar
 OC_PRETRAINED=/scratch/lerdl/lucas.david/MCAR/mcar-work-dirs/voc2012-resnet101-avg-512-4-0.5/model_best_95.1325.pth.tar
 EPOCHS=15
-BATCH_SIZE=16
+BATCH_SIZE=32
 OC_INIT=0.3
 OC_ALPHA=1.0
 OC_STRATEGY=random

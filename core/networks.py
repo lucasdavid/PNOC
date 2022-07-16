@@ -10,7 +10,7 @@ import torch.utils.model_zoo as model_zoo
 from tools.ai.torch_utils import resize_for_tensors
 from torchvision import models
 
-from . import regularizers
+from . import ccam, regularizers
 from .abc_modules import ABC_Model
 from .aff_utils import PathIndex
 from .arch_resnest import resnest
@@ -39,7 +39,7 @@ def group_norm(features):
 
 class Backbone(nn.Module, ABC_Model):
 
-  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False):
+  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
     super().__init__()
 
     self.mode = mode
@@ -64,16 +64,18 @@ class Backbone(nn.Module, ABC_Model):
       self.stage1 = nn.Sequential(self.model.conv1a)
       self.stage2 = nn.Sequential(self.model.b2, self.model.b2_1, self.model.b2_2)
       self.stage3 = nn.Sequential(self.model.b3, self.model.b3_1, self.model.b3_2)
-      self.stage4 = nn.Sequential(self.model.b4, self.model.b4_1, self.model.b4_2,
-                                  self.model.b4_3, self.model.b4_4, self.model.b4_5)
-      self.stage5 = nn.Sequential(self.model.b5, self.model.b5_1, self.model.b5_2,
-                                  self.model.b6, self.model.b7, self.model.bn7, nn.ReLU())
+      self.stage4 = nn.Sequential(
+        self.model.b4, self.model.b4_1, self.model.b4_2, self.model.b4_3, self.model.b4_4, self.model.b4_5
+      )
+      self.stage5 = nn.Sequential(
+        self.model.b5, self.model.b5_1, self.model.b5_2, self.model.b6, self.model.b7, self.model.bn7, nn.ReLU()
+      )
     else:
       self.features_out_channels = 2048
 
       if 'resnet' in model_name:
         self.model = resnet.ResNet(
-          resnet.Bottleneck, resnet.layers_dic[model_name], strides=(2, 2, 2, 1), batch_norm_fn=self.norm_fn
+          resnet.Bottleneck, resnet.layers_dic[model_name], strides=strides, batch_norm_fn=self.norm_fn
         )
 
         state_dict = model_zoo.load_url(resnet.urls_dic[model_name])
@@ -82,12 +84,8 @@ class Backbone(nn.Module, ABC_Model):
 
         self.model.load_state_dict(state_dict)
       else:
-        self.model = eval("resnest." + model_name)(
-          pretrained=True,
-          dilated=dilated,
-          dilation=dilation,
-          norm_layer=self.norm_fn
-        )
+        self.model = eval("resnest." +
+                          model_name)(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
 
         del self.model.avgpool
         del self.model.fc
@@ -101,8 +99,8 @@ class Backbone(nn.Module, ABC_Model):
 
 class Classifier(Backbone):
 
-  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, regularization=None):
-    super().__init__(model_name, num_classes, mode, dilated)
+  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, strides=(2, 2, 2, 1), regularization=None):
+    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     self.num_classes = num_classes
     self.regularization = regularization
@@ -135,6 +133,45 @@ class Classifier(Backbone):
       x = self.global_average_pooling_2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
+
+
+class CCAM(Classifier):
+
+  def __init__(
+    self,
+    model_name,
+    num_classes=20,
+    mode='fix',
+    dilated=False,
+    strides=(1, 2, 2, 1),
+    regularization=None,
+    cin=1024 + 2048
+  ):
+    super().__init__(
+      model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
+    )
+
+    self.ac_head = ccam.Disentangler(cin)
+
+  def forward(self, x, with_cam=False, inference=False):
+    x = self.stage1(x)
+    x = self.stage2(x)
+    x = self.stage3(x)
+    x1 = self.stage4(x)
+    x2 = self.stage5(x1)
+
+    feats = torch.cat([x2, x1], dim=1)
+
+    fg_feats, bg_feats, ccam = self.ac_head(feats, inference=inference)
+
+    if with_cam:
+      features = self.classifier(x2)
+      logits = self.global_average_pooling_2d(features)
+      return logits, fg_feats, bg_feats, ccam, features
+    else:
+      x = self.global_average_pooling_2d(x2, keepdims=True)
+      logits = self.classifier(x).view(-1, self.num_classes)
+      return logits, fg_feats, bg_feats, ccam
 
 
 class AffinityNet(Backbone):
@@ -247,14 +284,15 @@ class AffinityNet(Backbone):
 
 class DeepLabv3_Plus(Backbone):
 
-  def __init__(self, model_name, num_classes=21, mode='fix', use_group_norm=False):
-    super().__init__(model_name, num_classes, mode, dilated=False)
+  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, regularization=None, use_group_norm=False):
+    # model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
+    super().__init__(model_name, num_classes, mode=mode, dilated=dilated, regularization=regularization)
 
     if use_group_norm:
       norm_fn_for_extra_modules = group_norm
     else:
       norm_fn_for_extra_modules = self.norm_fn
-    
+
     in_features = self.features_out_channels
 
     self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn_for_extra_modules)
