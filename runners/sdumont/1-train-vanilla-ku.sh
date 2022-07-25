@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J inf-rs269-rand
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/inf-%j.out
-#SBATCH --time=36:00:00
+#SBATCH -J tr-puzzle
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/van-%j.out
+#SBATCH --time=16:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -21,7 +21,8 @@
 # limitations under the License.
 
 #
-# CAMs Inference.
+# Train ResNeSt269 to perform multilabel classification
+# task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
 echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -32,38 +33,20 @@ cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
-# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
+SOURCE=train_classification.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-DOMAIN=train_aug
-
 ARCHITECTURE=resnest269
-DILATED=false
-WEIGHTS=resnest269@puzzleoc
-TAG=$WEIGHTS
+REGULAR=kernel_usage
+AUGMENT=colorjitter_randaugment
+TAG=$ARCHITECTURE@$REGULAR@randaug
 
-CUDA_VISIBLE_DEVICES=0,1                  \
-    $PY inference_classification.py       \
-    --architecture $ARCHITECTURE          \
-    --dilated      $DILATED               \
-    --weights      $WEIGHTS               \
-    --tag          $TAG                   \
-    --domain       $DOMAIN                \
-    --data_dir     $DATA_DIR              &
-
-DILATED=false
-WEIGHTS=resnest269@randaug
-TAG=$WEIGHTS
-
-CUDA_VISIBLE_DEVICES=2,3                  \
-    $PY inference_classification.py       \
-    --architecture $ARCHITECTURE          \
-    --dilated $DILATED                    \
-    --weights $WEIGHTS                    \
-    --tag $TAG                            \
-    --domain $DOMAIN                      \
-    --data_dir $DATA_DIR &
-
-wait
+CUDA_VISIBLE_DEVICES=0,1,2,3         \
+    $PY $SOURCE                      \
+    --architecture   $ARCHITECTURE   \
+    --regularization $REGULAR        \
+    --augment        $AUGMENT        \
+    --tag            $TAG            \
+    --data_dir $DATA_DIR

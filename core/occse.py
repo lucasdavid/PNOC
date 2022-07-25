@@ -3,74 +3,69 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def random_label_split(label, choices):
+def random_label_split(label, k, choices):
   bs = label.shape[0]
-  label_mask = torch.zeros_like(label).cuda()
-  label_remain = label.clone()
-  for i in range(bs):
-    label_idx = torch.nonzero(label[i], as_tuple=False)  # -> [0, 1, 14]
-    rand_idx = torch.randint(0, len(label_idx), (1,))  # -> 2
-    target = label_idx[rand_idx][0]  # -> 14
-    label_remain[i, target] = 0
-    label_mask[i, target] = 1
+  y_mask = torch.zeros_like(label)
 
+  for i in range(bs):
+    label_idx = torch.nonzero(label[i], as_tuple=False)  # [0, 1, 14]
+    rand_idx = torch.randperm(len(label_idx))[:k]        # [2]
+    target = label_idx[rand_idx]                         # [14]
+    y_mask[i, target] = 1
     choices[target] += 1
 
-  return label_mask, label_remain
+  return y_mask
 
 
-def balanced_label_split(label, choices):
+def balanced_label_split(label, k, choices, gamma=1.0):
   bs = label.shape[0]
-  label_mask = torch.zeros_like(label).cuda()
-  label_remain = label.clone()
+  y_mask = torch.zeros_like(label)
+
   for i in range(bs):
-    p = (1 / choices)  # inv. prop. to the number of times chosen
+    p = (1 / choices**gamma)    # inv. prop. to the number of times chosen
     p[choices == 0] = 1  # not chosen so far are a priority
-    p = p * label[i]  # suppress if label not present
+    p = p * label[i]     # suppress if label not present
 
-    target = torch.multinomial(p, 1)[0]
-    label_remain[i, target] = 0
-    label_mask[i, target] = 1
-
+    target = torch.multinomial(p, k)
+    y_mask[i, target] = 1
     choices[target] += 1
 
-  return label_mask, label_remain
+  return y_mask
 
 
-def focal_label_split(label, choices, focal_factor):
+def focal_label_split(label, k, choices, focal_factor):
   bs = label.shape[0]
-  label_mask = torch.zeros_like(label).cuda()
-  label_remain = label.clone()
+  y_mask = torch.zeros_like(label)
 
   for i in range(bs):
     p = focal_factor  # prop. to the focal factor
     p = p * label[i]  # suppress if label not present
 
-    target = torch.multinomial(p, 1)[0]
-    label_remain[i, target] = 0
-    label_mask[i, target] = 1
+    target = torch.multinomial(p, k)
+    y_mask[i, target] = 1
 
     choices[target] += 1
 
-  return label_mask, label_remain
+  return y_mask
 
 
 def split_label(
   label,
+  k,
   choices,
   focal_factor=None,
   strategy='random',  # args.label_split
 ):
   if strategy == 'random':
-    label_mask, label_remain = random_label_split(label, choices)
+    y_mask = random_label_split(label, k, choices)
   elif strategy == 'balanced':
-    label_mask, label_remain = balanced_label_split(label, choices)
+    y_mask = balanced_label_split(label, k, choices)
   elif strategy == 'focal':
-    label_mask, label_remain = focal_label_split(label, choices, focal_factor)
+    y_mask = focal_label_split(label, k, choices, focal_factor)
   else:
     raise ValueError('Only `random` and `focus` are available.')
 
-  return label, label_mask, label_remain
+  return y_mask
 
 
 def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_balancing=False):
@@ -87,7 +82,7 @@ def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_ba
 
 def update_focal_factor(
     labels,
-    label_remain,
+    labels_oc,
     cl_logits,
     focal_factor,
     momentum=0.9,
@@ -96,14 +91,14 @@ def update_focal_factor(
   samples  = labels.sum(axis=0)
   valid    = labels.any(axis=0)
 
-  cf = calculate_focal_factor(label_remain, cl_logits, gamma).sum(axis=0) / samples
+  cf = calculate_focal_factor(labels_oc, cl_logits, gamma).sum(axis=0) / samples
   focal_factor[valid] = (momentum * focal_factor + (1-momentum)*cf)[valid]
 
   return focal_factor
 
 
 def images_with_masked_objects(images, features, label_mask):
-  mask = features[label_mask == 1, :, :].unsqueeze(1)
+  mask = torch.einsum('bc,bchw->bhw', label_mask, features).unsqueeze(1)
   mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
   mask = F.relu(mask)
   mask = mask / (mask.max() + 1e-5)

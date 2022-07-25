@@ -52,6 +52,7 @@ parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
+parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str)
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
@@ -85,8 +86,8 @@ parser.add_argument('--num_pieces', default=4, type=int)
 # 'cl_pcl_re_conf'
 parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
 
-parser.add_argument('--re_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
-parser.add_argument('--re_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
+parser.add_argument('--r_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
+parser.add_argument('--r_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
 
 # parser.add_argument('--branches', default='0,0,0,0,0,1', type=str)
 
@@ -97,6 +98,9 @@ parser.add_argument('--alpha_schedule', default=0.50, type=float)
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
 parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
+parser.add_argument('--oc-k', default=1.0, type=float)
+parser.add_argument('--oc-k-init', default=1.0, type=float)
+parser.add_argument('--oc-k-schedule', default=0.0, type=float)
 
 if __name__ == '__main__':
   # Arguments
@@ -172,12 +176,12 @@ if __name__ == '__main__':
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
-  first_iteration = args.first_epoch * val_iteration
-  max_iteration = args.max_epoch * val_iteration
+  step_init = args.first_epoch * val_iteration
+  step_max = args.max_epoch * val_iteration
 
   log_func('[i] log_iteration : {:,}'.format(log_iteration))
   log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(max_iteration))
+  log_func('[i] max_iteration : {:,}'.format(step_max))
 
   # Network
   model = Classifier(
@@ -212,7 +216,7 @@ if __name__ == '__main__':
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode)
+    oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.cuda()
@@ -238,10 +242,10 @@ if __name__ == '__main__':
   # Loss, Optimizer
   class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
 
-  if args.re_loss == 'L1_Loss':
-    re_loss_fn = L1_Loss
+  if args.r_loss == 'L1_Loss':
+    r_loss_fn = L1_Loss
   else:
-    re_loss_fn = L2_Loss
+    r_loss_fn = L2_Loss
 
   log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
   log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
@@ -257,7 +261,7 @@ if __name__ == '__main__':
     lr=args.lr,
     momentum=0.9,
     weight_decay=args.wd,
-    max_step=max_iteration,
+    max_step=step_max,
     nesterov=args.nesterov
   )
 
@@ -268,8 +272,7 @@ if __name__ == '__main__':
   eval_timer = Timer()
 
   train_meter = Average_Meter([
-    'loss', 'class_loss', 'p_class_loss', 're_loss',
-    'alpha', 'oc_alpha', 'oc_class_loss'
+    'loss', 'c_loss', 'p_loss', 'r_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'
   ])
 
   best_train_mIoU = -1
@@ -316,7 +319,7 @@ if __name__ == '__main__':
             image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
             image = image.astype(np.float32) / 255.
 
-            writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
+            writer.add_image('CAM/{}'.format(b + 1), image, step, dataformats='HWC')
 
         for batch_index in range(images.size()[0]):
           # c, h, w -> h, w, c
@@ -356,9 +359,13 @@ if __name__ == '__main__':
 
   loss_option = args.loss_option.split('_')
 
-  for iteration in range(first_iteration, max_iteration):
+  for step in range(step_init, step_max):
     images, labels = train_iterator.get()
     images, labels = images.cuda(), labels.cuda()
+
+    ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
+    ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
+    k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
     # Normal
     logits, features = model(images, with_cam=True)
@@ -368,27 +375,21 @@ if __name__ == '__main__':
     tiled_logits, tiled_features = model(tiled_images, with_cam=True)
     re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
-    class_loss = class_loss_fn(logits, labels).mean()
-
-    p_class_loss = class_loss_fn(gap_fn(re_features), labels).mean()
-
-    class_mask = labels.unsqueeze(2).unsqueeze(3)
-    re_loss = (re_loss_fn(features, re_features) * class_mask).mean()
+    c_loss = class_loss_fn(logits, labels).mean()
+    p_loss = class_loss_fn(gap_fn(re_features), labels).mean()
+    r_loss = (r_loss_fn(features, re_features) * labels.unsqueeze(2).unsqueeze(3)).mean()
 
     # OC-CSE
-    _, label_mask, label_remain = occse.split_label(labels, choices, focal_factor, args.oc_strategy)
-    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, label_mask))
-    oc_class_loss = class_loss_fn(cl_logits, label_remain).mean()
-
-    # Scheduling
-    ap = linear_schedule(iteration, max_iteration, args.alpha_init, args.alpha, args.alpha_schedule)
-    ao = linear_schedule(iteration, max_iteration, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
+    labels_mask = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
+    labels_oc = labels - labels_mask
+    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
+    o_loss = class_loss_fn(cl_logits, labels_oc).mean()
 
     loss = (
-      class_loss
-      + p_class_loss
-      + ap * re_loss
-      + ao * oc_class_loss
+      c_loss
+      + p_loss
+      + ap * r_loss
+      + ao * o_loss
     )
 
     optimizer.zero_grad()
@@ -397,7 +398,7 @@ if __name__ == '__main__':
 
     occse.update_focal_factor(
       labels,
-      label_remain,
+      labels_oc,
       cl_logits,
       focal_factor,
       momentum=args.oc_focal_momentum,
@@ -407,28 +408,40 @@ if __name__ == '__main__':
     # region logging
     train_meter.add({
       'loss': loss.item(),
-      'class_loss': class_loss.item(),
-      'p_class_loss': p_class_loss.item(),
-      're_loss': re_loss.item(),
+      'c_loss': c_loss.item(),
+      'p_loss': p_loss.item(),
+      'r_loss': r_loss.item(),
+      'o_loss': o_loss.item(),
       'alpha': ap,
       'oc_alpha': ao,
-      'oc_class_loss': oc_class_loss.item(),
+      'k': k
     })
 
-    if (iteration + 1) % log_iteration == 0:
-      loss, class_loss, p_class_loss, re_loss, ap, ao, oc_class_loss = train_meter.get(clear=True)
-      learning_rate = float(get_learning_rate_from_optimizer(optimizer))
+    if (step + 1) % log_iteration == 0:
+      (
+        loss,
+        c_loss,
+        p_loss,
+        r_loss,
+        o_loss,
+        ap,
+        ao,
+        k
+      ) = train_meter.get(clear=True)
+      
+      lr = float(get_learning_rate_from_optimizer(optimizer))
 
       data = {
-        'iteration': iteration + 1,
-        'learning_rate': learning_rate,
+        'iteration': step + 1,
+        'lr': lr,
         'alpha': ap,
         'loss': loss,
-        'class_loss': class_loss,
-        'p_class_loss': p_class_loss,
-        're_loss': re_loss,
+        'c_loss': c_loss,
+        'p_loss': p_loss,
+        'r_loss': r_loss,
+        'o_loss': o_loss,
         'oc_alpha': ao,
-        'oc_class_loss': oc_class_loss,
+        'k': k,
         'time': train_timer.tok(clear=True),
         'focal_factor': focal_factor.cpu().detach().numpy().tolist()
       }
@@ -436,39 +449,41 @@ if __name__ == '__main__':
       write_json(data_path, data_dic)
 
       log_func(
-        '\niteration     = {iteration:,}\n'
-        'time          = {time:.0f} sec\n'
-        'learning_rate = {learning_rate:.4f}\n'
-        'alpha         = {alpha:.2f}\n'
-        'loss          = {loss:.4f}\n'
-        'class_loss    = {class_loss:.4f}\n'
-        'p_class_loss  = {p_class_loss:.4f}\n'
-        're_loss       = {re_loss:.4f}\n'
-        'oc_class_loss = {oc_class_loss:.4f}\n'
-        'oc_alpha      = {oc_alpha:.4f}\n'
-        'focal_factor  = {focal_factor}'
+        '\niteration  = {iteration:,}\n'
+        'time         = {time:.0f} sec\n'
+        'lr           = {lr:.4f}\n'
+        'alpha        = {alpha:.2f}\n'
+        'loss         = {loss:.4f}\n'
+        'c_loss       = {c_loss:.4f}\n'
+        'p_loss       = {p_loss:.4f}\n'
+        'r_loss       = {r_loss:.4f}\n'
+        'o_loss       = {o_loss:.4f}\n'
+        'oc_alpha     = {oc_alpha:.4f}\n'
+        'k            = {k}\n'
+        'focal_factor = {focal_factor}'
         .format(**data)
       )
 
-      writer.add_scalar('Train/loss', loss, iteration)
-      writer.add_scalar('Train/class_loss', class_loss, iteration)
-      writer.add_scalar('Train/p_class_loss', p_class_loss, iteration)
-      writer.add_scalar('Train/re_loss', re_loss, iteration)
-      writer.add_scalar('Train/learning_rate', learning_rate, iteration)
-      writer.add_scalar('Train/alpha', ap, iteration)
-      writer.add_scalar('Train/oc_alpha', ao, iteration)
-      writer.add_scalar('Train/oc_class_loss', oc_class_loss, iteration)
+      writer.add_scalar('Train/loss', loss, step)
+      writer.add_scalar('Train/c_loss', c_loss, step)
+      writer.add_scalar('Train/p_loss', p_loss, step)
+      writer.add_scalar('Train/r_loss', r_loss, step)
+      writer.add_scalar('Train/o_loss', o_loss, step)
+      writer.add_scalar('Train/learning_rate', lr, step)
+      writer.add_scalar('Train/alpha', ap, step)
+      writer.add_scalar('Train/oc_alpha', ao, step)
+      writer.add_scalar('Train/k', k, step)
       # endregion
 
     # region evaluation
-    if (iteration + 1) % val_iteration == 0:
+    if (step + 1) % val_iteration == 0:
       threshold, mIoU = evaluate(train_loader_for_seg)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
 
       data = {
-        'iteration': iteration + 1,
+        'iteration': step + 1,
         'threshold': threshold,
         'train_mIoU': mIoU,
         'best_train_mIoU': best_train_mIoU,
@@ -486,9 +501,9 @@ if __name__ == '__main__':
         .format(**data)
       )
 
-      writer.add_scalar('Evaluation/threshold', threshold, iteration)
-      writer.add_scalar('Evaluation/train_mIoU', mIoU, iteration)
-      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, iteration)
+      writer.add_scalar('Evaluation/threshold', threshold, step)
+      writer.add_scalar('Evaluation/train_mIoU', mIoU, step)
+      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, step)
 
       save_model_fn()
       log_func('[i] save model')

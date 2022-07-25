@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J poc-rs101-rand
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
+#SBATCH -J focal-rs269
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/focal-%j.out
 #SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -40,36 +40,47 @@ SOURCE=train_classification_with_puzzle_oc.py
 LOGS_DIR=$SCRATCH/logs/puzzle
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest101
+# Arch
+ARCHITECTURE=resnest269
+REG=none
 DILATED=false
-OC_ARCHITECTURE=mcar
-OC_PRETRAINED=/scratch/lerdl/lucas.david/MCAR/mcar-work-dirs/voc2012-resnet101-avg-512-4-0.5/model_best_95.1325.pth.tar
+# Training
 EPOCHS=15
-BATCH_SIZE=32
+BATCH=8
+MODE=normal
+# OC
+OC_ARCHITECTURE=resnest269
+OC_REG=none
+OC_PRETRAINED=experiments/models/ResNeSt269.pth
+OC_STRATEGY=random
+OC_FOCAL_MOMENTUM=0.8
+OC_FOCAL_GAMMA=5.0
+# Schedule
+P_ALPHA=4.0
+P_SCHEDULE=0.5
 OC_INIT=0.3
 OC_ALPHA=1.0
-OC_STRATEGY=random
-OC_FOCAL_GAMMA=5.0
-MODE=normal
-REG=none
-TAG=$ARCHITECTURE@mcar
 
-CUDA_VISIBLE_DEVICES=0,1,2,3            \
-    $PY $SOURCE                         \
-    --max_epoch $EPOCHS                 \
-    --batch_size $BATCH_SIZE            \
-    --architecture $ARCHITECTURE        \
-    --regularization $REG               \
-    --mode $MODE                        \
-    --alpha 4.00                        \
-    --alpha_schedule 0.5                \
-    --oc-architecture $OC_ARCHITECTURE  \
-    --oc-pretrained $OC_PRETRAINED      \
-    --oc-strategy $OC_STRATEGY          \
-    --oc-alpha $OC_ALPHA                \
-    --oc-alpha-init $OC_INIT            \
-    --oc-alpha-schedule 1.0             \
-    --oc-focal-gamma $OC_FOCAL_GAMMA    \
-    --tag $TAG                          \
-    --dilated $DILATED                  \
-    --data_dir $DATA_DIR
+TAG=$ARCHITECTURE@puzzleoc@b$BATCH@$OC_STRATEGY
+
+CUDA_VISIBLE_DEVICES=0,1,2,3               \
+    $PY $SOURCE                            \
+    --max_epoch         $EPOCHS            \
+    --batch_size        $BATCH             \
+    --architecture      $ARCHITECTURE      \
+    --regularization    $REG               \
+    --dilated           $DILATED           \
+    --mode              $MODE              \
+    --alpha             $P_ALPHA           \
+    --alpha_schedule    $P_SCHEDULE        \
+    --oc-architecture   $OC_ARCHITECTURE   \
+    --oc-pretrained     $OC_PRETRAINED     \
+    --oc-regularization $OC_REG            \
+    --oc-strategy       $OC_STRATEGY       \
+    --oc-alpha          $OC_ALPHA          \
+    --oc-alpha-init     $OC_INIT           \
+    --oc-alpha-schedule 1.0                \
+    --oc-focal-momentum $OC_FOCAL_MOMENTUM \
+    --oc-focal-gamma    $OC_FOCAL_GAMMA    \
+    --tag               $TAG               \
+    --data_dir          $DATA_DIR

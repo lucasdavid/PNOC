@@ -36,14 +36,15 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
 PY=python3.9
 SOURCE=train_classification.py
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest101
+ARCHITECTURE=resnest269
 AUGMENT=colorjitter_randaugment
 TAG=$ARCHITECTURE@randaug
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \
-    --architecture $ARCHITECTURE     \
-    --augment $AUGMENT               \
-    --tag $TAG                       \
-    --data_dir $SCRATCH/datasets/VOCdevkit/VOC2012/
+    --architecture   $ARCHITECTURE   \
+    --augment        $AUGMENT        \
+    --tag            $TAG            \
+    --data_dir $DATA_DIR
