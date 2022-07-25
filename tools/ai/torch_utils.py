@@ -113,7 +113,7 @@ def batchnorm_eval(model):
 def freeze_and_eval(module):
   for m in module.modules():
     for p in ('weight', 'bias'):
-      p = getattr(m, p)
+      p = getattr(m, p, None)
       if p is not None:
         p.requires_grad = False
   module.eval()
