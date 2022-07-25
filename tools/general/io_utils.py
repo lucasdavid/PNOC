@@ -9,7 +9,7 @@ import numpy as np
 
 def create_directory(path):
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
     return path
 
 def str2bool(v):

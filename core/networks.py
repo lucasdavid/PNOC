@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from tools.ai.torch_utils import resize_for_tensors
+from tools.ai.torch_utils import (batchnorm_eval, batchnorm_freeze, freeze_and_eval,
+                                  resize_for_tensors)
 from torchvision import models
 
 from . import ccam, regularizers
@@ -15,8 +16,8 @@ from .abc_modules import ABC_Model
 from .aff_utils import PathIndex
 from .arch_resnest import resnest
 from .arch_resnet import resnet, resnet38d
-from .mcar import mcar_resnet50, mcar_resnet101
 from .deeplab_utils import ASPP, Decoder
+from .mcar import mcar_resnet50, mcar_resnet101
 from .puzzle_utils import merge_features, tile_features
 #######################################################################
 # Normalization
@@ -39,15 +40,11 @@ def group_norm(features):
 
 class Backbone(nn.Module, ABC_Model):
 
-  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
+  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1), norm_fn=nn.BatchNorm2d):
     super().__init__()
 
     self.mode = mode
-
-    if self.mode == 'fix':
-      self.norm_fn = FixedBatchNorm
-    else:
-      self.norm_fn = nn.BatchNorm2d
+    self.norm_fn = norm_fn
 
     if dilated:
       dilation, dilated = 4, True
@@ -64,19 +61,13 @@ class Backbone(nn.Module, ABC_Model):
       self.stage1 = nn.Sequential(self.model.conv1a)
       self.stage2 = nn.Sequential(self.model.b2, self.model.b2_1, self.model.b2_2)
       self.stage3 = nn.Sequential(self.model.b3, self.model.b3_1, self.model.b3_2)
-      self.stage4 = nn.Sequential(
-        self.model.b4, self.model.b4_1, self.model.b4_2, self.model.b4_3, self.model.b4_4, self.model.b4_5
-      )
-      self.stage5 = nn.Sequential(
-        self.model.b5, self.model.b5_1, self.model.b5_2, self.model.b6, self.model.b7, self.model.bn7, nn.ReLU()
-      )
+      self.stage4 = nn.Sequential(self.model.b4, self.model.b4_1, self.model.b4_2, self.model.b4_3, self.model.b4_4, self.model.b4_5)
+      self.stage5 = nn.Sequential(self.model.b5, self.model.b5_1, self.model.b5_2, self.model.b6, self.model.b7, self.model.bn7, nn.ReLU())
     else:
       self.features_out_channels = 2048
 
       if 'resnet' in model_name:
-        self.model = resnet.ResNet(
-          resnet.Bottleneck, resnet.layers_dic[model_name], strides=strides, batch_norm_fn=self.norm_fn
-        )
+        self.model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[model_name], strides=strides, batch_norm_fn=self.norm_fn)
 
         state_dict = model_zoo.load_url(resnet.urls_dic[model_name])
         state_dict.pop('fc.weight')
@@ -84,8 +75,8 @@ class Backbone(nn.Module, ABC_Model):
 
         self.model.load_state_dict(state_dict)
       else:
-        self.model = eval("resnest." +
-                          model_name)(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
+        model_fn = eval("resnest." + model_name)
+        self.model = model_fn(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
 
         del self.model.avgpool
         del self.model.fc
@@ -95,13 +86,17 @@ class Backbone(nn.Module, ABC_Model):
       self.stage3 = nn.Sequential(self.model.layer2)
       self.stage4 = nn.Sequential(self.model.layer3)
       self.stage5 = nn.Sequential(self.model.layer4)
+    
+    if self.mode == 'fix':
+      batchnorm_freeze(self.model)
 
 
 class Classifier(Backbone):
 
-  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, strides=(2, 2, 2, 1), regularization=None):
+  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, strides=(2, 2, 2, 1), regularization=None, trainable_stem=True):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
+    self.trainable_stem = trainable_stem
     self.num_classes = num_classes
     self.regularization = regularization
 
@@ -117,6 +112,20 @@ class Classifier(Backbone):
       raise ValueError(f'Unknown regularization strategy {regularization}.')
 
     self.initialize([self.classifier])
+
+    if not self.trainable_stem:
+      freeze_and_eval(self.stage1)
+  
+  def train(self, mode=True):
+    super().train(mode)
+
+    if not self.trainable_stem:
+      freeze_and_eval(self.stage1)
+
+    if self.mode == 'fix':
+      batchnorm_freeze(self.model)
+      batchnorm_eval(self.model)
+
 
   def forward(self, x, with_cam=False):
     x = self.stage1(x)
@@ -177,7 +186,7 @@ class CCAM(Classifier):
 class AffinityNet(Backbone):
 
   def __init__(self, model_name, path_index=None):
-    super().__init__(model_name, None, 'fix')
+    super().__init__(model_name, None, mode='fix')
 
     in_features = self.features_out_channels
 

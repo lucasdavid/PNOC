@@ -43,11 +43,12 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 # Arch
 ARCHITECTURE=resnest269
 REG=none
-DILATED=false
+DILATED=true
+TRAINABLE_STEM=true
 # Training
 EPOCHS=15
 BATCH=8
-MODE=normal
+MODE=fix
 # OC
 OC_ARCHITECTURE=resnest269
 OC_REG=none
@@ -61,7 +62,7 @@ P_SCHEDULE=0.5
 OC_INIT=0.3
 OC_ALPHA=1.0
 
-TAG=$ARCHITECTURE@puzzleoc@b$BATCH@$OC_STRATEGY
+TAG=$ARCHITECTURE@$MODE@dilated@puzzleoc@b$BATCH@$OC_STRATEGY
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
@@ -70,6 +71,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --architecture      $ARCHITECTURE      \
     --regularization    $REG               \
     --dilated           $DILATED           \
+    --trainable-stem    $TRAINABLE_STEM    \
     --mode              $MODE              \
     --alpha             $P_ALPHA           \
     --alpha_schedule    $P_SCHEDULE        \

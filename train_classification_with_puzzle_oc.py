@@ -48,6 +48,7 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
@@ -190,11 +191,12 @@ if __name__ == '__main__':
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
+    trainable_stem=args.trainable_stem,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
     model.load_state_dict(torch.load(args.restore), strict=True)
-  param_groups = model.get_parameter_groups(print_fn=None)
+  param_groups = model.get_parameter_groups()
 
   gap_fn = model.global_average_pooling_2d
 
