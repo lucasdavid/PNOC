@@ -110,13 +110,13 @@ def batchnorm_eval(model):
       m.eval()
 
 
-def freeze_and_eval(module):
-  for m in module.modules():
+def freeze_and_eval(modules):
+  for m in modules:
+    m.eval()
     for p in ('weight', 'bias'):
       p = getattr(m, p, None)
       if p is not None:
         p.requires_grad = False
-  module.eval()
 
 
 def get_numpy_from_tensor(tensor):

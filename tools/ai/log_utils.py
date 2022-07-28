@@ -16,7 +16,7 @@ def log_print(message, path):
             The type of variable is list.
             the type of each element is string.
     """
-    print(message)
+    print(message, flush=True)
     add_txt(path, message)
 
 class Logger:

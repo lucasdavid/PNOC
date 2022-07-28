@@ -41,19 +41,19 @@ LOGS_DIR=$SCRATCH/logs/puzzle
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Arch
-ARCHITECTURE=resnest269
+ARCHITECTURE=resnest101
 REG=none
-DILATED=true
+DILATED=false
 TRAINABLE_STEM=true
 # Training
 EPOCHS=15
-BATCH=8
-MODE=fix
+BATCH=16
+MODE=normal
 # OC
-OC_ARCHITECTURE=resnest269
+OC_ARCHITECTURE=resnest101
 OC_REG=none
-OC_PRETRAINED=experiments/models/ResNeSt269.pth
-OC_STRATEGY=random
+OC_PRETRAINED=experiments/models/resnest101@randaug.pth
+OC_STRATEGY=balanced
 OC_FOCAL_MOMENTUM=0.8
 OC_FOCAL_GAMMA=5.0
 # Schedule
@@ -62,7 +62,7 @@ P_SCHEDULE=0.5
 OC_INIT=0.3
 OC_ALPHA=1.0
 
-TAG=$ARCHITECTURE@$MODE@dilated@puzzleoc@b$BATCH@$OC_STRATEGY
+TAG=$ARCHITECTURE@$MODE@puzzleoc@b$BATCH@$OC_STRATEGY
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \

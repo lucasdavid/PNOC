@@ -39,9 +39,9 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 DOMAIN=train_aug
 
-ARCHITECTURE=resnest269
-DILATED=false
-WEIGHTS=resnest269@puzzleoc
+ARCHITECTURE=resnest101
+DILATED=true
+WEIGHTS=resnest101@normal-trstem@dilated@puzzleoc@b16@random
 TAG=$WEIGHTS
 
 CUDA_VISIBLE_DEVICES=0,1                  \
@@ -53,17 +53,17 @@ CUDA_VISIBLE_DEVICES=0,1                  \
     --domain       $DOMAIN                \
     --data_dir     $DATA_DIR              &
 
-DILATED=false
-WEIGHTS=resnest269@randaug
-TAG=$WEIGHTS
+# DILATED=false
+# WEIGHTS=ResNeSt269@Puzzle@optimal
+# TAG=$WEIGHTS
 
-CUDA_VISIBLE_DEVICES=2,3                  \
-    $PY inference_classification.py       \
-    --architecture $ARCHITECTURE          \
-    --dilated $DILATED                    \
-    --weights $WEIGHTS                    \
-    --tag $TAG                            \
-    --domain $DOMAIN                      \
-    --data_dir $DATA_DIR &
+# CUDA_VISIBLE_DEVICES=2,3                  \
+#     $PY inference_classification.py       \
+#     --architecture $ARCHITECTURE          \
+#     --dilated $DILATED                    \
+#     --weights $WEIGHTS                    \
+#     --tag $TAG                            \
+#     --domain $DOMAIN                      \
+#     --data_dir $DATA_DIR &
 
 wait

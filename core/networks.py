@@ -40,11 +40,16 @@ def group_norm(features):
 
 class Backbone(nn.Module, ABC_Model):
 
-  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1), norm_fn=nn.BatchNorm2d):
+  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
     super().__init__()
 
     self.mode = mode
-    self.norm_fn = norm_fn
+    if mode == 'normal':
+      self.norm_fn = nn.BatchNorm2d
+    elif mode == 'fix':
+      self.norm_fn = FixedBatchNorm
+    else:
+      raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
     if dilated:
       dilation, dilated = 4, True
@@ -86,9 +91,6 @@ class Backbone(nn.Module, ABC_Model):
       self.stage3 = nn.Sequential(self.model.layer2)
       self.stage4 = nn.Sequential(self.model.layer3)
       self.stage5 = nn.Sequential(self.model.layer4)
-    
-    if self.mode == 'fix':
-      batchnorm_freeze(self.model)
 
 
 class Classifier(Backbone):
@@ -113,19 +115,21 @@ class Classifier(Backbone):
 
     self.initialize([self.classifier])
 
-    if not self.trainable_stem:
-      freeze_and_eval(self.stage1)
-  
+    self.not_training = [self.stage1]
+    self.from_scratch_layers = [self.classifier]
+
   def train(self, mode=True):
     super().train(mode)
 
-    if not self.trainable_stem:
-      freeze_and_eval(self.stage1)
-
-    if self.mode == 'fix':
-      batchnorm_freeze(self.model)
-      batchnorm_eval(self.model)
-
+    # if self.mode == 'fix':
+    #   for c in self.modules():
+    #     if isinstance(c, torch.nn.BatchNorm2d):
+    #       freeze_and_eval([c])
+    #
+    # if not self.trainable_stem:
+    #   for l in self.not_training:
+    #     mods = l.modules() if isinstance(l, torch.nn.Module) else [l]
+    #     freeze_and_eval(mods)
 
   def forward(self, x, with_cam=False):
     x = self.stage1(x)
@@ -142,6 +146,25 @@ class Classifier(Backbone):
       x = self.global_average_pooling_2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
+    
+  def get_parameter_groups(self):
+    groups = ([], [], [], [])
+
+    for m in self.modules():
+      if isinstance(m, (nn.Conv2d, nn.modules.normalization.GroupNorm)):
+        if m.weight.requires_grad:
+          if m in self.from_scratch_layers:
+            groups[2].append(m.weight)
+          else:
+            groups[0].append(m.weight)
+
+        if m.bias is not None and m.bias.requires_grad:
+          if m in self.from_scratch_layers:
+            groups[3].append(m.bias)
+          else:
+            groups[1].append(m.bias)
+    
+    return groups
 
 
 class CCAM(Classifier):
