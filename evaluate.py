@@ -15,6 +15,7 @@ parser.add_argument("--domain", default='train', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--predict_dir", default='', type=str)
+parser.add_argument('--sal_dir', default=None, type=str)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
 parser.add_argument('--logfile', default='', type=str)
@@ -28,16 +29,17 @@ parser.add_argument('--step_th', default=0.05, type=float)
 args = parser.parse_args()
 
 predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
-gt_folder = args.gt_dir
+gt_dir = args.gt_dir
+sal_dir = args.sal_dir
 
 args.list = './data/' + args.domain + '.txt'
 args.predict_dir = predict_folder
 
-categories = [
+CLASSES = [
   'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
   'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
 ]
-num_cls = len(categories)
+NUM_CLASSES = len(CLASSES)
 
 
 def compare(start, step, TP, P, T, name_list):
@@ -45,16 +47,22 @@ def compare(start, step, TP, P, T, name_list):
     name = name_list[idx]
 
     npy_file = os.path.join(predict_folder, name + '.npy')
-    label_file = os.path.join(gt_folder, name + '.png')
+    label_file = os.path.join(gt_dir, name + '.png')
+    sal_file = os.path.join(sal_dir, name + '.png') if sal_dir else None
 
     if os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
 
       if 'hr_cam' in data.keys():
         cams = data['hr_cam']
-        cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
       elif 'rw' in data.keys():
         cams = data['rw']
+
+      if sal_file:
+        sal = np.array(Image.open(sal_file)).astype(float)
+        sal = 1 - sal / 255.
+        cams = np.concatenate((sal[np.newaxis, ...], cams), axis=0)
+      else:
         cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
       keys = data['keys']
@@ -67,7 +75,7 @@ def compare(start, step, TP, P, T, name_list):
     cal = gt < 255
     mask = (pred == gt) * cal
 
-    for i in range(num_cls):
+    for i in range(NUM_CLASSES):
       P[i].acquire()
       P[i].value += np.sum((pred == i) * cal)
       P[i].release()
@@ -79,11 +87,11 @@ def compare(start, step, TP, P, T, name_list):
       TP[i].release()
 
 
-def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8):
+def do_python_eval(name_list, num_cores=8):
   TP = []
   P = []
   T = []
-  for i in range(num_cls):
+  for i in range(NUM_CLASSES):
     TP.append(multiprocessing.Value('i', 0, lock=True))
     P.append(multiprocessing.Value('i', 0, lock=True))
     T.append(multiprocessing.Value('i', 0, lock=True))
@@ -101,7 +109,7 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8
   P_TP = []
   FP_ALL = []
   FN_ALL = []
-  for i in range(num_cls):
+  for i in range(NUM_CLASSES):
     IoU.append(TP[i].value / (T[i].value + P[i].value - TP[i].value + 1e-10))
     T_TP.append(T[i].value / (TP[i].value + 1e-10))
     P_TP.append(P[i].value / (TP[i].value + 1e-10))
@@ -109,12 +117,8 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8
     FN_ALL.append((T[i].value - TP[i].value) / (T[i].value + P[i].value - TP[i].value + 1e-10))
 
   loglist = {}
-  for i in range(num_cls):
-    # if i%2 != 1:
-    #     print('%11s:%7.3f%%'%(categories[i],IoU[i]*100),end='\t')
-    # else:
-    #     print('%11s:%7.3f%%'%(categories[i],IoU[i]*100))
-    loglist[categories[i]] = IoU[i] * 100
+  for i in range(NUM_CLASSES):
+    loglist[CLASSES[i]] = IoU[i] * 100
 
   miou = np.mean(np.array(IoU))
   t_tp = np.mean(np.array(T_TP)[1:])
@@ -122,13 +126,6 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8
   fp_all = np.mean(np.array(FP_ALL)[1:])
   fn_all = np.mean(np.array(FN_ALL)[1:])
   miou_foreground = np.mean(np.array(IoU)[1:])
-  # print('\n======================================================')
-  # print('%11s:%7.3f%%'%('mIoU',miou*100))
-  # print('%11s:%7.3f'%('T/TP',t_tp))
-  # print('%11s:%7.3f'%('P/TP',p_tp))
-  # print('%11s:%7.3f'%('FP/ALL',fp_all))
-  # print('%11s:%7.3f'%('FN/ALL',fn_all))
-  # print('%11s:%7.3f'%('miou_foreground',miou_foreground))
   loglist['mIoU'] = miou * 100
   loglist['t_tp'] = t_tp
   loglist['p_tp'] = p_tp
@@ -140,11 +137,11 @@ def do_python_eval(predict_folder, gt_folder, name_list, num_cls=21, num_cores=8
 
 if __name__ == '__main__':
   df = pd.read_csv(args.list, names=['filename'])
-  name_list = df['filename'].values
+  filenames = df['filename'].values
 
   if args.mode == 'png':
-    report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
-    print('mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(report['mIoU'], report['fp_all'], report['fn_all']))
+    r = do_python_eval(filenames)
+    print('mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(r['mIoU'], r['fp_all'], r['fn_all']))
   elif args.mode == 'rw':
     thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
 
@@ -156,9 +153,9 @@ if __name__ == '__main__':
 
     for t in thresholds:
       args.threshold = t
-      report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
+      r = do_python_eval(filenames)
 
-      mIoU, FP = report['mIoU'], report['fp_all']
+      mIoU, FP = r['mIoU'], r['fp_all']
 
       print('Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t, mIoU, FP))
 
@@ -192,32 +189,22 @@ if __name__ == '__main__':
     print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, over_FP))
     print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, under_FP))
   else:
-    if args.threshold is None:
-      thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
+    miou_ = 0
+    threshold_ = iou_ = None
 
-      threshold_ = 0
-      miou_ = 0
+    thresholds = (np.arange(args.min_th, args.max_th, args.step_th).tolist()
+                  if args.threshold is None and sal_dir is None
+                  else [args.threshold])
 
-      for t in thresholds:
-        args.threshold = t
-        report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
-        print(
-          'Th={:.2f}, mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(
-            args.threshold, report['mIoU'], report['fp_all'], report['fn_all']
-          )
-        )
+    for t in thresholds:
+      args.threshold = t
+      r = do_python_eval(filenames)
+      print(f"Th={t} mIoU={r['mIoU']:.5f}% FP={r['fp_all']:.5%} FN={r['fn_all']:.5%}")
 
-        if report['mIoU'] > miou_:
-          threshold_ = t
-          miou_ = report['mIoU']
-          iou_ = report
+      if r['mIoU'] > miou_:
+        threshold_ = t
+        miou_ = r['mIoU']
+        iou_ = r
 
-      print(f'Best Th={threshold_:.2f}, mIoU={miou_:.3f}%')
-      print(*(f'{k}\t{v}' for k, v in iou_.items()), sep='\n')
-    else:
-      report = do_python_eval(args.predict_dir, args.gt_dir, name_list, 21)
-      print(
-        'Th={:.2f}, mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(
-          args.threshold, report['mIoU'], report['fp_all'], report['fn_all']
-        )
-      )
+    print(f'Best Th={threshold_} mIoU={miou_:.5f}%')
+    print(*(f'{k:<12}\t{v:.5f}%' for k, v in iou_.items()), sep='\n')
