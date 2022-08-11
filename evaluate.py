@@ -2,7 +2,6 @@ import argparse
 import multiprocessing
 import os
 
-import torch
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -47,10 +46,13 @@ def compare(start, step, TP, P, T, name_list):
     name = name_list[idx]
 
     npy_file = os.path.join(predict_folder, name + '.npy')
+    png_file = os.path.join(predict_folder, name + '.png')
     label_file = os.path.join(gt_dir, name + '.png')
     sal_file = os.path.join(sal_dir, name + '.png') if sal_dir else None
 
-    if os.path.exists(npy_file):
+    if os.path.exists(png_file):
+      y_pred = np.array(Image.open(predict_folder + name + '.png'))
+    elif os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
 
       if 'hr_cam' in data.keys():
@@ -66,24 +68,24 @@ def compare(start, step, TP, P, T, name_list):
         cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
       keys = data['keys']
-      pred = keys[np.argmax(cams, axis=0)]
+      y_pred = keys[np.argmax(cams, axis=0)]
     else:
-      pred = np.array(Image.open(predict_folder + name + '.png'))
+      raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
 
-    gt = np.array(Image.open(label_file))
+    y_true = np.array(Image.open(label_file))
 
-    cal = gt < 255
-    mask = (pred == gt) * cal
+    valid_mask = y_true < 255
+    mask = (y_pred == y_true) * valid_mask
 
     for i in range(NUM_CLASSES):
       P[i].acquire()
-      P[i].value += np.sum((pred == i) * cal)
+      P[i].value += np.sum((y_pred == i) * valid_mask)
       P[i].release()
       T[i].acquire()
-      T[i].value += np.sum((gt == i) * cal)
+      T[i].value += np.sum((y_true == i) * valid_mask)
       T[i].release()
       TP[i].acquire()
-      TP[i].value += np.sum((gt == i) * mask)
+      TP[i].value += np.sum((y_true == i) * mask)
       TP[i].release()
 
 
@@ -139,72 +141,61 @@ if __name__ == '__main__':
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
-  if args.mode == 'png':
+  miou_ = 0
+  threshold_ = iou_ = fp_ = 0.
+  miou_history = []
+  fp_history = []
+
+  thresholds = (
+    np.arange(args.min_th, args.max_th, args.step_th).tolist()
+    if args.threshold is None and sal_dir is None and args.mode != 'png' else [args.threshold]
+  )
+
+  for t in thresholds:
+    args.threshold = t
     r = do_python_eval(filenames)
-    print('mIoU={:.3f}%, FP={:.4f}, FN={:.4f}'.format(r['mIoU'], r['fp_all'], r['fn_all']))
-  elif args.mode == 'rw':
-    thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
 
-    over_activation = 1.60
-    under_activation = 0.60
+    print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
 
-    mIoU_list = []
-    FP_list = []
+    fp_history.append(r['fp_all'])
+    miou_history.append(r['mIoU'])
 
-    for t in thresholds:
-      args.threshold = t
-      r = do_python_eval(filenames)
+    if r['mIoU'] > miou_:
+      threshold_ = t
+      miou_ = r['mIoU']
+      fp_ = r['fp_all']
+      iou_ = r
 
-      mIoU, FP = r['mIoU'], r['fp_all']
+  print(
+    f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}',
+    '-' * 80,
+    *(f'{k:<12}\t{v:.5f}' for k, v in iou_.items()),
+    '-' * 80,
+    sep='\n'
+  )
 
-      print('Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t, mIoU, FP))
+  if args.mode == 'rw':
+    a_over = 1.60
+    a_under = 0.60
 
-      FP_list.append(FP)
-      mIoU_list.append(mIoU)
+    fp_over = fp_ * a_over
+    fp_under = fp_ * a_under
 
-    best_index = np.argmax(mIoU_list)
-    threshold_ = thresholds[best_index]
-    miou_ = mIoU_list[best_index]
-    best_FP = FP_list[best_index]
+    print('Over FP : {:.4f}, Under FP : {:.4f}'.format(fp_over, fp_under))
 
-    over_FP = best_FP * over_activation
-    under_FP = best_FP * under_activation
-
-    print('Over FP : {:.4f}, Under FP : {:.4f}'.format(over_FP, under_FP))
-
-    over_loss_list = [np.abs(FP - over_FP) for FP in FP_list]
-    under_loss_list = [np.abs(FP - under_FP) for FP in FP_list]
+    over_loss_list = [np.abs(FP - fp_over) for FP in fp_history]
+    under_loss_list = [np.abs(FP - fp_under) for FP in fp_history]
 
     over_index = np.argmin(over_loss_list)
     over_th = thresholds[over_index]
-    over_mIoU = mIoU_list[over_index]
-    over_FP = FP_list[over_index]
+    over_mIoU = miou_history[over_index]
+    fp_over = fp_history[over_index]
 
     under_index = np.argmin(under_loss_list)
     under_th = thresholds[under_index]
-    under_mIoU = mIoU_list[under_index]
-    under_FP = FP_list[under_index]
+    under_mIoU = miou_history[under_index]
+    fp_under = fp_history[under_index]
 
-    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_, miou_, best_FP))
-    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, over_FP))
-    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, under_FP))
-  else:
-    miou_ = 0
-    threshold_ = iou_ = None
-
-    thresholds = (np.arange(args.min_th, args.max_th, args.step_th).tolist()
-                  if args.threshold is None and sal_dir is None
-                  else [args.threshold])
-
-    for t in thresholds:
-      args.threshold = t
-      r = do_python_eval(filenames)
-      print(f"Th={t} mIoU={r['mIoU']:.5f}% FP={r['fp_all']:.5%} FN={r['fn_all']:.5%}")
-
-      if r['mIoU'] > miou_:
-        threshold_ = t
-        miou_ = r['mIoU']
-        iou_ = r
-
-    print(f'Best Th={threshold_} mIoU={miou_:.5f}%')
-    print(*(f'{k:<12}\t{v:.5f}%' for k, v in iou_.items()), sep='\n')
+    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_, miou_, fp_))
+    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, fp_over))
+    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, fp_under))

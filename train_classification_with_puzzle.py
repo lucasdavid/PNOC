@@ -65,7 +65,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.1, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # Network
     ###################################################################################
     model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode)
-    param_groups = model.get_parameter_groups(print_fn=None)
+    param_groups = model.get_parameter_groups()
     
     gap_fn = model.global_average_pooling_2d
 
@@ -444,8 +444,8 @@ if __name__ == '__main__':
             if best_train_mIoU == -1 or best_train_mIoU < mIoU:
                 best_train_mIoU = mIoU
 
-                save_model_fn()
-                log_func('[i] save model')
+            save_model_fn()
+            log_func('[i] save model')
 
             data = {
                 'iteration' : iteration + 1,

@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=24
-#SBATCH -p nvidia_long
-#SBATCH -J mk-aff
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/mk-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --ntasks-per-node=48
+#SBATCH -p sequana_gpu_shared
+#SBATCH -J tr-aff
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/train-%j.out
+#SBATCH --time=8:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -30,25 +30,28 @@ nodeset -e $SLURM_JOB_NODELIST
 
 cd $SCRATCH/PuzzleCAM
 
-# module load sequana/current
-# module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
-module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
+module load sequana/current
+module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
 PY=python3.9
-SOURCE=make_affinity_labels.py
+SOURCE=train_affinitynet.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
+# Architecture
 ARCHITECTURE=resnest269
-DILATED=false
+# Dataset
+BATCH_SIZE=32
+LABEL=resnest269@puzzlerep@train@scale=0.5,1.0,1.5,2.0@aff_fg=0.40_bg=0.10
+# Training
+LR=0.1
+# Labels
+TAG=AffinityNet@resnest269@puzzlerep@aff_fg=0.40_bg=0.10
 
-DOMAIN=train_aug
-EXPERIMENT=resnest269@puzzlerep@train@scale=0.5,1.0,1.5,2.0
-
-$PY $SOURCE                       \
-    --experiment_name $EXPERIMENT \
-    --domain train_aug            \
-    --fg_threshold 0.4            \
-    --bg_threshold 0.1            \
-    --data_dir $DATA_DIR &
-
-wait
+CUDA_VISIBLE_DEVICES=0,1,2,3     \
+$PY $SOURCE                      \
+    --architecture $ARCHITECTURE \
+    --tag          $TAG          \
+    --label_name   $LABEL        \
+    --batch_size   $BATCH_SIZE   \
+    --lr           $LR           \
+    --data_dir     $DATA_DIR

@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J inf-rs269-rand
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/inf-%j.out
-#SBATCH --time=36:00:00
+#SBATCH -J tr-puzzle
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/puz-%j.out
+#SBATCH --time=16:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -21,7 +21,8 @@
 # limitations under the License.
 
 #
-# CAMs Inference.
+# Train ResNeSt269 to perform multilabel classification
+# task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
 echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -32,25 +33,23 @@ cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
-# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
+SOURCE=train_classification_with_puzzle.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-DOMAIN=train_aug
-DILATED=false
-
 ARCHITECTURE=resnest269
-WEIGHTS=resnest269@puzzlerep2
-TAG=$WEIGHTS
+BATCH=16
+TAG=$ARCHITECTURE@puzzlerep2
 
-CUDA_VISIBLE_DEVICES=0                    \
-    $PY inference_classification.py       \
-    --architecture $ARCHITECTURE          \
-    --dilated      $DILATED               \
-    --weights      $WEIGHTS               \
-    --tag          $TAG                   \
-    --domain       $DOMAIN                \
-    --data_dir     $DATA_DIR              &
-
-wait
+CUDA_VISIBLE_DEVICES=0,1,2,3        \
+    $PY $SOURCE                     \
+    --architecture   $ARCHITECTURE  \
+    --batch_size     $BATCH         \
+    --mode           normal         \
+    --re_loss_option masking        \
+    --re_loss        L1_Loss        \
+    --alpha_schedule 0.50           \
+    --alpha          4.00           \
+    --tag            $TAG           \
+    --data_dir       $DATA_DIR

@@ -62,7 +62,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.1, type=float)
+parser.add_argument('--print_ratio', default=0.3, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     ###################################################################################
     # Network
     ###################################################################################
-    model = AffinityNet(args.architecture, path_index)
+    model = AffinityNet(args.architecture, path_index=path_index)
     
     param_groups = list(model.edge_layers.parameters())
 
@@ -246,14 +246,14 @@ if __name__ == '__main__':
             data_dic['train'].append(data)
             write_json(data_path, data_dic)
             
-            log_func('[i] \
-                iteration={iteration:,}, \
-                learning_rate={learning_rate:.4f}, \
-                loss={loss:.4f}, \
-                bg_loss={bg_loss:.4f}, \
-                fg_loss={fg_loss:.4f}, \
-                neg_loss={neg_loss:.4f}, \
-                time={time:.0f}sec'.format(**data)
+            log_func('[i] '
+              'iteration={iteration:,}, '
+              'learning_rate={learning_rate:.4f}, '
+              'loss={loss:.4f}, '
+              'bg_loss={bg_loss:.4f}, '
+              'fg_loss={fg_loss:.4f}, '
+              'neg_loss={neg_loss:.4f}, '
+              'time={time:.0f}sec'.format(**data)
             )
 
             writer.add_scalar('Train/loss', loss, iteration)

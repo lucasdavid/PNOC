@@ -7,15 +7,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from tools.ai.torch_utils import (batchnorm_eval, batchnorm_freeze, freeze_and_eval,
-                                  resize_for_tensors)
+from tools.ai.torch_utils import resize_for_tensors
 from torchvision import models
 
 from . import ccam, regularizers
 from .abc_modules import ABC_Model
 from .aff_utils import PathIndex
-from .arch_resnest import resnest
-from .arch_resnet import resnet, resnet38d
 from .deeplab_utils import ASPP, Decoder
 from .mcar import mcar_resnet50, mcar_resnet101
 from .puzzle_utils import merge_features, tile_features
@@ -37,6 +34,54 @@ def group_norm(features):
 
 #######################################################################
 
+def build_backbone(name, dilated, strides, norm_fn):
+  if dilated:
+    dilation, dilated = 4, True
+  else:
+    dilation, dilated = 2, False
+
+  if 'resnet38d' == name:
+    from .arch_resnet import resnet38d
+    out_features = 4096
+
+    model = resnet38d.ResNet38d()
+    state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
+    model.load_state_dict(state_dict, strict=True)
+
+    stage1 = nn.Sequential(model.conv1a)
+    stage2 = nn.Sequential(model.b2, model.b2_1, model.b2_2)
+    stage3 = nn.Sequential(model.b3, model.b3_1, model.b3_2)
+    stage4 = nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5)
+    stage5 = nn.Sequential(model.b5, model.b5_1, model.b5_2, model.b6, model.b7, model.bn7, nn.ReLU())
+  else:
+    out_features = 2048
+
+    if 'resnet' in name:
+      from .arch_resnet import resnet
+      model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn)
+
+      state_dict = model_zoo.load_url(resnet.urls_dic[name])
+      state_dict.pop('fc.weight')
+      state_dict.pop('fc.bias')
+
+      model.load_state_dict(state_dict)
+    else:
+      from .arch_resnest import resnest
+
+      model_fn = getattr(resnest, name)
+      model = model_fn(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+
+      del model.avgpool
+      del model.fc
+
+    stage1 = nn.Sequential(model.conv1, model.bn1, model.relu, model.maxpool)
+    stage2 = nn.Sequential(model.layer1)
+    stage3 = nn.Sequential(model.layer2)
+    stage4 = nn.Sequential(model.layer3)
+    stage5 = nn.Sequential(model.layer4)
+    
+  return out_features, model, (stage1, stage2, stage3, stage4, stage5)
+
 
 class Backbone(nn.Module, ABC_Model):
 
@@ -51,46 +96,10 @@ class Backbone(nn.Module, ABC_Model):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    if dilated:
-      dilation, dilated = 4, True
-    else:
-      dilation, dilated = 2, False
-
-    if 'resnet38d' == model_name:
-      self.features_out_channels = 4096
-
-      self.model = resnet38d.ResNet38d()
-      state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
-      self.model.load_state_dict(state_dict, strict=True)
-
-      self.stage1 = nn.Sequential(self.model.conv1a)
-      self.stage2 = nn.Sequential(self.model.b2, self.model.b2_1, self.model.b2_2)
-      self.stage3 = nn.Sequential(self.model.b3, self.model.b3_1, self.model.b3_2)
-      self.stage4 = nn.Sequential(self.model.b4, self.model.b4_1, self.model.b4_2, self.model.b4_3, self.model.b4_4, self.model.b4_5)
-      self.stage5 = nn.Sequential(self.model.b5, self.model.b5_1, self.model.b5_2, self.model.b6, self.model.b7, self.model.bn7, nn.ReLU())
-    else:
-      self.features_out_channels = 2048
-
-      if 'resnet' in model_name:
-        self.model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[model_name], strides=strides, batch_norm_fn=self.norm_fn)
-
-        state_dict = model_zoo.load_url(resnet.urls_dic[model_name])
-        state_dict.pop('fc.weight')
-        state_dict.pop('fc.bias')
-
-        self.model.load_state_dict(state_dict)
-      else:
-        model_fn = eval("resnest." + model_name)
-        self.model = model_fn(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=self.norm_fn)
-
-        del self.model.avgpool
-        del self.model.fc
-
-      self.stage1 = nn.Sequential(self.model.conv1, self.model.bn1, self.model.relu, self.model.maxpool)
-      self.stage2 = nn.Sequential(self.model.layer1)
-      self.stage3 = nn.Sequential(self.model.layer2)
-      self.stage4 = nn.Sequential(self.model.layer3)
-      self.stage5 = nn.Sequential(self.model.layer4)
+    (out_features, model, stages) = build_backbone(model_name, dilated, strides, self.norm_fn)
+    self.model = model
+    self.out_features = out_features
+    self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
 
 
 class Classifier(Backbone):
@@ -102,7 +111,7 @@ class Classifier(Backbone):
     self.num_classes = num_classes
     self.regularization = regularization
 
-    features = self.features_out_channels
+    features = self.out_features
 
     if not regularization or regularization.lower() == 'none':
       self.classifier = nn.Conv2d(features, num_classes, 1, bias=False)
@@ -117,19 +126,6 @@ class Classifier(Backbone):
 
     self.not_training = [self.stage1]
     self.from_scratch_layers = [self.classifier]
-
-  def train(self, mode=True):
-    super().train(mode)
-
-    # if self.mode == 'fix':
-    #   for c in self.modules():
-    #     if isinstance(c, torch.nn.BatchNorm2d):
-    #       freeze_and_eval([c])
-    #
-    # if not self.trainable_stem:
-    #   for l in self.not_training:
-    #     mods = l.modules() if isinstance(l, torch.nn.Module) else [l]
-    #     freeze_and_eval(mods)
 
   def forward(self, x, with_cam=False):
     x = self.stage1(x)
@@ -208,10 +204,10 @@ class CCAM(Classifier):
 
 class AffinityNet(Backbone):
 
-  def __init__(self, model_name, path_index=None):
-    super().__init__(model_name, None, mode='fix')
+  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
+    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
-    in_features = self.features_out_channels
+    in_features = self.out_features
 
     if '50' in model_name:
       fc_edge1_features = 64
@@ -316,16 +312,16 @@ class AffinityNet(Backbone):
 
 class DeepLabv3_Plus(Backbone):
 
-  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, regularization=None, use_group_norm=False):
+  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=(2, 2, 2, 1), use_group_norm=False):
     # model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
-    super().__init__(model_name, num_classes, mode=mode, dilated=dilated, regularization=regularization)
+    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     if use_group_norm:
       norm_fn_for_extra_modules = group_norm
     else:
       norm_fn_for_extra_modules = self.norm_fn
 
-    in_features = self.features_out_channels
+    in_features = self.out_features
 
     self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn_for_extra_modules)
     self.decoder = Decoder(num_classes, 256, norm_fn_for_extra_modules)
