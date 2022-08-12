@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J focal-rs269
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/focal-%j.out
+#SBATCH -J tr-oc
+#SBATCH -o /scratch/lerdl/lucas.david/logs/occse/tr-%j.out
 #SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -36,13 +36,14 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
-SOURCE=train_classification_with_puzzle_oc.py
+SOURCE=train_occse.py
+
 LOGS_DIR=$SCRATCH/logs/puzzle
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Dataset
 BATCH=16
-# AUGMENT=colorjitter_randaugment
+AUGMENT=colorjitter  # _randaugment
 # Arch
 ARCHITECTURE=resnest269
 REG=none
@@ -67,12 +68,13 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=$ARCHITECTURE@$MODE@puzzleoc@e$EPOCHS@b$BATCH@$OC_STRATEGY
+TAG=$ARCHITECTURE@$MODE@b$BATCH@$oc
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
     --max_epoch         $EPOCHS            \
     --batch_size        $BATCH             \
+    --augment           $AUGMENT           \
     --architecture      $ARCHITECTURE      \
     --regularization    $REG               \
     --dilated           $DILATED           \
@@ -85,11 +87,19 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --oc-alpha-schedule $OC_SCHEDULE       \
     --oc-focal-momentum $OC_FOCAL_MOMENTUM \
     --oc-focal-gamma    $OC_FOCAL_GAMMA    \
-    --alpha             $P_ALPHA           \
-    --alpha_init        $P_INIT            \
-    --alpha_schedule    $P_SCHEDULE        \
     --oc-alpha          $OC_ALPHA          \
     --oc-alpha-init     $OC_INIT           \
     --tag               $TAG               \
     --data_dir          $DATA_DIR
-    # --augment           $AUGMENT           \
+
+# $PY $SOURCE                          \
+#   --device          $DEVICE          \
+#   --num_workers     $WORKERS         \
+#   --architecture    $ARCHITECTURE    \
+#   --dilated         $DILATED         \
+#   --mode            $MODE            \
+#   --trainable-stem  $TRAINABLE_STEM  \
+#   --oc-architecture $OC_ARCHITECTURE \
+#   --oc-pretrained   $OC_PRETRAINED   \
+#   --image_size      $IMAGE_SIZE      \
+#   --data_dir        $DATA_DIR

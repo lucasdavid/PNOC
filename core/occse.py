@@ -6,6 +6,7 @@ import torch.nn.functional as F
 def random_label_split(label, k, choices):
   bs = label.shape[0]
   y_mask = torch.zeros_like(label)
+  indices = []
 
   for i in range(bs):
     label_idx = torch.nonzero(label[i], as_tuple=False)  # [0, 1, 14]
@@ -14,12 +15,15 @@ def random_label_split(label, k, choices):
     y_mask[i, target] = 1
     choices[target] += 1
 
-  return y_mask
+    indices.append(target)
+
+  return y_mask, indices
 
 
 def balanced_label_split(label, k, choices, gamma=1.0):
   bs = label.shape[0]
   y_mask = torch.zeros_like(label)
+  indices = []
 
   for i in range(bs):
     p = (1 / choices**gamma)    # inv. prop. to the number of times chosen
@@ -30,12 +34,15 @@ def balanced_label_split(label, k, choices, gamma=1.0):
     y_mask[i, target] = 1
     choices[target] += 1
 
-  return y_mask
+    indices.append(target)
+
+  return y_mask, indices
 
 
 def focal_label_split(label, k, choices, focal_factor):
   bs = label.shape[0]
   y_mask = torch.zeros_like(label)
+  indices = []
 
   for i in range(bs):
     p = focal_factor  # prop. to the focal factor
@@ -43,10 +50,11 @@ def focal_label_split(label, k, choices, focal_factor):
 
     target = torch.multinomial(p, k)
     y_mask[i, target] = 1
-
     choices[target] += 1
 
-  return y_mask
+    indices.append(target)
+
+  return y_mask, indices
 
 
 def split_label(
@@ -57,15 +65,15 @@ def split_label(
   strategy='random',  # args.label_split
 ):
   if strategy == 'random':
-    y_mask = random_label_split(label, k, choices)
+    y_mask, indices = random_label_split(label, k, choices)
   elif strategy == 'balanced':
-    y_mask = balanced_label_split(label, k, choices)
+    y_mask, indices = balanced_label_split(label, k, choices)
   elif strategy == 'focal':
-    y_mask = focal_label_split(label, k, choices, focal_factor)
+    y_mask, indices = focal_label_split(label, k, choices, focal_factor)
   else:
     raise ValueError('Only `random` and `focus` are available.')
 
-  return y_mask
+  return y_mask, indices
 
 
 def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_balancing=False):
