@@ -155,7 +155,7 @@ class VOC_Dataset_For_WSSS(VOC_Dataset):
     def __getitem__(self, index):
         image, image_id = super().__getitem__(index)
         mask = Image.open(self.pred_dir + image_id + '.png')
-        
+
         if self.transform is not None:
             input_dic = {'image':image, 'mask':mask}
             output_dic = self.transform(input_dic)

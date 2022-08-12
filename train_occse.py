@@ -1,38 +1,39 @@
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
-import os
-import sys
-import copy
-import shutil
-import random
-import argparse
-import numpy as np
+from torch.backends import cudnn
+cudnn.enabled = True
 
+import argparse
+import copy
+from functools import partial
+import os
+import random
+import shutil
+import sys
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
-
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from torchsummary import summary
+from torchvision import transforms
 
-from core.networks import *
+from core import occse
 from core.datasets import *
-
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
-
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
-
+from core.networks import *
 from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
@@ -50,6 +51,23 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--restore', default=None, type=str)
+
+parser.add_argument('--oc-architecture', default='resnet50', type=str)
+parser.add_argument('--oc-regularization', default=None, type=str)
+parser.add_argument('--oc-pretrained', required=True, type=str)
+parser.add_argument('--oc-strategy', default='random', type=str)
+parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
+parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
+
+parser.add_argument('--oc-alpha', default=1.0, type=float)
+parser.add_argument('--oc-alpha-init', default=0.3, type=float)
+parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
+parser.add_argument('--oc-k', default=1.0, type=float)
+parser.add_argument('--oc-k-init', default=1.0, type=float)
+parser.add_argument('--oc-k-schedule', default=0.0, type=float)
 
 ###############################################################################
 # Hyperparameter
@@ -65,7 +83,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.1, type=float)
+parser.add_argument('--print_ratio', default=0.5, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -77,35 +95,30 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   DEVICE = args.device
+  SEED = args.seed
+  TAG = args.tag
+  SIZES = args.image_size
+  BATCH = args.batch_size
 
-  print('Train Configuration')
-  pad = max(map(len, vars(args))) + 1
-  for k, v in vars(args).items():
-    print(f'{k.ljust(pad)}: {v}')
-  print('===================')
+  set_seed(SEED)
 
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
+  tensorboard_dir = create_directory(f'./experiments/tensorboards/{TAG}/')
 
-  log_path = log_dir + f'{args.tag}.txt'
-  data_path = data_dir + f'{args.tag}.json'
-  model_path = model_dir + f'{args.tag}.pth'
+  log_path = log_dir + f'{TAG}.txt'
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
-  set_seed(args.seed)
-  log_func = lambda string='': log_print(string, log_path)
+  log = partial(log_print, path=log_path)
 
-  log_func('[i] {}'.format(args.tag))
-  log_func()
+  log_config(vars(args), title=f'Train OC-CSE `{TAG}`', print_fn=log)
 
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
-
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
+  in_stats = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 
   train_transforms = [
     RandomResize(args.min_image_size, args.max_image_size),
@@ -118,18 +131,19 @@ if __name__ == '__main__':
     train_transforms.append(RandAugmentMC(n=2, m=10))
 
   train_transform = transforms.Compose(train_transforms + [
-    Normalize(imagenet_mean, imagenet_std),
-    RandomCrop(args.image_size),
+    Normalize(*in_stats),
+    RandomCrop(SIZES),
     Transpose()
   ])
   test_transform = transforms.Compose([
-    Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-    Top_Left_Crop_For_Segmentation(args.image_size),
+    Normalize_For_Segmentation(*in_stats),
+    Top_Left_Crop_For_Segmentation(SIZES),
     Transpose_For_Segmentation()
   ])
 
-  meta_dic = read_json('./data/VOC_2012.json')
-  class_names = np.asarray(meta_dic['class_names'])
+  META = read_json('./data/VOC_2012.json')
+  CLASSES = META['classes']
+  CLASS_NAMES = np.asarray(META['class_names'])
 
   train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
 
@@ -139,41 +153,58 @@ if __name__ == '__main__':
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(meta_dic['classes']))
-  log_func('[i] train_transform is {}'.format(train_transform))
-  log_func('[i] test_transform is {}'.format(test_transform))
-  log_func()
+  log(f'[i] mean/std values are {in_stats}')
+  log(f'[i] The number of class is {CLASSES}')
+  log('[i] train_transform is {}'.format(train_transform))
+  log('[i] test_transform is {}'.format(test_transform))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
-  max_iteration = args.max_epoch * val_iteration
+  step_max = args.max_epoch * val_iteration
 
   # val_iteration = log_iteration
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(step_max))
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(max_iteration))
-
-  ###################################################################################
   # Network
-  ###################################################################################
-  model = Classifier(
-    args.architecture,
-    meta_dic['classes'],
+  classifier_args = dict(
+    model_name=args.architecture,
+    num_classes=CLASSES,
     mode=args.mode,
-    regularization=args.regularization
+    dilated=args.dilated,
+    regularization=args.regularization,
+    trainable_stem=args.trainable_stem,
+    # strides=(1, 2, 2, 1),
   )
-  param_groups = model.get_parameter_groups(print_fn=None)
+  log_config(classifier_args, 'Classifier')
+
+  model = Classifier(**classifier_args)
+  # model.eval(); summary(model, (3, *SIZES))
+
+  if args.restore:
+    print(f'  restoring weights from {args.restore}')
+    model.load_state_dict(torch.load(args.restore), strict=True)
+
+  param_groups = model.get_parameter_groups()
 
   model = model.to(DEVICE)
   model.train()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Regularization is {}'.format(args.regularization))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('  total parameters: %.2fM' % (calculate_parameters(model)))
+  log()
+
+  # Ordinary Classifier.
+  print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
+  oc_nn = Classifier(args.oc_architecture, CLASSES, mode=args.mode, regularization=args.oc_regularization)
+  oc_nn.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device(DEVICE)), strict=True)
+  
+  oc_nn = oc_nn.to(DEVICE)
+  oc_nn.eval()
+  for child in oc_nn.children():
+    for param in child.parameters():
+      param.requires_grad = False
 
   try:
     use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
@@ -182,7 +213,7 @@ if __name__ == '__main__':
 
   the_number_of_gpu = len(use_gpu.split(','))
   if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
 
   load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
@@ -193,10 +224,10 @@ if __name__ == '__main__':
   ###################################################################################
   class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
-  log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
+  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
+  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
+  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
+  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
   optimizer = PolyOptimizer(
     [
@@ -208,7 +239,7 @@ if __name__ == '__main__':
     lr=args.lr,
     momentum=0.9,
     weight_decay=args.wd,
-    max_step=max_iteration,
+    max_step=step_max,
     nesterov=args.nesterov
   )
 
@@ -220,10 +251,13 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss'])
+  train_meter = Average_Meter(['loss', 'c_loss', 'o_loss', 'oc_alpha'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.1, 0.50, 0.05))
+
+  choices = torch.ones(CLASSES).to(DEVICE)
+  focal_factor = torch.ones(CLASSES).to(DEVICE)
 
   def evaluate(loader):
     model.eval()
@@ -253,7 +287,7 @@ if __name__ == '__main__':
             image = get_numpy_from_tensor(images[b])
             cam = get_numpy_from_tensor(obj_cams[b])
 
-            image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
+            image = denormalize(image, in_stats, in_s)[..., ::-1]
             h, w, c = image.shape
 
             cam = (cam * 255).astype(np.uint8)
@@ -263,7 +297,7 @@ if __name__ == '__main__':
             image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
             image = image.astype(np.float32) / 255.
 
-            writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
+            writer.add_image('CAM/{}'.format(b + 1), image, step, dataformats='HWC')
 
         for batch_index in range(images.size()[0]):
           # c, h, w -> h, w, c
@@ -301,67 +335,101 @@ if __name__ == '__main__':
   writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
 
-  for iteration in range(max_iteration):
+  for step in range(step_max):
     images, labels = train_iterator.get()
     images, labels = images.to(DEVICE), labels.to(DEVICE)
 
-    #################################################################################################
-    logits = model(images)
+    ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
 
-    class_loss = class_loss_fn(logits, labels).mean()
-    loss = class_loss
     #################################################################################################
+    logits, features = model(images, with_cam=True)
+
+    c_loss = class_loss_fn(logits, labels).mean()
+    #################################################################################################
+
+    # OC-CSE
+    labels_mask = occse.split_label(labels, 1, choices, focal_factor, args.oc_strategy)
+    labels_oc = labels - labels_mask
+    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
+    o_loss = class_loss_fn(cl_logits, labels_oc).mean()
+
+    loss = (
+      c_loss
+      + ao * o_loss
+    )
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
-    train_meter.add({'loss': loss.item(), 'class_loss': class_loss.item()})
+    occse.update_focal_factor(
+      labels,
+      labels_oc,
+      cl_logits,
+      focal_factor,
+      momentum=args.oc_focal_momentum,
+      gamma=args.oc_focal_gamma
+    )
 
-    #################################################################################################
-    # For Log
-    #################################################################################################
-    if (iteration + 1) % log_iteration == 0:
-      loss, class_loss = train_meter.get(clear=True)
-      learning_rate = float(get_learning_rate_from_optimizer(optimizer))
+    # region logging
+    train_meter.add({
+      'loss': loss.item(),
+      'c_loss': c_loss.item(),
+      'o_loss': o_loss.item(),
+      'oc_alpha': ao,
+    })
+
+    if (step + 1) % log_iteration == 0:
+      (
+        loss,
+        c_loss,
+        o_loss,
+        ao,
+      ) = train_meter.get(clear=True)
+      
+      lr = float(get_learning_rate_from_optimizer(optimizer))
 
       data = {
-        'iteration': iteration + 1,
-        'learning_rate': learning_rate,
+        'iteration': step + 1,
+        'lr': lr,
         'loss': loss,
-        'class_loss': class_loss,
+        'c_loss': c_loss,
+        'o_loss': o_loss,
+        'oc_alpha': ao,
         'time': train_timer.tok(clear=True),
+        'focal_factor': focal_factor.cpu().detach().numpy().round(2).tolist()
       }
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
-        '[i] \
-                iteration={iteration:,}, \
-                learning_rate={learning_rate:.4f}, \
-                loss={loss:.4f}, \
-                class_loss={class_loss:.4f}, \
-                time={time:.0f}sec'.format(**data)
+      log(
+        '\niteration  = {iteration:,}\n'
+        'time         = {time:.0f} sec\n'
+        'lr           = {lr:.4f}\n'
+        'loss         = {loss:.4f}\n'
+        'c_loss       = {c_loss:.4f}\n'
+        'o_loss       = {o_loss:.4f}\n'
+        'oc_alpha     = {oc_alpha:.4f}\n'
+        'focal_factor = {focal_factor}'
+        .format(**data)
       )
 
-      writer.add_scalar('Train/loss', loss, iteration)
-      writer.add_scalar('Train/class_loss', class_loss, iteration)
-      writer.add_scalar('Train/learning_rate', learning_rate, iteration)
+      writer.add_scalar('Train/loss', loss, step)
+      writer.add_scalar('Train/c_loss', c_loss, step)
+      writer.add_scalar('Train/o_loss', o_loss, step)
+      writer.add_scalar('Train/learning_rate', lr, step)
+      writer.add_scalar('Train/oc_alpha', ao, step)
+    # endregion
 
-    #################################################################################################
-    # Evaluation
-    #################################################################################################
-    if (iteration + 1) % val_iteration == 0:
+    # region evaluation
+    if (step + 1) % val_iteration == 0:
       threshold, mIoU = evaluate(train_loader_for_seg)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
 
-        save_model_fn()
-        log_func('[i] save model')
-
       data = {
-        'iteration': iteration + 1,
+        'iteration': step + 1,
         'threshold': threshold,
         'train_mIoU': mIoU,
         'best_train_mIoU': best_train_mIoU,
@@ -370,20 +438,22 @@ if __name__ == '__main__':
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
-        '[i] \
-                iteration={iteration:,}, \
-                threshold={threshold:.2f}, \
-                train_mIoU={train_mIoU:.2f}%, \
-                best_train_mIoU={best_train_mIoU:.2f}%, \
-                time={time:.0f}sec'.format(**data)
+      log(
+        '\niteration       = {iteration:,}\n'
+        'time            = {time:.0f} sec'
+        'threshold       = {threshold:.2f}\n'
+        'train_mIoU      = {train_mIoU:.2f}%\n'
+        'best_train_mIoU = {best_train_mIoU:.2f}%\n'
+        .format(**data)
       )
 
-      writer.add_scalar('Evaluation/threshold', threshold, iteration)
-      writer.add_scalar('Evaluation/train_mIoU', mIoU, iteration)
-      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, iteration)
+      writer.add_scalar('Evaluation/threshold', threshold, step)
+      writer.add_scalar('Evaluation/train_mIoU', mIoU, step)
+      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, step)
+
+      save_model_fn()
+      log('[i] save model')
+    # endregion
 
   write_json(data_path, data_dic)
   writer.close()
-
-  print(args.tag)

@@ -4,7 +4,21 @@
 import numpy as np
 from tools.general.txt_utils import add_txt
 
-def log_print(message, path):
+def log_config(args, title=None, print_fn=print):
+  margin = '=' * 80
+  print_fn(margin)
+  if title:
+    print_fn(title)
+    print_fn()
+
+  pad = max(map(len, args)) + 1
+  for k, v in args.items():
+    print_fn(f'{k.ljust(pad)}: {v}')
+  
+  print_fn(margin)
+
+
+def log_print(message='', path=None):
     """This function shows message and saves message.
     
     Args:
@@ -17,7 +31,8 @@ def log_print(message, path):
             the type of each element is string.
     """
     print(message, flush=True)
-    add_txt(path, message)
+    if path:
+      add_txt(path, message)
 
 class Logger:
     def __init__(self):

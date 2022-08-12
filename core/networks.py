@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from tools.ai.torch_utils import resize_for_tensors
+from tools.ai.torch_utils import freeze_and_eval, resize_for_tensors
 from torchvision import models
 
 from . import ccam, regularizers
@@ -33,6 +33,7 @@ def group_norm(features):
 
 
 #######################################################################
+
 
 def build_backbone(name, dilated, strides, norm_fn):
   if dilated:
@@ -79,7 +80,7 @@ def build_backbone(name, dilated, strides, norm_fn):
     stage3 = nn.Sequential(model.layer2)
     stage4 = nn.Sequential(model.layer3)
     stage5 = nn.Sequential(model.layer4)
-    
+
   return out_features, model, (stage1, stage2, stage3, stage4, stage5)
 
 
@@ -104,28 +105,46 @@ class Backbone(nn.Module, ABC_Model):
 
 class Classifier(Backbone):
 
-  def __init__(self, model_name, num_classes=20, mode='fix', dilated=False, strides=(2, 2, 2, 1), regularization=None, trainable_stem=True):
+  def __init__(
+    self,
+    model_name,
+    num_classes=20,
+    mode='fix',
+    dilated=False,
+    strides=(2, 2, 2, 1),
+    regularization=None,
+    trainable_stem=True
+  ):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     self.trainable_stem = trainable_stem
     self.num_classes = num_classes
     self.regularization = regularization
 
-    features = self.out_features
+    cin = self.out_features
 
     if not regularization or regularization.lower() == 'none':
-      self.classifier = nn.Conv2d(features, num_classes, 1, bias=False)
+      self.classifier = nn.Conv2d(cin, num_classes, 1, bias=False)
     elif regularization.lower() in ('kernel_usage', 'ku'):
-      self.classifier = regularizers.Conv2dKU(features, num_classes, 1, bias=False)
+      self.classifier = regularizers.Conv2dKU(cin, num_classes, 1, bias=False)
     elif regularization.lower() in ('minmax', 'minmaxcam'):
-      self.classifier = regularizers.MinMaxConv2d(features, num_classes, 1, bias=False)
+      self.classifier = regularizers.MinMaxConv2d(cin, num_classes, 1, bias=False)
     else:
       raise ValueError(f'Unknown regularization strategy {regularization}.')
 
+    self.not_training = []
+    self.from_scratch_layers = [self.classifier]
+
+    if self.trainable_stem:
+      self.not_training += [self.stage1]
+
     self.initialize([self.classifier])
 
-    self.not_training = [self.stage1]
-    self.from_scratch_layers = [self.classifier]
+  def train(self, mode=True):
+    super().train(mode)
+    freeze_and_eval(self.not_training)
+
+    return self
 
   def forward(self, x, with_cam=False):
     x = self.stage1(x)
@@ -142,7 +161,7 @@ class Classifier(Backbone):
       x = self.global_average_pooling_2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
-    
+
   def get_parameter_groups(self):
     groups = ([], [], [], [])
 
@@ -159,7 +178,7 @@ class Classifier(Backbone):
             groups[3].append(m.bias)
           else:
             groups[1].append(m.bias)
-    
+
     return groups
 
 
@@ -180,6 +199,7 @@ class CCAM(Classifier):
     )
 
     self.ac_head = ccam.Disentangler(cin)
+    self.from_scratch_layers += [self.ac_head]
 
   def forward(self, x, with_cam=False, inference=False):
     x = self.stage1(x)
