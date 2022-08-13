@@ -101,21 +101,13 @@ if __name__ == '__main__':
 
     normalize_fn = Normalize(imagenet_mean, imagenet_std)
     
-    train_transforms = [
-        RandomResize_For_Segmentation(args.min_image_size, args.max_image_size),
-        RandomHorizontalFlip_For_Segmentation(),
-        
-        Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-        RandomCrop_For_Segmentation(args.image_size),
-    ]
-    
-    # if 'Seg' in args.architecture:
-    #     if 'C' in args.architecture:
-    #         train_transforms.append(Resize_For_Mask(args.image_size // 4))
-    #     else:
-    #         train_transforms.append(Resize_For_Mask(args.image_size // 8))
-
-    train_transform = transforms.Compose(train_transforms + [Transpose_For_Segmentation()])
+    train_transform = transforms.Compose([
+      RandomResize_For_Segmentation(args.min_image_size, args.max_image_size),
+      RandomHorizontalFlip_For_Segmentation(),
+      Normalize_For_Segmentation(imagenet_mean, imagenet_std),
+      RandomCrop_For_Segmentation(args.image_size),
+      Transpose_For_Segmentation()
+    ])
     
     test_transform = transforms.Compose([
         Normalize_For_Segmentation(imagenet_mean, imagenet_std),

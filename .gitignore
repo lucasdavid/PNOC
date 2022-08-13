@@ -14,3 +14,6 @@ CopyrightReceipt.pdf
 demo.py
 compare_*
 data/
+
+.ipynb_checkpoints/
+experiments

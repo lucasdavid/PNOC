@@ -68,7 +68,11 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=$ARCHITECTURE@$MODE@b$BATCH@$oracle
+W=0.5
+W_FG=0.25
+W_BG=0.25
+
+TAG=$ARCHITECTURE@$MODE@b$BATCH@$oracle@w-$W-wfg-$W_FG-wbg-$W_BG
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
@@ -79,15 +83,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --dilated           $DILATED           \
     --trainable-stem    $TRAINABLE_STEM    \
     --mode              $MODE              \
-    --oc-architecture   $OC_ARCHITECTURE   \
-    --oc-pretrained     $OC_PRETRAINED     \
-    --oc-regularization $OC_REG            \
-    --oc-strategy       $OC_STRATEGY       \
-    --oc-alpha-schedule $OC_SCHEDULE       \
-    --oc-focal-momentum $OC_FOCAL_MOMENTUM \
-    --oc-focal-gamma    $OC_FOCAL_GAMMA    \
-    --oc-alpha          $OC_ALPHA          \
-    --oc-alpha-init     $OC_INIT           \
+    --w                 $W                 \
+    --w-fg              $W_FG              \
+    --w-bg              $W_BG              \
     --tag               $TAG               \
     --data_dir          $DATA_DIR
     # --augment           $AUGMENT           \

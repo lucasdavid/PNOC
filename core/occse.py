@@ -73,7 +73,7 @@ def split_label(
   else:
     raise ValueError('Only `random` and `focus` are available.')
 
-  return y_mask, indices
+  return y_mask, torch.cat(indices, dim=0)
 
 
 def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_balancing=False):

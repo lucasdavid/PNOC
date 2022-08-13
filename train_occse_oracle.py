@@ -41,6 +41,7 @@ parser = argparse.ArgumentParser()
 
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
+parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
@@ -52,12 +53,16 @@ parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
-parser.add_argument('--oc-architecture', default='resnet50', type=str)
-parser.add_argument('--oc-regularization', default=None, type=str)
-parser.add_argument('--oc-pretrained', required=True, type=str)
-parser.add_argument('--oc-strategy', default='random', type=str)
-parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
-parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
+# parser.add_argument('--oc-architecture', default='resnet50', type=str)
+# parser.add_argument('--oc-regularization', default=None, type=str)
+# parser.add_argument('--oc-pretrained', required=True, type=str)
+# parser.add_argument('--oc-strategy', default='random', type=str)
+# parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
+# parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
+
+parser.add_argument('--w',    default=0.5, type=float)
+parser.add_argument('--w-fg', default=.25, type=float)
+parser.add_argument('--w-bg', default=.25, type=float)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)
@@ -77,24 +82,6 @@ parser.add_argument('--print_ratio', default=0.3, type=float)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
 
-# For Puzzle-CAM
-parser.add_argument('--num_pieces', default=4, type=int)
-
-# 'cl_pcl'
-# 'cl_re'
-# 'cl_conf'
-# 'cl_pcl_re'
-# 'cl_pcl_re_conf'
-# parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
-# parser.add_argument('--r_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
-# parser.add_argument('--r_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
-
-# parser.add_argument('--branches', default='0,0,0,0,0,1', type=str)
-
-# parser.add_argument('--alpha', default=1.0, type=float)
-# parser.add_argument('--alpha_init', default=0., type=float)
-# parser.add_argument('--alpha_schedule', default=0.50, type=float)
-
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
 parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
@@ -105,6 +92,8 @@ parser.add_argument('--oc-k-schedule', default=0.0, type=float)
 if __name__ == '__main__':
   # Arguments
   args = parser.parse_args()
+
+  DEVICE = args.device
 
   print('Train Configuration')
   pad = max(map(len, vars(args))) + 1
@@ -137,11 +126,12 @@ if __name__ == '__main__':
     RandomResize_For_Segmentation(args.min_image_size, args.max_image_size),
     RandomHorizontalFlip_For_Segmentation(),
   ]
-  if 'colorjitter' in args.augment:
-    train_transforms.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
 
-  if 'randaugment' in args.augment:
-    train_transforms.append(RandAugmentMC(n=2, m=10))
+  # if 'colorjitter' in args.augment:
+  #   train_transforms.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+
+  # if 'randaugment' in args.augment:
+  #   train_transforms.append(RandAugmentMC(n=2, m=10))
 
   train_transform = transforms.Compose(train_transforms + [
     Normalize_For_Segmentation(imagenet_mean, imagenet_std),
@@ -198,32 +188,13 @@ if __name__ == '__main__':
 
   gap_fn = model.global_average_pooling_2d
 
-  model = model.cuda()
+  model = model.to(DEVICE)
   model.train()
 
   log_func('[i] Architecture is {}'.format(args.architecture))
   log_func('[i] Regularization is {}'.format(args.regularization))
   log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
   log_func()
-
-  # Ordinary Classifier.
-  # print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
-  # if 'mcar' in args.oc_architecture:
-  #   ps = 'avg'
-  #   topN = 4
-  #   threshold = 0.5
-  #   oc_nn = mcar_resnet101(classes, ps, topN, threshold, inference_mode=True, with_logits=True)
-  #   ckpt = torch.load(args.oc_pretrained)
-  #   oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
-  # else:
-  #   oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode, regularization=args.oc_regularization)
-  #   oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
-
-  # oc_nn = oc_nn.cuda()
-  # oc_nn.eval()
-  # for child in oc_nn.children():
-  #   for param in child.parameters():
-  #     param.requires_grad = False
 
   try:
     use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
@@ -240,7 +211,7 @@ if __name__ == '__main__':
   save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
 
   # Loss, Optimizer
-  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
   # if args.r_loss == 'L1_Loss':
   #   r_loss_fn = L1_Loss
@@ -271,15 +242,13 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter([
-    'loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'
-  ])
+  train_meter = Average_Meter(['loss_c', 'loss_fg', 'loss_bg'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(classes).cuda()
-  focal_factor = torch.ones(classes).cuda()
+  choices = torch.ones(classes).to(DEVICE)
+  focal_factor = torch.ones(classes).to(DEVICE)
 
   def evaluate(loader):
     model.eval()
@@ -290,8 +259,8 @@ if __name__ == '__main__':
     with torch.no_grad():
       length = len(loader)
       for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.cuda()
-        labels = labels.cuda()
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
 
         _, features = model(images, with_cam=True)
 
@@ -359,44 +328,37 @@ if __name__ == '__main__':
 
   # loss_option = args.loss_option.split('_')
 
+  W, W_FG, W_BG = args.w, args.w_fg, args.w_bg
+
   for step in range(step_init, step_max):
     images, labels, masks = train_iterator.get()
-    images, labels, masks = images.cuda(), labels.cuda(), masks.cuda()
+    # images, labels, masks = images.to(DEVICE), labels.to(DEVICE), masks.to(DEVICE)
 
     # ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
-    ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
-    k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
+    # ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
+    # k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
     # Normal
-    logits = model(images)
-    loss = class_loss_fn(logits, labels).mean() / 3
-    loss.backward()
-
-    # logits, features = model(images, with_cam=True)
-
-    # Puzzle Module
-    # tiled_images = tile_features(images, args.num_pieces)
-    # tiled_logits, tiled_features = model(tiled_images, with_cam=True)
-    # re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
-
-    # p_loss = class_loss_fn(gap_fn(re_features), labels).mean()
-    # r_loss = (r_loss_fn(features, re_features) * labels.unsqueeze(2).unsqueeze(3)).mean()
+    logits = model(images.to(DEVICE))
+    loss_c = W * class_loss_fn(logits, labels.to(DEVICE)).mean()
+    loss_c.backward()
 
     # OC-CSE
     labels_mask, indices = occse.split_label(labels, 1, choices, focal_factor, args.oc_strategy)  # or k=k
     labels_oc = labels - labels_mask
 
-    first_indices = torch.cat(indices, dim=0).view(images.size()[0], 1, 1).to(masks.device)
-    # first_indices = torch.Tensor([i[0] for i in indices]).view(-1, 1, 1).to(masks.device)
-    fg = masks == first_indices  # (bhw, b11)
-
-    logits_fg = model(images * fg.float())
-    loss_fg = class_loss_fn(logits_fg, labels_mask).mean() / 3
+    fg = (masks == (indices.view(-1, 1, 1) + 1))  # (BHW == B11)
+    fg = fg.unsqueeze(1).float()                  # (B1HW)
+    
+    images_fg = images * fg
+    logits_fg = model(images_fg.to(DEVICE))
+    loss_fg = W_FG * class_loss_fn(logits_fg, labels_mask.to(DEVICE)).mean()
     loss_fg.backward()
 
-    logits_bg = model(images * (~fg).float())
-    loss_bg = class_loss_fn(logits_bg, labels_oc).mean() / 3
-    loss_bg.backward()
+    images_bg = (images * (1-fg))
+    logits_bg = model(images_bg.to(DEVICE))
+    loss_fg = W_FG * class_loss_fn(logits_bg, labels_oc.to(DEVICE)).mean()
+    loss_fg.backward()
 
     optimizer.step()
     optimizer.zero_grad()
@@ -412,26 +374,16 @@ if __name__ == '__main__':
 
     # region logging
     train_meter.add({
-      'loss': loss.item(),
-      'c_loss': c_loss.item(),
-      # 'p_loss': p_loss.item(),
-      # 'r_loss': r_loss.item(),
-      'o_loss': o_loss.item(),
-      # 'alpha': ap,
-      'oc_alpha': ao,
-      'k': k
+      'loss_c': loss_c.item(),
+      'loss_fg': loss_fg.item(),
+      'loss_bg': loss_bg.item(),
     })
 
     if (step + 1) % log_iteration == 0:
       (
-        loss,
-        c_loss,
-        # p_loss,
-        # r_loss,
-        o_loss,
-        # ap,
-        ao,
-        k
+        loss_c,
+        loss_fg,
+        loss_bg,
       ) = train_meter.get(clear=True)
       
       lr = float(get_learning_rate_from_optimizer(optimizer))
@@ -439,14 +391,9 @@ if __name__ == '__main__':
       data = {
         'iteration': step + 1,
         'lr': lr,
-        # 'alpha': ap,
-        'loss': loss,
-        'c_loss': c_loss,
-        # 'p_loss': p_loss,
-        # 'r_loss': r_loss,
-        'o_loss': o_loss,
-        'oc_alpha': ao,
-        'k': k,
+        'loss_c': loss_c,
+        'loss_bg': loss_bg,
+        'loss_fg': loss_fg,
         'time': train_timer.tok(clear=True),
         'focal_factor': focal_factor.cpu().detach().numpy().tolist()
       }
@@ -457,27 +404,18 @@ if __name__ == '__main__':
         '\niteration  = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
-        # 'alpha        = {alpha:.2f}\n'
-        'loss         = {loss:.4f}\n'
-        'c_loss       = {c_loss:.4f}\n'
-        # 'p_loss       = {p_loss:.4f}\n'
-        # 'r_loss       = {r_loss:.4f}\n'
-        'o_loss       = {o_loss:.4f}\n'
-        'oc_alpha     = {oc_alpha:.4f}\n'
-        'k            = {k}\n'
+        'loss_c       = {loss_c:.4f}\n'
+        'loss_fg      = {loss_fg:.4f}\n'
+        'loss_bg      = {loss_bg:.4f}\n'
         'focal_factor = {focal_factor}'
         .format(**data)
       )
 
-      writer.add_scalar('Train/loss', loss, step)
-      writer.add_scalar('Train/c_loss', c_loss, step)
-      # writer.add_scalar('Train/p_loss', p_loss, step)
-      # writer.add_scalar('Train/r_loss', r_loss, step)
-      writer.add_scalar('Train/o_loss', o_loss, step)
+      writer.add_scalar('Train/loss', loss_c, step)
+      writer.add_scalar('Train/loss_c', loss_c, step)
+      writer.add_scalar('Train/loss_fg', loss_fg, step)
+      writer.add_scalar('Train/loss_bg', loss_bg, step)
       writer.add_scalar('Train/learning_rate', lr, step)
-      # writer.add_scalar('Train/alpha', ap, step)
-      writer.add_scalar('Train/oc_alpha', ao, step)
-      writer.add_scalar('Train/k', k, step)
       # endregion
 
     # region evaluation

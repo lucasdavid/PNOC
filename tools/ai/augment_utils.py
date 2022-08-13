@@ -235,7 +235,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
         cropped_mask = np.ones(self.crop_shape_for_mask, mask.dtype) * 255
         cropped_mask[dst_bbox['ymin']:dst_bbox['ymax'], dst_bbox['xmin']:dst_bbox['xmax']] = \
             mask[src_bbox['ymin']:src_bbox['ymax'], src_bbox['xmin']:src_bbox['xmax']]
-        
+
         data['image'] = cropped_image
         data['mask'] = cropped_mask
         

@@ -181,13 +181,20 @@ class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
     def __getitem__(self, index):
         image, tags, mask = super().__getitem__(index)
 
+        if mask.mode == "RGB":
+          # Correction for SBD dataset.
+          mask = np.asarray(mask)
+          mask = (mask[..., np.newaxis] == self.colors[:, ::-1].T).all(axis=-2).argmax(-1)
+          mask[mask == 21] = 255
+          mask = Image.fromarray(mask.astype('uint8'))
+      
         if self.transform is not None:
             input_dic = {'image':image, 'mask':mask}
             output_dic = self.transform(input_dic)
 
             image = output_dic['image']
             mask = output_dic['mask']
-        
+
         label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
         return image, label, mask
 
