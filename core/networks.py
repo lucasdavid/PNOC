@@ -59,7 +59,12 @@ def build_backbone(name, dilated, strides, norm_fn):
 
     if 'resnet' in name:
       from .arch_resnet import resnet
-      model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn)
+      model = resnet.ResNet(
+        resnet.Bottleneck,
+        resnet.layers_dic[name],
+        strides=strides or (2, 2, 2, 1),
+        batch_norm_fn=norm_fn
+      )
 
       state_dict = model_zoo.load_url(resnet.urls_dic[name])
       state_dict.pop('fc.weight')
@@ -78,7 +83,7 @@ def build_backbone(name, dilated, strides, norm_fn):
       from .res2net import res2net_v1b
 
       model_fn = getattr(res2net_v1b, name)
-      model = model_fn(pretrained=True, strides=strides, norm_layer=norm_fn)
+      model = model_fn(pretrained=True, strides=strides or (1, 2, 2, 1), norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc
@@ -94,7 +99,7 @@ def build_backbone(name, dilated, strides, norm_fn):
 
 class Backbone(nn.Module, ABC_Model):
 
-  def __init__(self, model_name, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
+  def __init__(self, model_name, mode='fix', dilated=False, strides=None):
     super().__init__()
 
     self.mode = mode
@@ -122,7 +127,7 @@ class Classifier(Backbone):
     num_classes=20,
     mode='fix',
     dilated=False,
-    strides=(2, 2, 2, 1),
+    strides=None,
     regularization=None,
     trainable_stem=True
   ):
@@ -215,7 +220,7 @@ class CCAM(Classifier):
 
 class AffinityNet(Backbone):
 
-  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
+  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     in_features = self.out_features
@@ -323,7 +328,7 @@ class AffinityNet(Backbone):
 
 class DeepLabv3_Plus(Backbone):
 
-  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=(2, 2, 2, 1), use_group_norm=False):
+  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=None, use_group_norm=False):
     # model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 

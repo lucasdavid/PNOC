@@ -49,7 +49,11 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
-parser.add_argument('--mode', default='normal', type=str) # fix
+parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--restore', default=None, type=str)
 
 ###############################################################################
 # Hyperparameter
@@ -143,6 +147,7 @@ if __name__ == '__main__':
     
     meta_dic = read_json('./data/VOC_2012.json')
     class_names = np.asarray(meta_dic['class_names'])
+    classes = meta_dic['classes']
     
     train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
 
@@ -171,7 +176,14 @@ if __name__ == '__main__':
     ###################################################################################
     # Network
     ###################################################################################
-    model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode)
+    model = Classifier(
+      args.architecture,
+      classes,
+      mode=args.mode,
+      dilated=args.dilated,
+      regularization=args.regularization,
+      trainable_stem=args.trainable_stem,
+    )
     param_groups = model.get_parameter_groups(exclude_partial_names=['bn'])
     
     gap_fn = model.global_average_pooling_2d
