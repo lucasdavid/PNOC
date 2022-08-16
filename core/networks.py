@@ -66,11 +66,19 @@ def build_backbone(name, dilated, strides, norm_fn):
       state_dict.pop('fc.bias')
 
       model.load_state_dict(state_dict)
-    else:
+    elif 'resnest' in name:
       from .arch_resnest import resnest
 
       model_fn = getattr(resnest, name)
       model = model_fn(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+
+      del model.avgpool
+      del model.fc
+    elif 'res2net' in name:
+      from .res2net import res2net_v1b
+
+      model_fn = getattr(res2net_v1b, name)
+      model = model_fn(pretrained=True, strides=strides, norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc

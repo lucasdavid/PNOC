@@ -7,7 +7,7 @@ DATA_DIR=/mnt/files/Workspace/datasets/voc/VOCdevkit/VOC2012/
 
 IMAGE_SIZE=64
 
-ARCHITECTURE=resnet50
+ARCHITECTURE=res2net101_v1b
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
