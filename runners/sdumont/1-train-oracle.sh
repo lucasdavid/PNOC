@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-oc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/occse/tr-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/occse/tr-oracle-%j.out
 #SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -53,26 +53,15 @@ TRAINABLE_STEM=true
 EPOCHS=15
 MODE=normal
 # OC
-OC_ARCHITECTURE=resnest269
-OC_REG=none
-OC_PRETRAINED=experiments/models/ResNeSt269.pth
 OC_STRATEGY=random
 OC_FOCAL_MOMENTUM=0.8
 OC_FOCAL_GAMMA=5.0
 # Schedule
-P_INIT=0.0
-P_ALPHA=4.0
-P_SCHEDULE=0.5
-
-OC_INIT=0.3
-OC_ALPHA=1.0
-OC_SCHEDULE=1.0
-
 W=0.5
 W_FG=0.25
 W_BG=0.25
 
-TAG=$ARCHITECTURE@$MODE@b$BATCH@$oracle@w-$W-wfg-$W_FG-wbg-$W_BG
+TAG=$ARCHITECTURE@$MODE@b$BATCH@oracle@w-$W-wfg-$W_FG-wbg-$W_BG
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \

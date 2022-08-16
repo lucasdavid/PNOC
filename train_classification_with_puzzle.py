@@ -59,7 +59,6 @@ parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
-parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -173,7 +172,7 @@ if __name__ == '__main__':
     # Network
     ###################################################################################
     model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode)
-    param_groups = model.get_parameter_groups()
+    param_groups = model.get_parameter_groups(exclude_partial_names=['bn'])
     
     gap_fn = model.global_average_pooling_2d
 
@@ -220,8 +219,8 @@ if __name__ == '__main__':
         {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
         {'params': param_groups[2], 'lr': 10*args.lr, 'weight_decay': args.wd},
         {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
-    ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)
-    
+    ], lr=args.lr, momentum=0.9, weight_decay=0, max_step=max_iteration)
+
     #################################################################################################
     # Train
     #################################################################################################

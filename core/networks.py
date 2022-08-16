@@ -102,6 +102,9 @@ class Backbone(nn.Module, ABC_Model):
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
 
+    self.not_training = []
+    self.from_scratch_layers = []
+
 
 class Classifier(Backbone):
 
@@ -132,10 +135,9 @@ class Classifier(Backbone):
     else:
       raise ValueError(f'Unknown regularization strategy {regularization}.')
 
-    self.not_training = []
-    self.from_scratch_layers = [self.classifier]
+    self.from_scratch_layers += [self.classifier]
 
-    if self.trainable_stem:
+    if not self.trainable_stem:
       self.not_training += [self.stage1]
 
     self.initialize([self.classifier])
@@ -161,25 +163,6 @@ class Classifier(Backbone):
       x = self.global_average_pooling_2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
-
-  def get_parameter_groups(self):
-    groups = ([], [], [], [])
-
-    for m in self.modules():
-      if isinstance(m, (nn.Conv2d, nn.modules.normalization.GroupNorm)):
-        if m.weight.requires_grad:
-          if m in self.from_scratch_layers:
-            groups[2].append(m.weight)
-          else:
-            groups[0].append(m.weight)
-
-        if m.bias is not None and m.bias.requires_grad:
-          if m in self.from_scratch_layers:
-            groups[3].append(m.bias)
-          else:
-            groups[1].append(m.bias)
-
-    return groups
 
 
 class CCAM(Classifier):

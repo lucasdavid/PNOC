@@ -56,7 +56,6 @@ parser.add_argument('--max_epoch', default=3, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
-parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -67,7 +66,7 @@ parser.add_argument('--print_ratio', default=0.3, type=float)
 parser.add_argument('--tag', default='', type=str)
 
 parser.add_argument('--pred_dir', default='./experiments/predictions/', type=str)
-parser.add_argument('--label_name', default='resnet50@seed=0@nesterov@train_aug@bg=0.20@scale=0.5,1.0,1.5,2.0@aff', type=str)
+parser.add_argument('--label_name', default='resnet50@seed=0@train_aug@bg=0.20@scale=0.5,1.0,1.5,2.0@aff', type=str)
 
 if __name__ == '__main__':
     ###################################################################################
@@ -164,7 +163,7 @@ if __name__ == '__main__':
     ###################################################################################
     optimizer = PolyOptimizer([
         {'params': param_groups, 'lr': args.lr, 'weight_decay': args.wd},
-    ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)
+    ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
     
     #################################################################################################
     # Train

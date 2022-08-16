@@ -59,7 +59,6 @@ parser.add_argument('--max_epoch', default=50, type=int)
 
 parser.add_argument('--lr', default=0.007, type=float)
 parser.add_argument('--wd', default=4e-5, type=float)
-parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=256, type=int)
@@ -190,7 +189,7 @@ if __name__ == '__main__':
     # log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
     # log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
     
-    optimizer = PolyOptimizer(params, lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration, nesterov=args.nesterov)
+    optimizer = PolyOptimizer(params, lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
     
     #################################################################################################
     # Train

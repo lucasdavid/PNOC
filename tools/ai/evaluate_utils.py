@@ -120,8 +120,9 @@ class Calculator_For_mIoU:
             FP_list.append(FP)
             FN_list.append(FN)
         
-        mIoU = np.mean(np.asarray(IoU_list))
-        mIoU_foreground = np.mean(np.asarray(IoU_list)[1:])
+        iou = np.asarray(IoU_list)
+        mIoU = np.mean(iou)
+        mIoU_foreground = np.mean(iou[1:])
 
         FP = np.mean(np.asarray(FP_list))
         FN = np.mean(np.asarray(FN_list))

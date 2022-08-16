@@ -23,22 +23,34 @@ class ABC_Model(ABC):
         m.weight.data.fill_(1)
         m.bias.data.zero_()
 
-  def get_parameter_groups(self):
+  def get_parameter_groups(self, exclude_partial_names=(), with_names=False):
+    names = ([], [], [], [])
     groups = ([], [], [], [])
 
     for name, param in self.named_parameters():
       if param.requires_grad:
+        for p in exclude_partial_names:
+          if p in name:
+            continue
+
         if 'model' in name:
           if 'weight' in name:
+            names[0].append(name)
             groups[0].append(param)
           else:
+            names[1].append(name)
             groups[1].append(param)
 
         # scracthed weights
         else:
           if 'weight' in name:
+            names[2].append(name)
             groups[2].append(param)
           else:
+            names[3].append(name)
             groups[3].append(param)
 
+    if with_names:
+      return groups, names
+    
     return groups

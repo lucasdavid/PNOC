@@ -66,7 +66,6 @@ parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
-parser.add_argument('--nesterov', default=True, type=str2bool)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -263,7 +262,6 @@ if __name__ == '__main__':
     momentum=0.9,
     weight_decay=args.wd,
     max_step=step_max,
-    nesterov=args.nesterov
   )
 
   # Train
