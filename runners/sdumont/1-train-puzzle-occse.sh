@@ -42,7 +42,7 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Dataset
 BATCH=16
-# AUGMENT=colorjitter_randaugment
+AUGMENT=colorjitter
 # Arch
 ARCHITECTURE=resnest269
 REG=none
@@ -72,6 +72,7 @@ TAG=$ARCHITECTURE@$MODE@puzzleoc@e$EPOCHS@b$BATCH@$OC_STRATEGY
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
     --max_epoch         $EPOCHS            \
+    --augment           $AUGMENT           \
     --batch_size        $BATCH             \
     --architecture      $ARCHITECTURE      \
     --regularization    $REG               \
@@ -92,4 +93,3 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --oc-alpha-init     $OC_INIT           \
     --tag               $TAG               \
     --data_dir          $DATA_DIR
-    # --augment           $AUGMENT           \

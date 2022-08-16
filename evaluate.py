@@ -15,6 +15,7 @@ parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--predict_dir", default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
+parser.add_argument('--sal_mode', default='saliency', type=str)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
 parser.add_argument('--logfile', default='', type=str)
@@ -30,6 +31,8 @@ args = parser.parse_args()
 predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
 gt_dir = args.gt_dir
 sal_dir = args.sal_dir
+
+assert args.sal_mode in ('saliency', 'segmentation')
 
 args.list = './data/' + args.domain + '.txt'
 args.predict_dir = predict_folder
@@ -61,8 +64,13 @@ def compare(start, step, TP, P, T, name_list):
         cams = data['rw']
 
       if sal_file:
-        sal = np.array(Image.open(sal_file)).astype(float)
-        sal = 1 - sal / 255.
+        if args.sal_mode == 'saliency':
+          sal = np.array(Image.open(sal_file)).astype(float)
+          sal = 1 - sal / 255.
+        elif args.sal_mode == 'segmentation':
+          sal = np.array(Image.open(sal_file))
+          sal = np.isin(sal, [0, 255]).astype(float)
+
         cams = np.concatenate((sal[np.newaxis, ...], cams), axis=0)
       else:
         cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
@@ -141,8 +149,8 @@ if __name__ == '__main__':
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
-  miou_ = 0
-  threshold_ = iou_ = fp_ = 0.
+  miou_ = threshold_ = fp_ = 0.
+  iou_ = {}
   miou_history = []
   fp_history = []
 
@@ -196,6 +204,6 @@ if __name__ == '__main__':
     under_mIoU = miou_history[under_index]
     fp_under = fp_history[under_index]
 
-    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_, miou_, fp_))
+    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_ or 0., miou_, fp_))
     print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, fp_over))
     print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, fp_under))

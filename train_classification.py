@@ -164,7 +164,7 @@ if __name__ == '__main__':
     mode=args.mode,
     regularization=args.regularization
   )
-  param_groups = model.get_parameter_groups(print_fn=None)
+  param_groups = model.get_parameter_groups(exclude_partial_names=['bn'])
 
   model = model.to(DEVICE)
   model.train()
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     ],
     lr=args.lr,
     momentum=0.9,
-    weight_decay=args.wd,
+    weight_decay=0,
     max_step=max_iteration,
   )
 

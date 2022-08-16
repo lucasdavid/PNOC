@@ -38,10 +38,10 @@ PY=python3.9
 SOURCE=train_classification_with_puzzle.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest101
-BATCH=32
-AUGMENT=colorjitter_randaugment
-TAG=$ARCHITECTURE@randaug@puzzle@wobnwd
+ARCHITECTURE=resnest269
+BATCH=16
+AUGMENT=colorjitter
+TAG=$ARCHITECTURE@puzzle@wobnwd
 
 CUDA_VISIBLE_DEVICES=0,1,2,3        \
     $PY $SOURCE                     \

@@ -40,11 +40,11 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 ARCHITECTURE=resnest269
 AUGMENT=colorjitter_randaugment
-TAG=$ARCHITECTURE@randaug
+TAG=$ARCHITECTURE@randaug@bnwowd
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \
     --architecture   $ARCHITECTURE   \
     --augment        $AUGMENT        \
     --tag            $TAG            \
-    --data_dir $DATA_DIR
+    --data_dir       $DATA_DIR
