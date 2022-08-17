@@ -32,7 +32,7 @@ def de_interleave(x, size):
   return x.reshape([size, -1] + s[1:]).transpose(0, 1).reshape([-1] + s[1:])
 
 
-def resize_for_tensors(tensors, size, mode='bilinear', align_corners=False):
+def resize_for_tensors(tensors, size, mode='bilinear', align_corners=None):
   return F.interpolate(tensors, size, mode=mode, align_corners=align_corners)
 
 

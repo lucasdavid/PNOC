@@ -59,8 +59,6 @@ palette = np.array([[0, 0, 0],
                     [128, 192, 0],
                     [0, 64, 128]])
 
-from utils import check_positive
-
 parser = argparse.ArgumentParser()
 
 ###############################################################################
@@ -171,7 +169,6 @@ if __name__ == '__main__':
         
         # inferenece
         _, _, cam = model(images, inference=True)
-        # flag = check_positive(cam.clone())
         # if flag:
         #     cam = 1 - cam
         # postprocessing

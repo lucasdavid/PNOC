@@ -10,7 +10,6 @@ def cos_simi(embedded_fg, embedded_bg):
   embedded_fg = F.normalize(embedded_fg, dim=1)
   embedded_bg = F.normalize(embedded_bg, dim=1)
   sim = torch.matmul(embedded_fg, embedded_bg.T)
-
   return torch.clamp(sim, min=0.0005, max=0.9995)
 
 

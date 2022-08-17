@@ -144,3 +144,9 @@ class Calculator_For_mIoU:
             self.TP.append(0)
             self.P.append(0)
             self.T.append(0)
+
+class MIoUCalcFromNames(Calculator_For_mIoU):
+    def __init__(self, class_names):
+        self.class_names = class_names
+        self.classes = len(self.class_names)
+        self.clear()

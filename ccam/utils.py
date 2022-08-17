@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 from tools.ai.torch_utils import *
 from tools.ai.demo_utils import *
@@ -14,33 +17,8 @@ imagenet_mean = [0.485, 0.456, 0.406]
 imagenet_std = [0.229, 0.224, 0.225]
 
 
-def model_info(model, log_func=print):
-    n_p = sum(x.numel() for x in model.parameters())  # number parameters
-    n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
-    log_func('\n%5s %50s %9s %12s %20s %12s %12s' % ('layer', 'name', 'gradient', 'parameters', 'shape', 'mu', 'sigma'))
-    for i, (name, p) in enumerate(model.named_parameters()):
-        name = name.replace('module_list.', '')
-        log_func('%5g %50s %9s %12g %20s %12.3g %12.3g' % (
-            i, name, p.requires_grad, p.numel(), list(p.shape), p.mean(), p.std()))
-    log_func('Model Summary: %g layers, %g parameters, %g gradients\n' % (i + 1, n_p, n_g))
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the acc@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res
-
-import cmapy
 def visualize_heatmap(experiments, images, attmaps, epoch, cnt, phase='train', seg=False):
+    import cmapy
     n = int(np.sqrt(images.shape[0]))
     utils.save_image(images, './experiments/images/{}/{}/{}-{}-pri.jpg'.format(experiments, phase, epoch, cnt), nrow=n,
                      normalize=True)
@@ -97,20 +75,3 @@ def visualize_heatmap(experiments, images, attmaps, epoch, cnt, phase='train', s
             mask = np.where(attmap > 150, 1, 0).reshape(h, w, 1)
             temp = np.uint8(image*mask)
             cv2.imwrite('./experiments/images/{}/{}/colormaps/{}-{}-seg.jpg'.format(experiments, phase, cnt, i), temp)
-
-
-def normalize_scoremap(alm):
-    """
-    Args:
-        alm: numpy.ndarray(size=(H, W), dtype=np.float)
-    Returns:
-        numpy.ndarray(size=(H, W), dtype=np.float) between 0 and 1.
-        If input array is constant, a zero-array is returned.
-    """
-    if np.isnan(alm).any():
-        return np.zeros_like(alm)
-    if alm.min() == alm.max():
-        return np.zeros_like(alm)
-    alm -= alm.min()
-    alm /= alm.max()
-    return alm

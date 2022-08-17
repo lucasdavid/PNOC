@@ -60,10 +60,7 @@ def build_backbone(name, dilated, strides, norm_fn):
     if 'resnet' in name:
       from .arch_resnet import resnet
       model = resnet.ResNet(
-        resnet.Bottleneck,
-        resnet.layers_dic[name],
-        strides=strides or (2, 2, 2, 1),
-        batch_norm_fn=norm_fn
+        resnet.Bottleneck, resnet.layers_dic[name], strides=strides or (2, 2, 2, 1), batch_norm_fn=norm_fn
       )
 
       state_dict = model_zoo.load_url(resnet.urls_dic[name])
@@ -99,10 +96,19 @@ def build_backbone(name, dilated, strides, norm_fn):
 
 class Backbone(nn.Module, ABC_Model):
 
-  def __init__(self, model_name, mode='fix', dilated=False, strides=None):
+  def __init__(
+      self,
+      model_name,
+      mode='fix',
+      dilated=False,
+      strides=None,
+      trainable_stem=True,
+  ):
     super().__init__()
 
     self.mode = mode
+    self.trainable_stem = trainable_stem
+    
     if mode == 'normal':
       self.norm_fn = nn.BatchNorm2d
     elif mode == 'fix':
@@ -118,6 +124,9 @@ class Backbone(nn.Module, ABC_Model):
     self.not_training = []
     self.from_scratch_layers = []
 
+    if not self.trainable_stem:
+      self.not_training.extend([self.stage1])
+
 
 class Classifier(Backbone):
 
@@ -131,9 +140,14 @@ class Classifier(Backbone):
     regularization=None,
     trainable_stem=True
   ):
-    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
+    super().__init__(
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_stem=trainable_stem
+    )
 
-    self.trainable_stem = trainable_stem
     self.num_classes = num_classes
     self.regularization = regularization
 
@@ -148,11 +162,7 @@ class Classifier(Backbone):
     else:
       raise ValueError(f'Unknown regularization strategy {regularization}.')
 
-    self.from_scratch_layers += [self.classifier]
-
-    if not self.trainable_stem:
-      self.not_training += [self.stage1]
-
+    self.from_scratch_layers.extend([self.classifier])
     self.initialize([self.classifier])
 
   def train(self, mode=True):
@@ -178,26 +188,29 @@ class Classifier(Backbone):
       return logits
 
 
-class CCAM(Classifier):
+class CCAM(Backbone):
 
   def __init__(
     self,
     model_name,
-    num_classes=20,
     mode='fix',
     dilated=False,
     strides=(1, 2, 2, 1),
-    regularization=None,
+    trainable_stem=True,
     cin=1024 + 2048
   ):
     super().__init__(
-      model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_stem=trainable_stem
     )
 
     self.ac_head = ccam.Disentangler(cin)
     self.from_scratch_layers += [self.ac_head]
 
-  def forward(self, x, with_cam=False, inference=False):
+  def forward(self, x, inference=False):
     x = self.stage1(x)
     x = self.stage2(x)
     x = self.stage3(x)
@@ -206,16 +219,16 @@ class CCAM(Classifier):
 
     feats = torch.cat([x2, x1], dim=1)
 
-    fg_feats, bg_feats, ccam = self.ac_head(feats, inference=inference)
+    return self.ac_head(feats, inference=inference)
 
-    if with_cam:
-      features = self.classifier(x2)
-      logits = self.global_average_pooling_2d(features)
-      return logits, fg_feats, bg_feats, ccam, features
-    else:
-      x = self.global_average_pooling_2d(x2, keepdims=True)
-      logits = self.classifier(x).view(-1, self.num_classes)
-      return logits, fg_feats, bg_feats, ccam
+    # if with_cam:
+    #   features = self.classifier(x2)
+    #   logits = self.global_average_pooling_2d(features)
+    #   return logits, fg_feats, bg_feats, ccam, features
+    # else:
+    #   x = self.global_average_pooling_2d(x2, keepdims=True)
+    #   logits = self.classifier(x).view(-1, self.num_classes)
+    #   return logits, fg_feats, bg_feats, ccam
 
 
 class AffinityNet(Backbone):
