@@ -39,14 +39,13 @@ SOURCE=train_classification_with_puzzle.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 ARCHITECTURE=resnest269
-BATCH=16
-AUGMENT=colorjitter
-TAG=$ARCHITECTURE@puzzle@wobnwd
+BATCH=32
+# AUGMENT=colorjitter
+TAG=$ARCHITECTURE@puzzle-rep#2
 
 CUDA_VISIBLE_DEVICES=0,1,2,3        \
     $PY $SOURCE                     \
     --architecture   $ARCHITECTURE  \
-    --augment        $AUGMENT       \
     --batch_size     $BATCH         \
     --mode           normal         \
     --re_loss_option masking        \
@@ -55,3 +54,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3        \
     --alpha          4.00           \
     --tag            $TAG           \
     --data_dir       $DATA_DIR
+    # --augment        $AUGMENT       \

@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-puzzle
+#SBATCH -J tr-vanilla
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/van-%j.out
 #SBATCH --time=16:00:00
 
@@ -38,7 +38,7 @@ PY=python3.9
 SOURCE=train_classification.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest269
+ARCHITECTURE=res2net101_v1b
 AUGMENT=colorjitter_randaugment
 TAG=$ARCHITECTURE@randaug@bnwowd
 

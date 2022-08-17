@@ -195,7 +195,7 @@ if __name__ == '__main__':
   if args.restore:
     print(f'Restoring weights from {args.restore}')
     model.load_state_dict(torch.load(args.restore), strict=True)
-  param_groups = model.get_parameter_groups()
+  param_groups = model.get_parameter_groups()  # (exclude_partial_names=['bn'])
 
   gap_fn = model.global_average_pooling_2d
 
@@ -345,14 +345,16 @@ if __name__ == '__main__':
 
     best_th = 0.0
     best_mIoU = 0.0
+    best_iou = None
 
     for th in thresholds:
-      mIoU, mIoU_foreground = meter_dic[th].get(clear=True)
+      mIoU, mIoU_foreground, iou, *_ = meter_dic[th].get(clear=True, detail=True)
       if best_mIoU < mIoU:
         best_th = th
         best_mIoU = mIoU
+        best_iou = [round(iou[c], 2) for c in class_names]
 
-    return best_th, best_mIoU
+    return best_th, best_mIoU, best_iou
 
   writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
@@ -430,6 +432,7 @@ if __name__ == '__main__':
       ) = train_meter.get(clear=True)
       
       lr = float(get_learning_rate_from_optimizer(optimizer))
+      ffs = focal_factor.cpu().detach().numpy().astype(float).round(2).tolist()
 
       data = {
         'iteration': step + 1,
@@ -443,7 +446,7 @@ if __name__ == '__main__':
         'oc_alpha': ao,
         'k': k,
         'time': train_timer.tok(clear=True),
-        'focal_factor': focal_factor.cpu().detach().numpy().tolist()
+        'focal_factor': ffs
       }
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
@@ -460,7 +463,7 @@ if __name__ == '__main__':
         'o_loss       = {o_loss:.4f}\n'
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
-        'focal_factor = {focal_factor}'
+        'focal_factor = {focal_factor}\n'
         .format(**data)
       )
 
@@ -477,7 +480,7 @@ if __name__ == '__main__':
 
     # region evaluation
     if (step + 1) % val_iteration == 0:
-      threshold, mIoU = evaluate(train_loader_for_seg)
+      threshold, mIoU, iou = evaluate(train_loader_for_seg)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
@@ -486,6 +489,7 @@ if __name__ == '__main__':
         'iteration': step + 1,
         'threshold': threshold,
         'train_mIoU': mIoU,
+        'train_iou': iou,
         'best_train_mIoU': best_train_mIoU,
         'time': eval_timer.tok(clear=True),
       }
@@ -498,6 +502,7 @@ if __name__ == '__main__':
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
         'best_train_mIoU = {best_train_mIoU:.2f}%\n'
+        'train_iou       = {train_iou}\n'
         .format(**data)
       )
 

@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J focal-rs269
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/focal-%j.out
+#SBATCH -J tr-poc
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
 #SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -42,7 +42,7 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Dataset
 BATCH=16
-AUGMENT=colorjitter
+# AUGMENT=colorjitter
 # Arch
 ARCHITECTURE=resnest269
 REG=none
@@ -67,12 +67,11 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=$ARCHITECTURE@$MODE@puzzleoc@e$EPOCHS@b$BATCH@$OC_STRATEGY
+TAG=$ARCHITECTURE@$MODE@puzzleoc@b$BATCH-rep3
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
     --max_epoch         $EPOCHS            \
-    --augment           $AUGMENT           \
     --batch_size        $BATCH             \
     --architecture      $ARCHITECTURE      \
     --regularization    $REG               \
@@ -93,3 +92,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --oc-alpha-init     $OC_INIT           \
     --tag               $TAG               \
     --data_dir          $DATA_DIR
+    # --augment           $AUGMENT           \

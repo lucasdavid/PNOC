@@ -313,14 +313,16 @@ if __name__ == '__main__':
         
         best_th = 0.0
         best_mIoU = 0.0
+        best_iou = {}
         
         for th in thresholds:
-            mIoU, mIoU_foreground = meter_dic[th].get(clear=True)
+            mIoU, mIoU_foreground, iou, *_ = meter_dic[th].get(clear=True, detail=True)
             if best_mIoU < mIoU:
                 best_th = th
                 best_mIoU = mIoU
+                best_iou = iou
 
-        return best_th, best_mIoU
+        return best_th, best_mIoU, best_iou
     
     writer = SummaryWriter(tensorboard_dir)
     train_iterator = Iterator(train_loader)
@@ -450,7 +452,7 @@ if __name__ == '__main__':
         # Evaluation
         #################################################################################################
         if (iteration + 1) % val_iteration == 0:
-            threshold, mIoU = evaluate(train_loader_for_seg)
+            threshold, mIoU, iou = evaluate(train_loader_for_seg)
             
             if best_train_mIoU == -1 or best_train_mIoU < mIoU:
                 best_train_mIoU = mIoU
@@ -462,18 +464,20 @@ if __name__ == '__main__':
                 'iteration' : iteration + 1,
                 'threshold' : threshold,
                 'train_mIoU' : mIoU,
+                'train_iou' : iou,
                 'best_train_mIoU' : best_train_mIoU,
                 'time' : eval_timer.tok(clear=True),
             }
             data_dic['validation'].append(data)
             write_json(data_path, data_dic)
             
-            log_func('[i] \
-                iteration={iteration:,}, \
-                threshold={threshold:.2f}, \
-                train_mIoU={train_mIoU:.2f}%, \
-                best_train_mIoU={best_train_mIoU:.2f}%, \
-                time={time:.0f}sec'.format(**data)
+            log_func(
+              'iteration       = {iteration:,} '
+              'threshold       = {threshold:.2f}'
+              'best_train_mIoU = {best_train_mIoU:.2f}%'
+              'train_mIoU      = {train_mIoU:.2f}%'
+              'train_iou       = {train_iou}'
+              'time={time:.0f}sec'.format(**data)
             )
             
             writer.add_scalar('Evaluation/threshold', threshold, iteration)
