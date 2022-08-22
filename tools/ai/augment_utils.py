@@ -168,9 +168,7 @@ class RandomCrop:
         self.crop_size = crop_size
         self.crop_shape = (self.crop_size, self.crop_size, channels)
 
-    def get_random_crop_box(self, image):
-        h, w, c = image.shape
-
+    def get_random_crop_box(self, h, w):
         ch = min(self.crop_size, h)
         cw = min(self.crop_size, w)
 
@@ -204,7 +202,7 @@ class RandomCrop:
     
     def __call__(self, image, bbox_dic=None):
         if bbox_dic is None:
-            dst_bbox, src_bbox = self.get_random_crop_box(image)
+            dst_bbox, src_bbox = self.get_random_crop_box(image.shape[:2])
         else:
             dst_bbox, src_bbox = bbox_dic['dst_bbox'], bbox_dic['src_bbox']
         
@@ -226,7 +224,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
     def __call__(self, data):
         image, mask = data['image'], data['mask']
 
-        dst_bbox, src_bbox = self.get_random_crop_box(image)
+        dst_bbox, src_bbox = self.get_random_crop_box(image.shape[:2])
         
         cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
         cropped_image[dst_bbox['ymin']:dst_bbox['ymax'], dst_bbox['xmin']:dst_bbox['xmax']] = \

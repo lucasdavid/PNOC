@@ -133,7 +133,7 @@ if __name__ == '__main__':
         logits = resize_for_tensors(logits, image_size)
         
         logits = logits[0] + logits[1].flip(-1)
-        logits = get_numpy_from_tensor(logits).transpose((1, 2, 0))
+        logits = to_numpy(logits).transpose((1, 2, 0))
         return logits
 
     with torch.no_grad():

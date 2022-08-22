@@ -49,11 +49,11 @@ def build_backbone(name, dilated, strides, norm_fn):
     state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
     model.load_state_dict(state_dict, strict=True)
 
-    stage1 = nn.Sequential(model.conv1a)
-    stage2 = nn.Sequential(model.b2, model.b2_1, model.b2_2)
-    stage3 = nn.Sequential(model.b3, model.b3_1, model.b3_2)
-    stage4 = nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5)
-    stage5 = nn.Sequential(model.b5, model.b5_1, model.b5_2, model.b6, model.b7, model.bn7, nn.ReLU())
+    stage1 = nn.Sequential(model.conv1a, model.b2)
+    stage2 = nn.Sequential(model.b2_1, model.b2_2, model.b3, model.b3_1, model.b3_2)
+    stage3 = nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5)
+    stage4 = nn.Sequential(model.b5, model.b5_1, model.b5_2)
+    stage5 = nn.Sequential(model.b6, model.b7, model.bn7, nn.ReLU())
   else:
     out_features = 2048
 
@@ -197,7 +197,7 @@ class CCAM(Backbone):
     dilated=False,
     strides=(1, 2, 2, 1),
     trainable_stem=True,
-    cin=1024 + 2048
+    stage4_out_features=1024
   ):
     super().__init__(
       model_name,
@@ -207,7 +207,7 @@ class CCAM(Backbone):
       trainable_stem=trainable_stem
     )
 
-    self.ac_head = ccam.Disentangler(cin)
+    self.ac_head = ccam.Disentangler(stage4_out_features + self.out_features)
     self.from_scratch_layers += [self.ac_head]
 
   def forward(self, x, inference=False):

@@ -58,7 +58,6 @@ def shannon_entropy_loss(logits, activation=torch.sigmoid, epsilon=1e-5):
 
 
 def make_cam(x, epsilon=1e-5, global_norm=False):
-  # relu(x) = max(x, 0)
   x = F.relu(x)
 
   b, c, h, w = x.size()
@@ -119,7 +118,7 @@ def freeze_and_eval(modules):
         p.requires_grad = False
 
 
-def get_numpy_from_tensor(tensor):
+def to_numpy(tensor):
   return tensor.cpu().detach().numpy()
 
 

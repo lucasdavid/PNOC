@@ -4,22 +4,12 @@
 
 import os
 import sys
-import copy
-import shutil
-import random
 import argparse
 import numpy as np
 
 import imageio
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
-from torchvision import transforms
-# from torch.utils.tensorboard import SummaryWriter
-
-from torch.utils.data import DataLoader
 
 from core.puzzle_utils import *
 from core.networks import *
@@ -53,8 +43,9 @@ parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type
 parser.add_argument('--experiment_name', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
 
-parser.add_argument('--threshold', default=0.25, type=float)
-parser.add_argument('--crf_iteration', default=0, type=int)
+parser.add_argument('--threshold', default=0.3, type=float)
+parser.add_argument('--crf_iteration', default=10, type=int)
+parser.add_argument('--activation', default='relu', type=str, choices=['relu', 'sigmoid'])
 
 
 if __name__ == '__main__':
@@ -92,15 +83,20 @@ if __name__ == '__main__':
             keys = predict_dict['keys']
             cams = predict_dict['hr_cam']
 
-            cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
-            cams = np.argmax(cams, axis=0)
+            if args.activation == 'relu':
+              cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
+              cams = np.argmax(cams, axis=0)
 
-            if args.crf_iteration > 0:
+              if args.crf_iteration > 0:
                 cams = crf_inference_label(np.asarray(ori_image), cams, n_labels=keys.shape[0], t=args.crf_iteration)
+            else:
+              cams = np.concatenate((1-cams, cams))
 
-            imageio.imwrite(png_path, (cams*255).astype(np.uint8))
+              if args.crf_iteration > 0:
+                cams = np.argmax(crf_inference(np.asarray(ori_image), cams, t=args.crf_iteration, labels=2), axis=0)
+
+            imageio.imwrite(png_path, (cams*255).clip(0, 255).astype(np.uint8))
 
             sys.stdout.write('\r# CAMs CRF Inference [{}/{}] = {:.2f}%, ({}, {})'.format(step + 1, length, (step + 1) / length * 100, (ori_h, ori_w), cams.shape))
             sys.stdout.flush()
         print()
-    

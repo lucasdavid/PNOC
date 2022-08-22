@@ -2,40 +2,40 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 # modified by Sierkinhane <sierkinhane@163.com>
 
-import os
-import sys
-import copy
-import shutil
-import random
 import argparse
-import numpy as np
+import copy
+import os
+import random
+import shutil
+import sys
 
 import imageio
-
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.utils.data import DataLoader
 from torchvision import transforms
+
+from core.datasets import *
+from core.model import *
+from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
+from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
+
 # from torch.utils.tensorboardX import SummaryWriter
 
-from torch.utils.data import DataLoader
 
-from core.model import *
-from core.datasets import *
 
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
 
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
 
-from tools.ai.augment_utils import *
-from tools.ai.randaugment import *
 
 palette = np.array([[0, 0, 0],
                     [128, 0, 0],
@@ -211,7 +211,7 @@ if __name__ == '__main__':
             cam = cam.unsqueeze(0).unsqueeze(0)
 
             cam = make_cam(cam).squeeze()
-            cam = get_numpy_from_tensor(cam)
+            cam = to_numpy(cam)
 
             image = np.array(ori_image)
 

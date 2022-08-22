@@ -33,16 +33,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
+parser.add_argument('--data_dir', default='/datasets/VOCdevkit/VOC2012/', type=str)
+parser.add_argument('--cams_dir', default='/experiments/predictions/resnest101@ra/', type=str)
 
 ###############################################################################
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-# parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--stage4_out_features', default=1024, type=int)
 
 ###############################################################################
 # Hyperparameter
@@ -50,6 +51,7 @@ parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--max_epoch', default=10, type=int)
 parser.add_argument('--depth', default=50, type=int)
+parser.add_argument('--accumule_steps', default=1, type=int)
 
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -65,7 +67,70 @@ parser.add_argument('--augment', default='', type=str)
 
 parser.add_argument('--alpha', type=float, default=0.25)
 
-flag = True
+parser.add_argument('--bg_threshold', type=float, default=0.1)
+parser.add_argument('--fg_threshold', type=float, default=0.4)
+
+IS_POSITIVE = True
+
+GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
+GPUS_COUNT = len(GPUS_VISIBLE.split(','))
+
+
+class VOCDatasetWithCAMs(VOC_Dataset):
+
+  def __init__(self, root_dir, domain, cams_dir, resize, image_transform, aug_transform):
+    super().__init__(root_dir, domain, with_id=True)
+    self.cams_dir = cams_dir
+    self.resize = resize
+    self.aug_transform = aug_transform
+    self.image_transform = image_transform
+
+    cmap_dic, _, class_names = get_color_map_dic()
+    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
+
+    data = read_json('./data/VOC_2012.json')
+
+    self.class_dic = data['class_dic']
+    self.classes = data['classes']
+
+  def __getitem__(self, index):
+    image, image_id, tags = super().__getitem__(index)
+
+    mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
+    mask_pack = np.load(mask_path, allow_pickle=True).item()
+    cams = mask_pack['hr_cam']
+
+    # Transforms
+    image = self.image_transform(image)
+    cams = self.resize(cams)
+
+    image, cams = self.aug_transform(image, cams)
+
+    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    return image, label, cams
+
+
+# Augmentations
+
+
+def random_horizontal_flip(image, cams):
+  if bool(random.getrandbits(1)):
+    image = image.flip(-1)
+    cams = cams.flip(-1)
+  return image, cams
+
+
+class RandomCropForCams(RandomCrop):
+
+  def __init__(self, crop_size):
+    super().__init__(crop_size)
+    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
+
+  def __call__(self, image, cams):
+    _, src = self.get_random_crop_box(data['image'].shape[1:])
+    ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
+    return (image[:, ymin:ymax, xmin:xmax], cams[:, ymin:ymax, xmin:xmax])
+
 
 if __name__ == '__main__':
   # global flag
@@ -73,9 +138,11 @@ if __name__ == '__main__':
   # Arguments
   ###################################################################################
   args = parser.parse_args()
-  
+
   DEVICE = args.device
   SIZE = args.image_size
+  BATCH_TRAIN = args.batch_size
+  BATCH_VALID = 32
 
   log_dir = create_directory('./experiments/logs/')
   data_dir = create_directory('./experiments/data/')
@@ -104,16 +171,13 @@ if __name__ == '__main__':
   imagenet_mean = [0.485, 0.456, 0.406]
   imagenet_std = [0.229, 0.224, 0.225]
 
-  train_transform = transforms.Compose(
-    [
-      transforms.Resize(size=(512, 512)),
-      transforms.RandomHorizontalFlip(),
-      transforms.RandomCrop(size=(SIZE, SIZE)),
-      transforms.ToTensor(),
-      transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
-    ]
-  )
-
+  resize_t = transforms.Resize(interpolation='bicubic', size=(512, 512))
+  image_transform = transforms.Compose([
+    resize_t,
+    transforms.ToTensor(),
+    transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
+  ])
+  aug_transform = transforms.Compose([random_horizontal_flip, RandomCropForCams(SIZE)])
   test_transform = transforms.Compose(
     [
       Normalize_For_Segmentation(imagenet_mean, imagenet_std),
@@ -126,22 +190,28 @@ if __name__ == '__main__':
   class_names = np.asarray(meta_dic['class_names'])
   classes = len(class_names)
 
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
+  train_dataset = VOCDatasetWithCAMs(
+    args.data_dir,
+    'train_aug',
+    args.cams_dir,
+    resize=resize_t,
+    image_transform=image_transform,
+    aug_transform=aug_transform
+  )
+  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
+  # valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
 
-  train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
-
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
-  train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=args.num_workers)
-  valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=args.num_workers)
+  train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers)
+  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
 
   log_func('[i] mean values is {}'.format(imagenet_mean))
   log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(meta_dic['classes']))
+  log_func('[i] The number of class is {}'.format(classes))
   log_func('[i] train_transform is {}'.format(train_transform))
   log_func('[i] test_transform is {}'.format(test_transform))
   log_func('[i] #train data'.format(len(train_dataset)))
-  log_func('[i] #valid data'.format(len(valid_dataset_for_seg)))
+  log_func('[i] #valid data'.format(len(valid_dataset)))
   log_func()
 
   val_iteration = len(train_loader)
@@ -155,30 +225,21 @@ if __name__ == '__main__':
   ###################################################################################
   # Network
   ###################################################################################
-  model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated)
-  # model = ccam_lib.get_model(pretrained=args.pretrained)
+  model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated, stage4_out_features=args.stage4_out_features)
   param_groups = model.get_parameter_groups()
-
-  model = model.to(DEVICE)
-  model.train()
-  # model_info(model)
 
   log_func('[i] Architecture is {}'.format(args.architecture))
   log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
   log_func()
 
-  try:
-    use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
-  except KeyError:
-    use_gpu = '0'
-
-  the_number_of_gpu = len(use_gpu.split(','))
-  if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+  if GPUS_COUNT > 1:
+    log_func('[i] the number of gpu : {}'.format(GPUS_COUNT))
     model = nn.DataParallel(model)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
+  model = model.to(DEVICE)
+
+  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
+  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   ###################################################################################
   # Loss, Optimizer
@@ -189,13 +250,31 @@ if __name__ == '__main__':
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
   ]
 
-  optimizer = PolyOptimizer([
-      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
-      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
-      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
-      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0}
+  optimizer = PolyOptimizer(
+    [
+      {
+        'params': param_groups[0],
+        'lr': args.lr,
+        'weight_decay': args.wd
+      }, {
+        'params': param_groups[1],
+        'lr': 2 * args.lr,
+        'weight_decay': 0
+      }, {
+        'params': param_groups[2],
+        'lr': 10 * args.lr,
+        'weight_decay': args.wd
+      }, {
+        'params': param_groups[3],
+        'lr': 20 * args.lr,
+        'weight_decay': 0
+      }
     ],
-    lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
+    lr=args.lr,
+    momentum=0.9,
+    weight_decay=args.wd,
+    max_step=max_iteration
+  )
 
   #################################################################################################
   # Train
@@ -208,12 +287,12 @@ if __name__ == '__main__':
   train_meter = Average_Meter(['loss', 'class_loss'])
 
   best_train_mIoU = -1
-  thresholds = list(np.arange(0., 0.50, 0.05))
+  thresholds = np.arange(0., 0.50, 0.05).astype(float).tolist()
 
   def evaluate(loader):
     length = len(loader)
 
-    print(f'Evaluating over {length} samples...')
+    print(f'Evaluating over {length} batches...')
 
     model.eval()
     eval_timer.tik()
@@ -222,36 +301,40 @@ if __name__ == '__main__':
 
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
-        B, _, H, W = images.size()
+        B, C, H, W = images.size()
+        _, _, ccams = model(images.to(DEVICE), inference=True)
 
-        images = images.to(DEVICE)
+        ccams = resize_for_tensors(ccams.cpu(), (H, W))
+        ccams = make_cam(ccams)
+        ccams = ccams.squeeze()
+        ccams = to_numpy(ccams)
 
-        _, _, ccams = model(images, inference=True)
-        ccams = resize_for_tensors(ccams, (H, W)).squeeze()
-        
         for i in range(B):
-          mask = get_numpy_from_tensor(masks[i])
-          mask[~np.isin(mask, [0, 255])] = 1  # to saliency
-          mh, mw = mask.shape
+          y_i = to_numpy(masks[i])
+          valid_mask = y_i < 255
+          bg_mask = y_i == 0
 
-          ccam = get_numpy_from_tensor(ccams[i])
+          # to saliency
+          y_i = np.zeros_like(y_i)
+          y_i[~bg_mask] = 1
+          y_i[~valid_mask] = 255
+
+          ccam_i = ccams[i]
 
           for t in thresholds:
-            ccam_b = (ccam > t).astype(mask.dtype)
-            meter_dic[t].add(ccam_b, mask)
-
-    model.train()
+            ccam_b = (ccam_i <= t).astype(y_i.dtype)
+            meter_dic[t].add(ccam_b, y_i)
 
     best_th = 0.0
     best_mIoU = 0.0
     best_iou = {}
 
-    for th in thresholds:
-      mIoU, _, iou, *_ = meter_dic[th].get(clear=True, detail=True)
+    for t in thresholds:
+      mIoU, _, iou, *_ = meter_dic[t].get(clear=True, detail=True)
       if best_mIoU < mIoU:
-        best_th = th
+        best_th = t
         best_mIoU = mIoU
-        best_iou = iou
+        best_iou = iou  # .astype(float).round(2).float()
 
     return best_th, best_mIoU, best_iou
 
@@ -260,11 +343,11 @@ if __name__ == '__main__':
   writer = SummaryWriter(tensorboard_dir)
 
   for epoch in range(args.max_epoch):
-    for iteration, (images, labels) in enumerate(train_loader):
+    model.train()
 
+    for step, (images, labels) in enumerate(train_loader):
       images, labels = images.to(DEVICE), labels.to(DEVICE)
 
-      optimizer.zero_grad()
       fg_feats, bg_feats, ccam = model(images)
 
       loss1 = criterion[0](fg_feats)
@@ -272,14 +355,16 @@ if __name__ == '__main__':
       loss3 = criterion[2](bg_feats)
 
       loss = loss1 + loss2 + loss3
-
       loss.backward()
-      optimizer.step()
 
-      if epoch == 0 and iteration == 600:
-        flag = check_positive(ccam)
-        print(f"Is Negative: {flag}")
-      if flag:
+      if (step + 1) % args.accumule_steps == 0:
+        optimizer.step()
+        optimizer.zero_grad()
+
+      if epoch == 0 and step == 600:
+        IS_POSITIVE = check_positive(ccam)
+        print(f"Is Negative: {IS_POSITIVE}")
+      if IS_POSITIVE:
         ccam = 1 - ccam
 
       train_meter.add(
@@ -294,19 +379,19 @@ if __name__ == '__main__':
       # For Log
       #################################################################################################
 
-      if (iteration + 1) % 100 == 0:
-        visualize_heatmap(args.tag, images.clone().detach(), ccam, 0, iteration)
+      if (step + 1) % 100 == 0:
+        visualize_heatmap(args.tag, images.clone().detach(), ccam, 0, step)
         loss, positive_loss, negative_loss = train_meter.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
 
         data = {
           'epoch': epoch,
           'max_epoch': args.max_epoch,
-          'iteration': iteration + 1,
+          'iteration': step + 1,
           'learning_rate': lr,
           'loss': loss,
-          'positive_loss': loss1,
-          'negative_loss': loss2,
+          'positive_loss': positive_loss,
+          'negative_loss': negative_loss,
           'time': train_timer.tok(clear=True),
         }
         data_dic['train'].append(data)
@@ -317,10 +402,8 @@ if __name__ == '__main__':
           'time={time:.0f}sec'.format(**data)
         )
 
-        writer.add_scalar('Train/loss', loss, iteration)
-        writer.add_scalar('Train/learning_rate', lr, iteration)
-        # break
-
+        writer.add_scalar('Train/loss', loss, step)
+        writer.add_scalar('Train/learning_rate', lr, step)
 
     #################################################################################################
     # Evaluation
@@ -328,7 +411,7 @@ if __name__ == '__main__':
     save_model_fn()
     log_func('[i] save model')
 
-    threshold, mIoU, iou = evaluate(train_loader_for_seg)
+    threshold, mIoU, iou = evaluate(valid_loader)
 
     if best_train_mIoU == -1 or best_train_mIoU < mIoU:
       best_train_mIoU = mIoU
@@ -337,10 +420,10 @@ if __name__ == '__main__':
       log_func('[i] save model')
 
     data = {
-      'iteration': iteration + 1,
+      'iteration': step + 1,
       'threshold': threshold,
       'train_sal_mIoU': mIoU,
-      'train_sal_iou': iou.float().round(4).tolist(),
+      'train_sal_iou': iou,
       'best_train_sal_mIoU': best_train_mIoU,
       'time': eval_timer.tok(clear=True),
     }
@@ -350,14 +433,14 @@ if __name__ == '__main__':
     log_func(
       'iteration={iteration:,}\n'
       'threshold={threshold:.2f}\n'
-      'train_sal_mIoU={train_mIoU:.2f}%\n'
-      'train_sal_iou ={train_iou}\n'
-      'best_train_sal_mIoU={best_train_mIoU:.2f}%\n'
+      'train_sal_mIoU={train_sal_mIoU:.2f}%\n'
+      'train_sal_iou ={train_sal_iou}\n'
+      'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
       'time={time:.0f}sec'.format(**data)
     )
 
-    writer.add_scalar('Evaluation/threshold', threshold, iteration)
-    writer.add_scalar('Evaluation/train_sal_mIoU', mIoU, iteration)
-    writer.add_scalar('Evaluation/best_train_sal_mIoU', best_train_mIoU, iteration)
+    writer.add_scalar('Evaluation/threshold', threshold, step)
+    writer.add_scalar('Evaluation/train_sal_mIoU', mIoU, step)
+    writer.add_scalar('Evaluation/best_train_sal_mIoU', best_train_mIoU, step)
 
   print(args.tag)

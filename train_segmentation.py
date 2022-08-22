@@ -224,8 +224,8 @@ if __name__ == '__main__':
                 # for visualization
                 if step == 0:
                     for b in range(8):
-                        image = get_numpy_from_tensor(images[b])
-                        pred_mask = get_numpy_from_tensor(predictions[b])
+                        image = to_numpy(images[b])
+                        pred_mask = to_numpy(predictions[b])
 
                         image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
                         h, w, c = image.shape
@@ -239,8 +239,8 @@ if __name__ == '__main__':
                         writer.add_image('Mask/{}'.format(b + 1), image, iteration, dataformats='HWC')
                 
                 for batch_index in range(images.size()[0]):
-                    pred_mask = get_numpy_from_tensor(predictions[batch_index])
-                    gt_mask = get_numpy_from_tensor(labels[batch_index])
+                    pred_mask = to_numpy(predictions[batch_index])
+                    gt_mask = to_numpy(labels[batch_index])
 
                     h, w = pred_mask.shape
                     gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)

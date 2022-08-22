@@ -305,8 +305,8 @@ if __name__ == '__main__':
           obj_cams = cams.max(dim=1)[0]
 
           for b in range(8):
-            image = get_numpy_from_tensor(images[b])
-            cam = get_numpy_from_tensor(obj_cams[b])
+            image = to_numpy(images[b])
+            cam = to_numpy(obj_cams[b])
 
             image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
             h, w, c = image.shape
@@ -322,8 +322,8 @@ if __name__ == '__main__':
 
         for batch_index in range(images.size()[0]):
           # c, h, w -> h, w, c
-          cam = get_numpy_from_tensor(cams[batch_index]).transpose((1, 2, 0))
-          gt_mask = get_numpy_from_tensor(gt_masks[batch_index])
+          cam = to_numpy(cams[batch_index]).transpose((1, 2, 0))
+          gt_mask = to_numpy(gt_masks[batch_index])
 
           h, w, c = cam.shape
           gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)

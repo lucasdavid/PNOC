@@ -1,6 +1,6 @@
 
 PY=python
-SOURCE=train_ccam.py
+SOURCE=ccam_train.py
 DEVICE=cpu
 WORKERS=8
 DATA_DIR=/mnt/files/Workspace/datasets/voc/VOCdevkit/VOC2012/
