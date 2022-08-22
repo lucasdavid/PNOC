@@ -66,6 +66,7 @@ parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
 
 parser.add_argument('--alpha', type=float, default=0.25)
+parser.add_argument('--hint_w', type=float, default=1.0)
 
 parser.add_argument('--bg_threshold', type=float, default=0.1)
 parser.add_argument('--fg_threshold', type=float, default=0.4)
@@ -79,7 +80,7 @@ GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 class VOCDatasetWithCAMs(VOC_Dataset):
 
   def __init__(self, root_dir, domain, cams_dir, resize, image_transform, aug_transform):
-    super().__init__(root_dir, domain, with_id=True)
+    super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.cams_dir = cams_dir
     self.resize = resize
     self.aug_transform = aug_transform
@@ -98,13 +99,14 @@ class VOCDatasetWithCAMs(VOC_Dataset):
 
     mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
     mask_pack = np.load(mask_path, allow_pickle=True).item()
-    cams = mask_pack['hr_cam']
+    cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
 
     # Transforms
     image = self.image_transform(image)
     cams = self.resize(cams)
 
-    image, cams = self.aug_transform(image, cams)
+    data = self.aug_transform({'image': image, 'cams': cams})
+    image, cams = data['image'], data['cams']
 
     label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
     return image, label, cams
@@ -113,11 +115,11 @@ class VOCDatasetWithCAMs(VOC_Dataset):
 # Augmentations
 
 
-def random_horizontal_flip(image, cams):
+def random_horizontal_flip(data):
   if bool(random.getrandbits(1)):
-    image = image.flip(-1)
-    cams = cams.flip(-1)
-  return image, cams
+    data['image'] = data['image'].flip(-1)
+    data['cams'] = data['cams'].flip(-1)
+  return data
 
 
 class RandomCropForCams(RandomCrop):
@@ -126,10 +128,14 @@ class RandomCropForCams(RandomCrop):
     super().__init__(crop_size)
     self.crop_shape_for_mask = (self.crop_size, self.crop_size)
 
-  def __call__(self, image, cams):
-    _, src = self.get_random_crop_box(data['image'].shape[1:])
+  def __call__(self, data):
+    _, src = self.get_random_crop_box(*data['image'].shape[1:])
     ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
-    return (image[:, ymin:ymax, xmin:xmax], cams[:, ymin:ymax, xmin:xmax])
+
+    data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
+    data['cams'] = data['cams'][:, ymin:ymax, xmin:xmax]
+
+    return data
 
 
 if __name__ == '__main__':
@@ -171,7 +177,7 @@ if __name__ == '__main__':
   imagenet_mean = [0.485, 0.456, 0.406]
   imagenet_std = [0.229, 0.224, 0.225]
 
-  resize_t = transforms.Resize(interpolation='bicubic', size=(512, 512))
+  resize_t = transforms.Resize(size=(512, 512))
   image_transform = transforms.Compose([
     resize_t,
     transforms.ToTensor(),
@@ -208,7 +214,7 @@ if __name__ == '__main__':
   log_func('[i] mean values is {}'.format(imagenet_mean))
   log_func('[i] std values is {}'.format(imagenet_std))
   log_func('[i] The number of class is {}'.format(classes))
-  log_func('[i] train_transform is {}'.format(train_transform))
+  log_func(f'[i] train_transform is {[resize_t, image_transform, aug_transform]}')
   log_func('[i] test_transform is {}'.format(test_transform))
   log_func('[i] #train data'.format(len(train_dataset)))
   log_func('[i] #valid data'.format(len(valid_dataset)))
@@ -244,10 +250,12 @@ if __name__ == '__main__':
   ###################################################################################
   # Loss, Optimizer
   ###################################################################################
+  hint_loss_fn = nn.BCEWithLogitsLoss(reduction='none').to(DEVICE)
+
   criterion = [
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE),
     SimMinLoss(metric='cos').to(DEVICE),
-    SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
+    SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE),
   ]
 
   optimizer = PolyOptimizer(
@@ -284,8 +292,6 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss'])
-
   best_train_mIoU = -1
   thresholds = np.arange(0., 0.50, 0.05).astype(float).tolist()
 
@@ -302,12 +308,12 @@ if __name__ == '__main__':
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
         B, C, H, W = images.size()
-        _, _, ccams = model(images.to(DEVICE), inference=True)
+        _, _, ccam = model(images.to(DEVICE))
 
-        ccams = resize_for_tensors(ccams.cpu(), (H, W))
-        ccams = make_cam(ccams)
-        ccams = ccams.squeeze()
-        ccams = to_numpy(ccams)
+        ccam = resize_for_tensors(ccam.cpu(), (H, W))
+        ccam = make_cam(ccam)
+        ccam = ccam.squeeze()
+        ccam = to_numpy(ccam)
 
         for i in range(B):
           y_i = to_numpy(masks[i])
@@ -319,7 +325,7 @@ if __name__ == '__main__':
           y_i[~bg_mask] = 1
           y_i[~valid_mask] = 255
 
-          ccam_i = ccams[i]
+          ccam_i = ccam[i]
 
           for t in thresholds:
             ccam_b = (ccam_i <= t).astype(y_i.dtype)
@@ -338,28 +344,43 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU, best_iou
 
-  train_meter = Average_Meter(['loss', 'positive_loss', 'negative_loss'])
+  train_meter = Average_Meter(['loss', 'positive_loss', 'negative_loss', 'hint_loss'])
 
   writer = SummaryWriter(tensorboard_dir)
 
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, labels) in enumerate(train_loader):
-      images, labels = images.to(DEVICE), labels.to(DEVICE)
+    for step, (images, labels, cam_hints) in enumerate(train_loader):
 
-      fg_feats, bg_feats, ccam = model(images)
+      fg_feats, bg_feats, output = model(images.to(DEVICE))
 
       loss1 = criterion[0](fg_feats)
       loss2 = criterion[1](bg_feats, fg_feats)
       loss3 = criterion[2](bg_feats)
 
-      loss = loss1 + loss2 + loss3
+      # CAM Hints
+      cam_hints = F.interpolate(cam_hints, output.shape[2:], mode='bicubic')  # B1HW -> B1hw
+
+      bg_likely = cam_hints < args.bg_threshold
+      fg_likely = cam_hints >= args.fg_threshold
+      mk_likely = (bg_likely | fg_likely).to(DEVICE)
+
+      target = torch.zeros_like(cam_hints)
+      target[fg_likely] = 1.
+
+      loss_h = hint_loss_fn(output, target.to(DEVICE))
+      loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum()
+
+      # Back-propagation
+      loss = args.hint_w * loss_h + (loss1 + loss2 + loss3)
       loss.backward()
 
       if (step + 1) % args.accumule_steps == 0:
         optimizer.step()
         optimizer.zero_grad()
+
+      ccam = torch.sigmoid(output)
 
       if epoch == 0 and step == 600:
         IS_POSITIVE = check_positive(ccam)
@@ -370,6 +391,7 @@ if __name__ == '__main__':
       train_meter.add(
         {
           'loss': loss.item(),
+          'hint_loss': loss_h.item(),
           'positive_loss': loss1.item() + loss3.item(),
           'negative_loss': loss2.item(),
         }
@@ -381,7 +403,7 @@ if __name__ == '__main__':
 
       if (step + 1) % 100 == 0:
         visualize_heatmap(args.tag, images.clone().detach(), ccam, 0, step)
-        loss, positive_loss, negative_loss = train_meter.get(clear=True)
+        loss, positive_loss, negative_loss, loss_h = train_meter.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
 
         data = {
@@ -392,13 +414,14 @@ if __name__ == '__main__':
           'loss': loss,
           'positive_loss': positive_loss,
           'negative_loss': negative_loss,
+          'hint_loss': loss_h,
           'time': train_timer.tok(clear=True),
         }
         data_dic['train'].append(data)
 
         log_func(
           'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
-          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} '
+          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} hint_loss={hint_loss:.4f}'
           'time={time:.0f}sec'.format(**data)
         )
 

@@ -105,14 +105,10 @@ class Disentangler(nn.Module):
     self.activation_head = nn.Conv2d(cin, 1, kernel_size=3, padding=1, bias=False)
     self.bn_head = nn.BatchNorm2d(1)
 
-  def forward(self, x, inference=False):
+  def forward(self, x):
     N, C, H, W = x.size()
-    if inference:
-      ccam = self.bn_head(self.activation_head(x))
-    else:
-      ccam = torch.sigmoid(self.bn_head(self.activation_head(x)))
-
-    ccam_ = ccam.reshape(N, 1, H * W)  # [N, 1, H*W]
+    ccam = self.bn_head(self.activation_head(x))
+    ccam_ = torch.sigmoid(ccam).reshape(N, 1, H * W)  # [N, 1, H*W]
     x = x.reshape(N, C, H * W).permute(0, 2, 1).contiguous()  # [N, H*W, C]
     fg_feats = torch.matmul(ccam_, x) / (H * W)  # [N, 1, C]
     bg_feats = torch.matmul(1 - ccam_, x) / (H * W)  # [N, 1, C]

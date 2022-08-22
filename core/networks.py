@@ -210,7 +210,7 @@ class CCAM(Backbone):
     self.ac_head = ccam.Disentangler(stage4_out_features + self.out_features)
     self.from_scratch_layers += [self.ac_head]
 
-  def forward(self, x, inference=False):
+  def forward(self, x):
     x = self.stage1(x)
     x = self.stage2(x)
     x = self.stage3(x)
@@ -219,16 +219,7 @@ class CCAM(Backbone):
 
     feats = torch.cat([x2, x1], dim=1)
 
-    return self.ac_head(feats, inference=inference)
-
-    # if with_cam:
-    #   features = self.classifier(x2)
-    #   logits = self.global_average_pooling_2d(features)
-    #   return logits, fg_feats, bg_feats, ccam, features
-    # else:
-    #   x = self.global_average_pooling_2d(x2, keepdims=True)
-    #   logits = self.classifier(x).view(-1, self.num_classes)
-    #   return logits, fg_feats, bg_feats, ccam
+    return self.ac_head(feats)
 
 
 class AffinityNet(Backbone):
