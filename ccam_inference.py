@@ -132,7 +132,7 @@ if __name__ == '__main__':
     images = images.cuda()
 
     # inferenece
-    _, _, cam = model(images, inference=True)
+    _, _, cam = model(images)
     # if flag:
     #     cam = 1 - cam
     # postprocessing

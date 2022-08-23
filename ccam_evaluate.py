@@ -1,6 +1,7 @@
 import argparse
 import multiprocessing
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -23,7 +24,8 @@ parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/Segmentation
 parser.add_argument('--logfile', default='', type=str)
 parser.add_argument('--comment', default='', type=str)
 
-parser.add_argument('--mode', default='npy', type=str)  # png, rw
+parser.add_argument('--mode', default='npy', type=str, choices=['npy', 'png'])
+parser.add_argument('--eval_mode', default='saliency', type=str, choices=['saliency', 'segmentation'])
 parser.add_argument('--min_th', default=0.05, type=float)
 parser.add_argument('--max_th', default=0.50, type=float)
 parser.add_argument('--step_th', default=0.05, type=float)
@@ -31,14 +33,21 @@ parser.add_argument('--step_th', default=0.05, type=float)
 args = parser.parse_args()
 
 predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
-gt_dir = args.gt_dir
+ground_truth_folder = args.gt_dir
 p_mode = args.predict_mode
 
 assert p_mode in ('logit', 'sigmoid')
 
 args.list = './data/' + args.domain + '.txt'
 
-CLASSES = ['background', 'foreground']
+if args.eval_mode == 'saliency':
+  CLASSES = ['background', 'foreground']
+else:
+  CLASSES = [
+    'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
+    'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
+  ]
+
 NUM_CLASSES = len(CLASSES)
 
 
@@ -48,11 +57,11 @@ def compare(start, step, TP, P, T, name_list):
 
     npy_file = os.path.join(predict_folder, name + '.npy')
     png_file = os.path.join(predict_folder, name + '.png')
-    label_file = os.path.join(gt_dir, name + '.png')
+    label_file = os.path.join(ground_truth_folder, name + '.png')
 
     if os.path.exists(png_file):
-      y_pred = np.array(Image.open(predict_folder + name + '.png')) / 255.
-      y_pred = y_pred.astype(np.uint8)
+      sal_pred = np.array(Image.open(predict_folder + name + '.png')) / 255.
+      sal_pred = sal_pred.round().astype(np.uint8)
     elif os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
 
@@ -66,21 +75,35 @@ def compare(start, step, TP, P, T, name_list):
       else:
         cams = np.concatenate((cams, 1-cams), axis=0)
 
-      y_pred = data['keys'][np.argmax(cams, axis=0)]
+      sal_pred = data['keys'][np.argmax(cams, axis=0)]
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
     
     if args.predict_flip:
-      y_pred = 1 - y_pred
-
+      sal_pred = 1 - sal_pred
+    
     y_true = np.array(Image.open(label_file))
     valid_mask = y_true < 255
-    bg_mask = y_true == 0
 
-    y_true = np.zeros_like(y_true)
-    y_true[bg_mask] = 0
-    y_true[~bg_mask] = 1
-    y_true[~valid_mask] = 255
+    if args.eval_mode == 'saliency':
+      # Segmentation to saliency map:
+      bg_mask = y_true == 0
+      y_true = np.zeros_like(y_true)
+      y_true[bg_mask] = 0
+      y_true[~bg_mask] = 1
+      y_true[~valid_mask] = 255
+
+      y_pred = sal_pred
+    else:
+      # Predicted saliency to segmentation map, assuming perfect pixel segm.:
+      fg_pred = sal_pred == 1
+      fg_true = ~np.isin(y_true, [0, 255])
+      
+      # does not leak true bg:
+      random_pixels = np.unique(y_true[fg_true].ravel())
+      random_pixels = np.random.choice(random_pixels, size=y_true.shape)
+      y_pred = fg_true * y_true + ~fg_true * random_pixels
+      y_pred[~fg_pred] = 0
 
     mask = (y_pred == y_true) * valid_mask
 
@@ -145,6 +168,14 @@ def do_python_eval(name_list, num_cores=8):
 
 
 if __name__ == '__main__':
+  if not os.path.exists(predict_folder):
+    print(f'Predicted saliency maps folder `{predict_folder}` does not exist.', file=sys.stderr)
+    exit(1)
+  
+  if not os.path.exists(ground_truth_folder):
+    print(f'True saliency maps folder `{ground_truth_folder}` does not exist.', file=sys.stderr)
+    exit(1)
+
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
@@ -155,7 +186,7 @@ if __name__ == '__main__':
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and p_mode == 'logit' and args.mode != 'png'
+    if args.threshold is None and args.mode != 'png' and p_mode == 'logit'
     else [args.threshold]
   )
 
@@ -163,7 +194,9 @@ if __name__ == '__main__':
     args.threshold = t
     r = do_python_eval(filenames)
 
-    print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%} iou=[{r['background']:.3f}, {r['foreground']:.3f}]")
+    print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
+          f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
+          f"FP={r['fp_all']:.3%}")
 
     fp_history.append(r['fp_all'])
     miou_history.append(r['mIoU'])

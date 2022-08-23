@@ -47,7 +47,7 @@ DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
 
-DOMAIN=train
+DOMAIN=train_aug
 
 
 TAG=ccamh@resnest101@resnest101-ra
@@ -70,22 +70,21 @@ CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
   --data_dir        $DATA_DIR            &
 
 
-TAG=ccamh@resnet38d@resnest101-ra@0.3-@BG_T@h1.0-e10-b64-lr0.001
-ARCHITECTURE=resnet38d
-WEIGHTS=./experiments/models/ccamh@resnet38d@resnest101-ra@0.3-@BG_T@h1.0-e10-b64-lr0.001.pth
+# TAG=ccamh@resnet38d@resnest101-ra@0.3-@BG_T@h1.0-e10-b64-lr0.001
+# ARCHITECTURE=resnet38d
+# WEIGHTS=./experiments/models/ccamh@resnet38d@resnest101-ra@0.3-@BG_T@h1.0-e10-b64-lr0.001.pth
 
-CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
-  --tag             $TAG                 \
-  --domain          $DOMAIN              \
-  --activation      sigmoid              \
-  --num_workers     $WORKERS             \
-  --architecture    $ARCHITECTURE        \
-  --dilated         $DILATED             \
-  --stage4_out_features $S4_OUT_FEATURES \
-  --mode            $MODE                \
-  --trainable-stem  $TRAINABLE_STEM      \
-  --pretrained      $WEIGHTS             \
-  --data_dir        $DATA_DIR            &
+# CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
+#   --tag             $TAG                 \
+#   --domain          $DOMAIN              \
+#   --num_workers     $WORKERS             \
+#   --architecture    $ARCHITECTURE        \
+#   --dilated         $DILATED             \
+#   --stage4_out_features $S4_OUT_FEATURES \
+#   --mode            $MODE                \
+#   --trainable-stem  $TRAINABLE_STEM      \
+#   --pretrained      $WEIGHTS             \
+#   --data_dir        $DATA_DIR            &
 
 TAG=ccamh@resnest101@resnest269-poc
 ARCHITECTURE=resnest101
@@ -107,21 +106,20 @@ CUDA_VISIBLE_DEVICES=2 $PY $SOURCE       \
   --data_dir        $DATA_DIR            &
 
 
-TAG=ccamh@resnet38d@resnest269-poc
-ARCHITECTURE=resnet38d
-WEIGHTS=./experiments/models/ccamh@resnet38d@resnest269-poc@0.4-@BG_T@h1.0-e10-b64-lr0.001.pth
+# TAG=ccamh@resnet38d@resnest269-poc
+# ARCHITECTURE=resnet38d
+# WEIGHTS=./experiments/models/ccamh@resnet38d@resnest269-poc@0.4-@BG_T@h1.0-e10-b64-lr0.001.pth
 
-CUDA_VISIBLE_DEVICES=3 $PY $SOURCE       \
-  --tag             $TAG                 \
-  --domain          $DOMAIN              \
-  --activation      sigmoid              \
-  --num_workers     $WORKERS             \
-  --architecture    $ARCHITECTURE        \
-  --dilated         $DILATED             \
-  --stage4_out_features $S4_OUT_FEATURES \
-  --mode            $MODE                \
-  --trainable-stem  $TRAINABLE_STEM      \
-  --pretrained      $WEIGHTS             \
-  --data_dir        $DATA_DIR            &
+# CUDA_VISIBLE_DEVICES=3 $PY $SOURCE       \
+#   --tag             $TAG                 \
+#   --domain          $DOMAIN              \
+#   --num_workers     $WORKERS             \
+#   --architecture    $ARCHITECTURE        \
+#   --dilated         $DILATED             \
+#   --stage4_out_features $S4_OUT_FEATURES \
+#   --mode            $MODE                \
+#   --trainable-stem  $TRAINABLE_STEM      \
+#   --pretrained      $WEIGHTS             \
+#   --data_dir        $DATA_DIR            &
 
 wait
