@@ -36,11 +36,11 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
-SOURCE=ccam_train_with_hints.py
+SOURCE=ccam_train_with_cam_hints.py
 
 LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest269@puzzlerep@train@scale=0.5,1.0,1.5,2.0
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 
 WORKERS=8
 
@@ -49,23 +49,25 @@ EPOCHS=10
 BATCH_SIZE=64
 ACCUMULATE_STEPS=2
 
-ARCHITECTURE=resnet38d
+ARCHITECTURE=resnest101
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
 S4_OUT_FEATURES=1024
 
 ALPHA=0.25
+HINT_W=1.0
 LR=0.001
 
 FG_T=0.4
 BG_T=0.1
 
-TAG=ccamh@$ARCHITECTURE@e$EPOCHS-b$BATCH_SIZE-lr$LR
+TAG=ccamh@$ARCHITECTURE@resnest269-poc@$BG_T-$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
   --tag             $TAG                 \
   --alpha           $ALPHA               \
+  --hint_w          $HINT_W              \
   --max_epoch       $EPOCHS              \
   --batch_size      $BATCH_SIZE          \
   --lr              $LR                  \

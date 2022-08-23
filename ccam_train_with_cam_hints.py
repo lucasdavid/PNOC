@@ -421,7 +421,7 @@ if __name__ == '__main__':
 
         log_func(
           'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
-          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} hint_loss={hint_loss:.4f}'
+          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} loss_h={hint_loss:.4f} '
           'time={time:.0f}sec'.format(**data)
         )
 
