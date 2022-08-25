@@ -68,10 +68,11 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.1, type=float)
+parser.add_argument('--print_ratio', default=0.5, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
+parser.add_argument('--cutmix_prob', default=1.0, type=float)
 
 if __name__ == '__main__':
   ###################################################################################
@@ -79,7 +80,14 @@ if __name__ == '__main__':
   ###################################################################################
   args = parser.parse_args()
 
+  TAG = args.tag
+  SEED = args.seed
   DEVICE = args.device
+  CUTMIX = 'cutmix' in args.augment
+
+  META = read_json('./data/VOC_2012.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
   print('Train Configuration')
   pad = max(map(len, vars(args))) + 1
@@ -90,16 +98,16 @@ if __name__ == '__main__':
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
+  tensorboard_dir = create_directory(f'./experiments/tensorboards/{TAG}/')
 
-  log_path = log_dir + f'{args.tag}.txt'
-  data_path = data_dir + f'{args.tag}.json'
-  model_path = model_dir + f'{args.tag}.pth'
+  log_path = log_dir + f'{TAG}.txt'
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
-  set_seed(args.seed)
+  set_seed(SEED)
   log_func = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(args.tag))
+  log_func('[i] {}'.format(TAG))
   log_func()
 
   ###################################################################################
@@ -108,46 +116,53 @@ if __name__ == '__main__':
   imagenet_mean = [0.485, 0.456, 0.406]
   imagenet_std = [0.229, 0.224, 0.225]
 
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
+  if CUTMIX:
+    tt = [
+      transforms.Resize((args.image_size, args.image_size)),
+      RandomHorizontalFlip(),
+      transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+      Normalize(imagenet_mean, imagenet_std),
+      Transpose()
+    ]
+  else:
+    tt = [
+      RandomResize(args.min_image_size, args.max_image_size),
+      RandomHorizontalFlip()
+    ]
 
-  train_transforms = [
-    RandomResize(args.min_image_size, args.max_image_size),
-    RandomHorizontalFlip(),
-  ]
-  if 'colorjitter' in args.augment:
-    train_transforms.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+    if 'colorjitter' in args.augment:
+      tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
 
-  if 'randaugment' in args.augment:
-    train_transforms.append(RandAugmentMC(n=2, m=10))
+    if 'randaugment' in args.augment:
+      tt.append(RandAugmentMC(n=2, m=10))
+  
+    tt += [
+      Normalize(imagenet_mean, imagenet_std),
+      RandomCrop(args.image_size),
+      Transpose()
+    ]
 
-  train_transform = transforms.Compose(train_transforms + [
-    Normalize(imagenet_mean, imagenet_std),
-    RandomCrop(args.image_size),
-    Transpose()
-  ])
-  test_transform = transforms.Compose([
+  tt = transforms.Compose(tt)
+  tv = transforms.Compose([
     Normalize_For_Segmentation(imagenet_mean, imagenet_std),
     Top_Left_Crop_For_Segmentation(args.image_size),
     Transpose_For_Segmentation()
   ])
 
-  meta_dic = read_json('./data/VOC_2012.json')
-  class_names = np.asarray(meta_dic['class_names'])
-  classes = meta_dic['classes']
+  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
+  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
 
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
-
-  train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
+  if CUTMIX:
+    train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
-  train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
   log_func('[i] mean values is {}'.format(imagenet_mean))
   log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(meta_dic['classes']))
-  log_func('[i] train_transform is {}'.format(train_transform))
-  log_func('[i] test_transform is {}'.format(test_transform))
+  log_func('[i] The number of class is {}'.format(META['classes']))
+  log_func('[i] train_transform is {}'.format(tt))
+  log_func('[i] test_transform is {}'.format(tv))
   log_func()
 
   val_iteration = len(train_loader)
@@ -165,7 +180,7 @@ if __name__ == '__main__':
   ###################################################################################
   model = Classifier(
     args.architecture,
-    classes,
+    NUM_CLASSES,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -341,12 +356,11 @@ if __name__ == '__main__':
       write_json(data_path, data_dic)
 
       log_func(
-        '[i] \
-                iteration={iteration:,}, \
-                learning_rate={learning_rate:.4f}, \
-                loss={loss:.4f}, \
-                class_loss={class_loss:.4f}, \
-                time={time:.0f}sec'.format(**data)
+        'iteration={iteration:,} '
+        'learning_rate={learning_rate:.4f} '
+        'loss={loss:.4f} '
+        'class_loss={class_loss:.4f} '
+        'time={time:.0f}sec'.format(**data)
       )
 
       writer.add_scalar('Train/loss', loss, iteration)
@@ -357,7 +371,7 @@ if __name__ == '__main__':
     # Evaluation
     #################################################################################################
     if (iteration + 1) % val_iteration == 0:
-      threshold, mIoU = evaluate(train_loader_for_seg)
+      threshold, mIoU = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
@@ -376,12 +390,11 @@ if __name__ == '__main__':
       write_json(data_path, data_dic)
 
       log_func(
-        '[i] \
-                iteration={iteration:,}, \
-                threshold={threshold:.2f}, \
-                train_mIoU={train_mIoU:.2f}%, \
-                best_train_mIoU={best_train_mIoU:.2f}%, \
-                time={time:.0f}sec'.format(**data)
+        'iteration={iteration:,} '
+        'threshold={threshold:.2f} '
+        'train_mIoU={train_mIoU:.2f}% '
+        'best_train_mIoU={best_train_mIoU:.2f}% '
+        'time={time:.0f}sec'.format(**data)
       )
 
       writer.add_scalar('Evaluation/threshold', threshold, iteration)
@@ -391,4 +404,4 @@ if __name__ == '__main__':
   write_json(data_path, data_dic)
   writer.close()
 
-  print(args.tag)
+  print(TAG)

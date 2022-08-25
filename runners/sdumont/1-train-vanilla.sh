@@ -39,8 +39,8 @@ SOURCE=train_classification.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 ARCHITECTURE=resnest269
-AUGMENT=colorjitter_randaugment
-TAG=$ARCHITECTURE@randaug
+AUGMENT=cutmix
+TAG=$ARCHITECTURE@cutmix
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \

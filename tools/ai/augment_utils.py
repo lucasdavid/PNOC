@@ -1,4 +1,3 @@
-import cv2
 import random
 import numpy as np
 
@@ -185,8 +184,8 @@ def random_crop_box(crop_size, h, w):
   ch = min(crop_size, h)  # (448, 512) -> 448
   cw = min(crop_size, w)  # (448, 300) -> 300
 
-  w_space = w - crop_size # 512-448 =   64
-  h_space = h - crop_size # 300-448 = -148
+  w_space = w - crop_size  # 512-448 =   64
+  h_space = h - crop_size  # 300-448 = -148
 
   if w_space > 0:
     cont_left = 0
@@ -215,7 +214,6 @@ class RandomCrop:
     self.with_bbox = with_bbox
     self.crop_size = crop_size
     self.crop_shape = (self.crop_size, self.crop_size, channels)
-
 
   def __call__(self, image, bbox_dic=None):
     if bbox_dic is None:
@@ -294,21 +292,20 @@ class Resize_For_Mask:
 # CutMix and FMix
 
 
-
 def rand_bbox(h, w, lam):
-    cut_rat = np.sqrt(1. - lam)
-    cut_w = np.int(w * cut_rat)
-    cut_h = np.int(h * cut_rat)
+  ratio = np.sqrt(1. - lam)
+  cw = np.int(w * ratio)
+  ch = np.int(h * ratio)
 
-    cx = np.random.randint(w)
-    cy = np.random.randint(h)
+  cx = np.random.randint(cw//2, w - cw//2)
+  cy = np.random.randint(ch//2, h - ch//2)
 
-    h1 = np.clip(cy - cut_h // 2, 0, h)
-    h2 = np.clip(cy + cut_h // 2, 0, h)
-    w1 = np.clip(cx - cut_w // 2, 0, w)
-    w2 = np.clip(cx + cut_w // 2, 0, w)
+  h1 = np.clip(cy - ch // 2, 0, h)
+  h2 = np.clip(cy + ch // 2, 0, h)
+  w1 = np.clip(cx - cw // 2, 0, w)
+  w2 = np.clip(cx + cw // 2, 0, w)
 
-    return h1, w1, h2, w2
+  return h1, w1, h2, w2
 
 
 class CutMix(torch.utils.data.Dataset):
@@ -336,19 +333,27 @@ class CutMix(torch.utils.data.Dataset):
       xb, yb = self.dataset[r]
 
       # Cut random bbox.
-      aH, aW = x.size()[1:]
-      bH, bW = xb.size()[1:]
-      bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
-      xb = xb[:, bh1:bh2, bw1:bw2]
-      bH, bW = xb.size()[1:]
+      bH, bW = xb.shape[1:]
 
-      bhs = (bH-aH) // 2 if bH > aH else 0
-      bws = (bW-aW) // 2 if bW > aW else 0
-      xb = xb[:, bhs:bhs+aH, bws:bws+aW]
+      h1, w1, h2, w2 = rand_bbox(bH, bW, lam)
+      x[:, h1:h2, w1:w2] = xb[:, h1:h2, w1:w2]
 
-      x[:, bh1:bh2, bw1:bw2] = xb
-      
-      lam = 1 - ((bh2 - bh1) * (bw2 - bw1) / (bH*bW))
+      # For images with different sizes:
+      # bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
+      # xb = xb[:, bh1:bh2, bw1:bw2]
+
+      # # Central crop if B larger than A.
+      # aH, aW = x.shape[1:]
+      # bH, bW = xb.shape[1:]
+      # bhs = (bH-aH) // 2 if bH > aH else 0
+      # bws = (bW-aW) // 2 if bW > aW else 0
+      # xb = xb[:, bhs:bhs+aH, bws:bws+aW]
+
+      # # Random (x,y) placement if A larger than B.
+      # bH, bW = xb.shape[1:]
+      # x[:, 0:bH, 0:bW] = xb
+
+      lam = 1 - ((h2 - h1) * (w2 - w1) / (bH * bW))
       y = y * lam + yb * (1. - lam)
 
     return x, y
