@@ -40,16 +40,17 @@ SOURCE=ccam_train_with_cam_hints.py
 
 LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
 CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 
 WORKERS=8
 
 IMAGE_SIZE=448
 EPOCHS=10
-BATCH_SIZE=64
-ACCUMULATE_STEPS=2
+BATCH_SIZE=32
+ACCUMULATE_STEPS=4
 
-ARCHITECTURE=resnest101
+ARCHITECTURE=resnest269
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
@@ -60,9 +61,9 @@ HINT_W=1.0
 LR=0.001
 
 FG_T=0.4
-BG_T=0.1
+# BG_T=0.1
 
-TAG=ccamh@$ARCHITECTURE@resnest269-poc@$BG_T-$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+TAG=ccam-fg-hints@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
   --tag             $TAG                 \
@@ -80,6 +81,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
   --trainable-stem  $TRAINABLE_STEM      \
   --image_size      $IMAGE_SIZE          \
   --cams_dir        $CAMS_DIR            \
-  --bg_threshold    $BG_T                \
   --fg_threshold    $FG_T                \
   --data_dir        $DATA_DIR
+  # --bg_threshold    $BG_T                \

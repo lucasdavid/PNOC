@@ -38,9 +38,9 @@ PY=python3.9
 SOURCE=train_classification.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=res2net101_v1b
+ARCHITECTURE=resnest269
 AUGMENT=colorjitter_randaugment
-TAG=$ARCHITECTURE@randaug@bnwowd
+TAG=$ARCHITECTURE@randaug
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \

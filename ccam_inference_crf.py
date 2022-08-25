@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=16, type=int)
+parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
 
 ###############################################################################
@@ -53,7 +53,6 @@ def _work(process_id, dataset, args):
       continue
 
     pack = np.load(ccam_dir + _id + '.npy', allow_pickle=True).item()
-    keys = pack['keys']
     cams = pack['hr_cam']
 
     if args.activation == 'relu':
@@ -61,7 +60,7 @@ def _work(process_id, dataset, args):
       cams = np.argmax(cams, axis=0)
 
       if args.crf_iteration > 0:
-        cams = crf_inference_label(np.asarray(image), cams, n_labels=keys.shape[0], t=args.crf_iteration)
+        cams = crf_inference_label(np.asarray(image), cams, n_labels=2, t=args.crf_iteration)
     else:
       cams = np.concatenate((1 - cams, cams))
 
@@ -73,7 +72,7 @@ def _work(process_id, dataset, args):
     if process_id == args.num_workers - 1 and step % (length // 20) == 0:
       sys.stdout.write(
         '\r# CAMs CRF Inference [{}/{}] = {:.2f}%, ({}, {})'.format(
-          step + 1, length, (step + 1) / length * 100, reversed(image.size), cams.shape
+          step + 1, length, (step + 1) / length * 100, tuple(reversed(image.size)), cams.shape
         )
       )
       sys.stdout.flush()

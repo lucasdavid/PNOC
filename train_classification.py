@@ -171,7 +171,7 @@ if __name__ == '__main__':
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
-  param_groups = model.get_parameter_groups(exclude_partial_names=['bn'])
+  param_groups = model.get_parameter_groups()
 
   model = model.to(DEVICE)
   model.train()
@@ -213,7 +213,7 @@ if __name__ == '__main__':
     ],
     lr=args.lr,
     momentum=0.9,
-    weight_decay=0,
+    weight_decay=args.wd,
     max_step=max_iteration,
   )
 

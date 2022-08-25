@@ -17,7 +17,7 @@ parser.add_argument("--domain", default='train', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument('--predict_mode', default='logit', type=str)
-parser.add_argument('--predict_flip', default=True, type=str2bool)
+parser.add_argument('--predict_flip', default=False, type=str2bool)
 
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
@@ -60,27 +60,27 @@ def compare(start, step, TP, P, T, name_list):
     label_file = os.path.join(ground_truth_folder, name + '.png')
 
     if os.path.exists(png_file):
-      sal_pred = np.array(Image.open(predict_folder + name + '.png')) / 255.
-      sal_pred = sal_pred.round().astype(np.uint8)
+      s_pred = np.array(Image.open(predict_folder + name + '.png'))[np.newaxis, ...] / 255.
     elif os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
 
       if 'hr_cam' in data.keys():
-        cams = data['hr_cam']
+        s_pred = data['hr_cam']
       elif 'rw' in data.keys():
-        cams = data['rw']
-    
-      if p_mode == 'logit':
-        cams = np.pad(cams, ((0, 1), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
-      else:
-        cams = np.concatenate((cams, 1-cams), axis=0)
-
-      sal_pred = data['keys'][np.argmax(cams, axis=0)]
+        s_pred = data['rw']
+      s_pred = s_pred
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
     
+    if p_mode == 'logit':
+      s_pred = np.pad(s_pred, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
+    else:
+      s_pred = np.concatenate((1-s_pred, s_pred), axis=0)
+
+    s_pred = np.argmax(s_pred, axis=0)
+
     if args.predict_flip:
-      sal_pred = 1 - sal_pred
+      s_pred = 1 - s_pred
     
     y_true = np.array(Image.open(label_file))
     valid_mask = y_true < 255
@@ -92,11 +92,10 @@ def compare(start, step, TP, P, T, name_list):
       y_true[bg_mask] = 0
       y_true[~bg_mask] = 1
       y_true[~valid_mask] = 255
-
-      y_pred = sal_pred
+      y_pred = s_pred
     else:
       # Predicted saliency to segmentation map, assuming perfect pixel segm.:
-      fg_pred = sal_pred == 1
+      fg_pred = s_pred == 1
       fg_true = ~np.isin(y_true, [0, 255])
       
       # does not leak true bg:
@@ -186,7 +185,7 @@ if __name__ == '__main__':
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and args.mode != 'png' and p_mode == 'logit'
+    if args.threshold is None and p_mode == 'logit'
     else [args.threshold]
   )
 

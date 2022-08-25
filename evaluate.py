@@ -205,5 +205,5 @@ if __name__ == '__main__':
     fp_under = fp_history[under_index]
 
     print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_ or 0., miou_, fp_))
-    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th, over_mIoU, fp_over))
-    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th, under_mIoU, fp_under))
+    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th or 0., over_mIoU, fp_over))
+    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th or 0., under_mIoU, fp_under))

@@ -68,10 +68,8 @@ parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--alpha', type=float, default=0.25)
 parser.add_argument('--hint_w', type=float, default=1.0)
 
-parser.add_argument('--bg_threshold', type=float, default=0.1)
+# parser.add_argument('--bg_threshold', type=float, default=0.1)
 parser.add_argument('--fg_threshold', type=float, default=0.4)
-
-IS_POSITIVE = True
 
 GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
 GPUS_COUNT = len(GPUS_VISIBLE.split(','))
@@ -129,7 +127,7 @@ class RandomCropForCams(RandomCrop):
     self.crop_shape_for_mask = (self.crop_size, self.crop_size)
 
   def __call__(self, data):
-    _, src = self.get_random_crop_box(*data['image'].shape[1:])
+    _, src = self.random_crop_box(*data['image'].shape[1:])
     ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
 
     data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
@@ -328,8 +326,8 @@ if __name__ == '__main__':
           ccam_i = ccam[i]
 
           for t in thresholds:
-            ccam_b = (ccam_i <= t).astype(y_i.dtype)
-            meter_dic[t].add(ccam_b, y_i)
+            ccam_it = (ccam_i >= t).astype(y_i.dtype)
+            meter_dic[t].add(ccam_it, y_i)
 
     best_th = 0.0
     best_mIoU = 0.0
@@ -362,15 +360,22 @@ if __name__ == '__main__':
       # CAM Hints
       cam_hints = F.interpolate(cam_hints, output.shape[2:], mode='bicubic')  # B1HW -> B1hw
 
-      bg_likely = cam_hints < args.bg_threshold
-      fg_likely = cam_hints >= args.fg_threshold
-      mk_likely = (bg_likely | fg_likely).to(DEVICE)
+      # Using foreground cues:
+      fg_likely = (cam_hints >= args.fg_threshold).to(DEVICE)
 
-      target = torch.zeros_like(cam_hints)
-      target[fg_likely] = 1.
+      # loss_h := -log(sigmoid(output[fg_likely]))
+      output_fg = output[fg_likely]
+      target_fg = torch.ones_like(output_fg)
+      loss_h = hint_loss_fn(target_fg, output_fg).mean()
 
-      loss_h = hint_loss_fn(output, target.to(DEVICE))
-      loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum()
+      # Using both foreground and background cues:
+      # bg_likely = cam_hints < args.bg_threshold
+      # fg_likely = cam_hints >= args.fg_threshold
+      # mk_likely = (bg_likely | fg_likely).to(DEVICE)
+      # target = torch.zeros_like(cam_hints)
+      # target[fg_likely] = 1.
+      # loss_h = hint_loss_fn(target, output)
+      # loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum()
 
       # Back-propagation
       loss = args.hint_w * loss_h + (loss1 + loss2 + loss3)
@@ -381,12 +386,6 @@ if __name__ == '__main__':
         optimizer.zero_grad()
 
       ccam = torch.sigmoid(output)
-
-      if epoch == 0 and step == 600:
-        IS_POSITIVE = check_positive(ccam)
-        print(f"Is Negative: {IS_POSITIVE}")
-      if IS_POSITIVE:
-        ccam = 1 - ccam
 
       train_meter.add(
         {

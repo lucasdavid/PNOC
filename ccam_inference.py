@@ -148,9 +148,8 @@ if __name__ == '__main__':
   vis_cam = True
   with torch.no_grad():
     length = len(dataset)
-    for step, (ori_image, image_id, label, gt_mask) in enumerate(dataset):
+    for step, (ori_image, image_id, _, _) in enumerate(dataset):
       ori_w, ori_h = ori_image.size
-      label = np.array([1])
       npy_path = pred_dir + image_id + '.npy'
       if os.path.isfile(npy_path):
         continue
@@ -165,41 +164,10 @@ if __name__ == '__main__':
       hr_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams_list]
       hr_cams = torch.mean(torch.stack(hr_cams_list), dim=0)[:, :ori_h, :ori_w] # (1, 1, H, W)
 
-      keys = torch.nonzero(torch.from_numpy(label))[:, 0]
+      strided_cams = make_cam(strided_cams.unsqueeze(1)).squeeze(1)
+      hr_cams = make_cam(hr_cams.unsqueeze(1)).squeeze(1)
 
-      strided_cams = strided_cams[keys]
-
-      if args.activation == 'relu':
-        strided_cams /= F.adaptive_max_pool2d(strided_cams, (1, 1)) + 1e-5
-
-      hr_cams = hr_cams[keys]
-      if args.activation == 'relu':
-        hr_cams /= F.adaptive_max_pool2d(hr_cams, (1, 1)) + 1e-5
-
-      ######################################################################
-      # cam = torch.sum(hr_cams, dim=0)
-      # cam = cam.unsqueeze(0).unsqueeze(0)
-
-      # cam = make_cam(cam).squeeze()
-      # cam = to_numpy(cam)
-
-      # image = np.array(ori_image)
-
-      # h, w, c = image.shape
-
-      # cam = (cam * 255).astype(np.uint8)
-      # cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
-      # cam = colormap(cam)
-
-      # image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)
-      # if os.path.isfile(f'{cam_path}/{image_id}.png'):
-      #    continue
-      # cv2.imwrite(f'{cam_path}/{image_id}.png', image.astype(np.uint8))
-      ######################################################################
-
-      # save cams
-      keys = np.pad(keys + 1, (1, 0), mode='constant')
-      np.save(npy_path, {"keys": keys, "cam": strided_cams.cpu(), "hr_cam": hr_cams.cpu().numpy()})
+      np.save(npy_path, {"keys": [0, 1], "cam": strided_cams.cpu(), "hr_cam": hr_cams.cpu().numpy()})
 
       sys.stdout.write(
         '\r# Make CAM [{}/{}] = {:.2f}%, ({}, {})'.format(
