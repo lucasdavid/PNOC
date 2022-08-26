@@ -184,25 +184,25 @@ def random_crop_box(crop_size, h, w):
   ch = min(crop_size, h)  # (448, 512) -> 448
   cw = min(crop_size, w)  # (448, 300) -> 300
 
-  w_space = w - crop_size  # 512-448 =   64
-  h_space = h - crop_size  # 300-448 = -148
+  h_space = h - crop_size  # 512-448 =   64
+  w_space = w - crop_size  # 300-448 = -148
 
   if w_space > 0:
     cont_left = 0
     img_left = random.randrange(w_space + 1)
   else:
-    cont_left = random.randrange(-w_space + 1)
+    cont_left = random.randrange(-w_space + 1)  # rand(149)  = 20
     img_left = 0
 
   if h_space > 0:
     cont_top = 0
-    img_top = random.randrange(h_space + 1)
+    img_top = random.randrange(h_space + 1)     # rand(65)   = 10
   else:
     cont_top = random.randrange(-h_space + 1)
     img_top = 0
 
-  dst_bbox = {'xmin': cont_left, 'ymin': cont_top, 'xmax': cont_left + cw, 'ymax': cont_top + ch}
-  src_bbox = {'xmin': img_left, 'ymin': img_top, 'xmax': img_left + cw, 'ymax': img_top + ch}
+  dst_bbox = {'xmin': cont_left, 'ymin': cont_top, 'xmax': cont_left + cw, 'ymax': cont_top + ch}  # 20,  0, 20+300, 0+448
+  src_bbox = {'xmin': img_left, 'ymin': img_top, 'xmax': img_left + cw, 'ymax': img_top + ch}      #  0, 10,    300, 10+448
 
   return dst_bbox, src_bbox
 
