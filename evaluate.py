@@ -1,4 +1,5 @@
 import argparse
+from heapq import nlargest
 import multiprocessing
 import os
 
@@ -6,18 +7,18 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-
+from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file
 
 SAL_MODES = ('saliency', 'segmentation')
 
 parser = argparse.ArgumentParser()
-parser.add_argument(
-  '--experiment_name', default='resnet50@seed=0@nesterov@train@bg=0.20@scale=0.5,1.0,1.5,2.0@png', type=str
-)
+parser.add_argument('--experiment_name', type=str, required=True)
+parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument("--domain", default='train', type=str)
 parser.add_argument("--threshold", default=None, type=float)
 
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument("--predict_dir", default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
 parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODES)
@@ -26,6 +27,9 @@ parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/Segmentation
 
 parser.add_argument('--logfile', default='', type=str)
 parser.add_argument('--comment', default='', type=str)
+
+parser.add_argument('--crf_t', default=0, type=int)
+parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
 parser.add_argument('--mode', default='npy', type=str)  # png, rw
 parser.add_argument('--min_th', default=0.05, type=float)
@@ -52,6 +56,7 @@ def compare(start, step, TP, P, T, name_list):
   for idx in range(start, len(name_list), step):
     name = name_list[idx]
 
+    img_file = os.path.join(args.data_dir, 'JPEGImages', name + '.jpg')
     npy_file = os.path.join(predict_folder, name + '.npy')
     png_file = os.path.join(predict_folder, name + '.png')
     label_file = os.path.join(gt_dir, name + '.png')
@@ -64,23 +69,29 @@ def compare(start, step, TP, P, T, name_list):
       keys = data['keys']
 
       if 'hr_cam' in data.keys():
-        cams = data['hr_cam']
+        cam = data['hr_cam']
       elif 'rw' in data.keys():
-        cams = data['rw']
+        cam = data['rw']
 
       if sal_file:
         sal = load_saliency_file(sal_file, args.sal_mode)
         bg = (
-          (2 * (sal < args.sal_threshold).astype(float))
+          (sal < args.sal_threshold).astype(float)
           if args.sal_threshold
           else (1 - sal)
         )
 
-        cams = np.concatenate((bg, cams), axis=0)
+        cam = np.concatenate((bg, cam), axis=0)
       else:
-        cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
+        cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
-      y_pred = keys[np.argmax(cams, axis=0)]
+      cam = np.argmax(cam, axis=0)
+
+      if args.crf_t:
+        img = np.asarray(Image.open(img_file).convert('RGB'))
+        cam = crf_inference_label(img, cam, n_labels=len(keys), t=args.crf_t, gt_prob=args.crf_gt_prob)
+
+      y_pred = keys[cam]
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
 
@@ -101,7 +112,7 @@ def compare(start, step, TP, P, T, name_list):
       TP[i].release()
 
 
-def do_python_eval(name_list, num_cores=8):
+def do_python_eval(name_list, num_workers=8):
   TP = []
   P = []
   T = []
@@ -111,8 +122,8 @@ def do_python_eval(name_list, num_cores=8):
     T.append(multiprocessing.Value('i', 0, lock=True))
 
   p_list = []
-  for i in range(num_cores):
-    p = multiprocessing.Process(target=compare, args=(i, num_cores, TP, P, T, name_list))
+  for i in range(num_workers):
+    p = multiprocessing.Process(target=compare, args=(i, num_workers, TP, P, T, name_list))
     p.start()
     p_list.append(p)
   for p in p_list:
@@ -165,7 +176,7 @@ if __name__ == '__main__':
 
   for t in thresholds:
     args.threshold = t
-    r = do_python_eval(filenames)
+    r = do_python_eval(filenames, num_workers=args.num_workers)
 
     print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
 

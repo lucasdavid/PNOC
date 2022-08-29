@@ -77,12 +77,12 @@ GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 
 class VOCDatasetWithCAMs(VOC_Dataset):
 
-  def __init__(self, root_dir, domain, cams_dir, resize, image_transform, aug_transform):
+  def __init__(self, root_dir, domain, cams_dir, resize, normalize, aug_transform):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.cams_dir = cams_dir
     self.resize = resize
+    self.normalize = normalize
     self.aug_transform = aug_transform
-    self.image_transform = image_transform
 
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
@@ -100,8 +100,10 @@ class VOCDatasetWithCAMs(VOC_Dataset):
     cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
 
     # Transforms
-    image = self.image_transform(image)
+    image = self.resize(image)
     cams = self.resize(cams)
+
+    image = self.normalize(image)
 
     data = self.aug_transform({'image': image, 'cams': cams})
     image, cams = data['image'], data['cams']
@@ -127,7 +129,7 @@ class RandomCropForCams(RandomCrop):
     self.crop_shape_for_mask = (self.crop_size, self.crop_size)
 
   def __call__(self, data):
-    _, src = self.random_crop_box(*data['image'].shape[1:])
+    _, src = random_crop_box(self.crop_size, *data['image'].shape[1:])
     ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
 
     data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
@@ -148,6 +150,10 @@ if __name__ == '__main__':
   BATCH_TRAIN = args.batch_size
   BATCH_VALID = 32
 
+  META = read_json('./data/VOC_2012.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = len(CLASSES)
+
   log_dir = create_directory('./experiments/logs/')
   data_dir = create_directory('./experiments/data/')
   model_dir = create_directory('./experiments/models/')
@@ -164,10 +170,10 @@ if __name__ == '__main__':
   create_directory(cam_path + '/test/colormaps')
 
   set_seed(args.seed)
-  log_func = lambda string='': log_print(string, log_path)
+  log = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(args.tag))
-  log_func()
+  log('[i] {}'.format(args.tag))
+  log()
 
   ###################################################################################
   # Transform, Dataset, DataLoader
@@ -176,7 +182,7 @@ if __name__ == '__main__':
   imagenet_std = [0.229, 0.224, 0.225]
 
   resize_t = transforms.Resize(size=(512, 512))
-  image_transform = transforms.Compose([
+  normalize_t = transforms.Compose([
     resize_t,
     transforms.ToTensor(),
     transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
@@ -190,41 +196,34 @@ if __name__ == '__main__':
     ]
   )
 
-  meta_dic = read_json('./data/VOC_2012.json')
-  class_names = np.asarray(meta_dic['class_names'])
-  classes = len(class_names)
-
   train_dataset = VOCDatasetWithCAMs(
     args.data_dir,
     'train_aug',
     args.cams_dir,
     resize=resize_t,
-    image_transform=image_transform,
+    normalize=normalize_t,
     aug_transform=aug_transform
   )
   valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  # valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
-
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
   valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers)
-  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
 
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(classes))
-  log_func(f'[i] train_transform is {[resize_t, image_transform, aug_transform]}')
-  log_func('[i] test_transform is {}'.format(test_transform))
-  log_func('[i] #train data'.format(len(train_dataset)))
-  log_func('[i] #valid data'.format(len(valid_dataset)))
-  log_func()
+  log('[i] mean values is {}'.format(imagenet_mean))
+  log('[i] std values is {}'.format(imagenet_std))
+  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log(f'[i] train_transform is {[resize_t, normalize_t, aug_transform]}')
+  log('[i] test_transform is {}'.format(test_transform))
+  log('[i] #train data'.format(len(train_dataset)))
+  log('[i] #valid data'.format(len(valid_dataset)))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   max_iteration = args.max_epoch * val_iteration
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(max_iteration))
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(max_iteration))
 
   ###################################################################################
   # Network
@@ -232,12 +231,12 @@ if __name__ == '__main__':
   model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated, stage4_out_features=args.stage4_out_features)
   param_groups = model.get_parameter_groups()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   if GPUS_COUNT > 1:
-    log_func('[i] the number of gpu : {}'.format(GPUS_COUNT))
+    log('[i] the number of gpu : {}'.format(GPUS_COUNT))
     model = nn.DataParallel(model)
 
   model = model.to(DEVICE)
@@ -418,7 +417,7 @@ if __name__ == '__main__':
         }
         data_dic['train'].append(data)
 
-        log_func(
+        log(
           'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
           'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} loss_h={hint_loss:.4f} '
           'time={time:.0f}sec'.format(**data)
@@ -431,7 +430,7 @@ if __name__ == '__main__':
     # Evaluation
     #################################################################################################
     save_model_fn()
-    log_func('[i] save model')
+    log('[i] save model')
 
     threshold, mIoU, iou = evaluate(valid_loader)
 
@@ -439,7 +438,7 @@ if __name__ == '__main__':
       best_train_mIoU = mIoU
 
       save_model_fn()
-      log_func('[i] save model')
+      log('[i] save model')
 
     data = {
       'iteration': step + 1,
@@ -452,7 +451,7 @@ if __name__ == '__main__':
     data_dic['validation'].append(data)
     write_json(data_path, data_dic)
 
-    log_func(
+    log(
       'iteration={iteration:,}\n'
       'threshold={threshold:.2f}\n'
       'train_sal_mIoU={train_sal_mIoU:.2f}%\n'

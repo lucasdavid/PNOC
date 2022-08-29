@@ -63,6 +63,7 @@ parser.add_argument('--print_ratio', default=0.2, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
+parser.add_argument('--cutmix_prob', default=1.0, type=float)
 
 parser.add_argument('--alpha', type=float, default=0.25)
 
@@ -82,6 +83,7 @@ if __name__ == '__main__':
   SIZE = args.image_size
   BATCH_TRAIN = args.batch_size
   BATCH_VALID = 32
+  CUTMIX = 'cutmix' in args.augment
 
   log_dir = create_directory('./experiments/logs/')
   data_dir = create_directory('./experiments/data/')
@@ -99,10 +101,10 @@ if __name__ == '__main__':
   create_directory(cam_path + '/test/colormaps')
 
   set_seed(args.seed)
-  log_func = lambda string='': log_print(string, log_path)
+  log = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(args.tag))
-  log_func()
+  log('[i] {}'.format(args.tag))
+  log()
 
   ###################################################################################
   # Transform, Dataset, DataLoader
@@ -133,6 +135,9 @@ if __name__ == '__main__':
   classes = len(class_names)
 
   train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
+  if CUTMIX:
+    log('[i] Using cutmix')
+    train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
 
   train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
   valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
@@ -141,22 +146,22 @@ if __name__ == '__main__':
   train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
   # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
 
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(classes))
-  log_func('[i] train_transform is {}'.format(train_transform))
-  log_func('[i] test_transform is {}'.format(test_transform))
-  log_func('[i] #train data'.format(len(train_dataset)))
-  log_func('[i] #valid data'.format(len(valid_dataset_for_seg)))
-  log_func()
+  log('[i] mean values is {}'.format(imagenet_mean))
+  log('[i] std values is {}'.format(imagenet_std))
+  log('[i] The number of class is {}'.format(classes))
+  log('[i] train_transform is {}'.format(train_transform))
+  log('[i] test_transform is {}'.format(test_transform))
+  log('[i] #train data'.format(len(train_dataset)))
+  log('[i] #valid data'.format(len(valid_dataset_for_seg)))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   max_iteration = args.max_epoch * val_iteration
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(max_iteration))
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(max_iteration))
 
   ###################################################################################
   # Network
@@ -164,12 +169,12 @@ if __name__ == '__main__':
   model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated, stage4_out_features=args.stage4_out_features)
   param_groups = model.get_parameter_groups()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   if GPUS_COUNT > 1:
-    log_func('[i] the number of gpu : {}'.format(GPUS_COUNT))
+    log('[i] the number of gpu : {}'.format(GPUS_COUNT))
     model = nn.DataParallel(model)
 
   model = model.to(DEVICE)
@@ -314,7 +319,7 @@ if __name__ == '__main__':
         }
         data_dic['train'].append(data)
 
-        log_func(
+        log(
           'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
           'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} '
           'time={time:.0f}sec'.format(**data)
@@ -327,7 +332,7 @@ if __name__ == '__main__':
     # Evaluation
     #################################################################################################
     save_model_fn()
-    log_func('[i] save model')
+    log('[i] save model')
 
     threshold, mIoU, iou = evaluate(train_loader_for_seg)
 
@@ -335,7 +340,7 @@ if __name__ == '__main__':
       best_train_mIoU = mIoU
 
       save_model_fn()
-      log_func('[i] save model')
+      log('[i] save model')
 
     data = {
       'iteration': step + 1,
@@ -348,7 +353,7 @@ if __name__ == '__main__':
     data_dic['validation'].append(data)
     write_json(data_path, data_dic)
 
-    log_func(
+    log(
       'iteration={iteration:,}\n'
       'threshold={threshold:.2f}\n'
       'train_sal_mIoU={train_sal_mIoU:.2f}%\n'
