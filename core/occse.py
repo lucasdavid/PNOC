@@ -39,6 +39,23 @@ def balanced_label_split(label, k, choices, gamma=1.0):
   return y_mask, indices
 
 
+def least_chosen_label_split(label, k, choices, gamma=1.0):
+  bs = label.shape[0]
+  y_mask = torch.zeros_like(label)
+  indices = []
+
+  for i in range(bs):
+    label_i = torch.nonzero(label[i]).ravel()
+    min_i = choices[label_i].argsort()[:k]
+    target = label_i[min_i]
+
+    y_mask[i, target] = 1
+    choices[target] += 1
+
+    indices.append(target)
+
+  return y_mask, indices
+
 def focal_label_split(label, k, choices, focal_factor):
   bs = label.shape[0]
   y_mask = torch.zeros_like(label)
@@ -56,6 +73,8 @@ def focal_label_split(label, k, choices, focal_factor):
 
   return y_mask, indices
 
+STRATEGIES = ['random', 'balanced', 'focal', 'least_chosen']
+
 
 def split_label(
   label,
@@ -70,6 +89,8 @@ def split_label(
     y_mask, indices = balanced_label_split(label, k, choices)
   elif strategy == 'focal':
     y_mask, indices = focal_label_split(label, k, choices, focal_factor)
+  elif strategy == 'least_chosen':
+    y_mask, indices = least_chosen_label_split(label, k, choices, focal_factor)
   else:
     raise ValueError('Only `random` and `focus` are available.')
 

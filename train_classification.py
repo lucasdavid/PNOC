@@ -116,33 +116,31 @@ if __name__ == '__main__':
   imagenet_mean = [0.485, 0.456, 0.406]
   imagenet_std = [0.229, 0.224, 0.225]
 
+  tt = []
+
   if CUTMIX:
-    tt = [
-      transforms.Resize((args.image_size, args.image_size)),
-      RandomHorizontalFlip(),
-      transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-      Normalize(imagenet_mean, imagenet_std),
-      Transpose()
-    ]
+    tt.append(transforms.Resize((args.image_size, args.image_size)))
   else:
-    tt = [
-      RandomResize(args.min_image_size, args.max_image_size),
-      RandomHorizontalFlip()
-    ]
+    tt.append(RandomResize(args.min_image_size, args.max_image_size))
 
-    if 'colorjitter' in args.augment:
-      tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+  tt.append(RandomHorizontalFlip())
 
-    if 'randaugment' in args.augment:
-      tt.append(RandAugmentMC(n=2, m=10))
-  
-    tt += [
-      Normalize(imagenet_mean, imagenet_std),
-      RandomCrop(args.image_size),
-      Transpose()
-    ]
+  if 'colorjitter' in args.augment:
+    tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
 
+  if 'randaugment' in args.augment:
+    tt.append(RandAugmentMC(n=2, m=10))
+
+  tt += [
+    Normalize(imagenet_mean, imagenet_std),
+  ]
+
+  if not CUTMIX:
+    tt.append(RandomCrop(args.image_size))
+
+  tt.append(Transpose())
   tt = transforms.Compose(tt)
+
   tv = transforms.Compose([
     Normalize_For_Segmentation(imagenet_mean, imagenet_std),
     Top_Left_Crop_For_Segmentation(args.image_size),
@@ -153,6 +151,7 @@ if __name__ == '__main__':
   valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
 
   if CUTMIX:
+    log_func('[i] Using cutmix')
     train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
@@ -299,12 +298,6 @@ if __name__ == '__main__':
 
             meter_dic[th].add(pred_mask, gt_mask)
 
-        # break
-
-        sys.stdout.write('\r# Evaluation [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
-        sys.stdout.flush()
-
-    print(' ')
     model.train()
 
     best_th = 0.0

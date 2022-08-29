@@ -37,8 +37,11 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
-parser.add_argument('--mode', default='normal', type=str)
+parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--restore', default=None, type=str)
 
 ###############################################################################
 # Inference parameters
@@ -55,16 +58,20 @@ if __name__ == '__main__':
   ###################################################################################
   args = parser.parse_args()
 
-  experiment_name = args.tag
+  TAG = args.tag
+
+  META = read_json('./data/VOC_2012.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
   if 'train' in args.domain:
-    experiment_name += '@train'
+    TAG += '@train'
   else:
-    experiment_name += '@val'
+    TAG += '@val'
 
-  experiment_name += '@scale=%s' % args.scales
+  TAG += '@scale=%s' % args.scales
 
-  pred_dir = create_directory(f'./experiments/predictions/{experiment_name}/')
+  pred_dir = create_directory(f'./experiments/predictions/{TAG}/')
 
   model_path = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
@@ -80,13 +87,19 @@ if __name__ == '__main__':
   normalize_fn = Normalize(imagenet_mean, imagenet_std)
 
   # for mIoU
-  meta_dic = read_json('./data/VOC_2012.json')
   dataset = VOC_Dataset_For_Making_CAM(args.data_dir, args.domain)
 
   ###################################################################################
   # Network
   ###################################################################################
-  model = Classifier(args.architecture, meta_dic['classes'], mode=args.mode, dilated=args.dilated)
+  model = Classifier(
+    args.architecture,
+    NUM_CLASSES,
+    mode=args.mode,
+    dilated=args.dilated,
+    regularization=args.regularization,
+    trainable_stem=args.trainable_stem,
+  )
 
   model = model.cuda()
   model.eval()
@@ -182,4 +195,4 @@ if __name__ == '__main__':
   if args.domain == 'train_aug':
     args.domain = 'train'
 
-  print("python3 evaluate.py --experiment_name {} --domain {}".format(experiment_name, args.domain))
+  print("python3 evaluate.py --experiment_name {} --domain {}".format(TAG, args.domain))

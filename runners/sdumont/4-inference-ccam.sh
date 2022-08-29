@@ -47,7 +47,7 @@ DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
 
-DOMAIN=train
+DOMAIN=train_aug
 
 
 TAG=ccam-fgh@rs269@rs269-poc
@@ -67,72 +67,13 @@ CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
   --mode            $MODE                \
   --trainable-stem  $TRAINABLE_STEM      \
   --pretrained      $WEIGHTS             \
-  --data_dir        $DATA_DIR            &
+  --data_dir        $DATA_DIR
 
-# TAG=ccam-fgh@rs269@rs269-poc
-# ARCHITECTURE=resnest269
-# S4_OUT_FEATURES=1024
-# WEIGHTS=./experiments/models/ccam-fg-hints@resnest269@rs269-poc@0.3@h1.0-e10-b32-lr0.001.pth
-# # THRESHOLD=0.3
-# # CRF=10
+EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
 
-# CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
-#   --tag             $TAG                 \
-#   --domain          $DOMAIN              \
-#   --num_workers     $WORKERS             \
-#   --architecture    $ARCHITECTURE        \
-#   --dilated         $DILATED             \
-#   --stage4_out_features $S4_OUT_FEATURES \
-#   --mode            $MODE                \
-#   --trainable-stem  $TRAINABLE_STEM      \
-#   --pretrained      $WEIGHTS             \
-#   --data_dir        $DATA_DIR            &
-
-
-# TAG=ccam-fgh@rs269@rs101-ra
-# ARCHITECTURE=resnest269
-# S4_OUT_FEATURES=1024
-# WEIGHTS=./experiments/models/ccam-fg-hints@resnest269@rs101-ra@0.3@h1.0-e10-b32-lr0.001.pth
-# # THRESHOLD=0.3
-# # CRF=10
-
-# CUDA_VISIBLE_DEVICES=3 $PY $SOURCE       \
-#   --tag             $TAG                 \
-#   --domain          $DOMAIN              \
-#   --num_workers     $WORKERS             \
-#   --architecture    $ARCHITECTURE        \
-#   --dilated         $DILATED             \
-#   --stage4_out_features $S4_OUT_FEATURES \
-#   --mode            $MODE                \
-#   --trainable-stem  $TRAINABLE_STEM      \
-#   --pretrained      $WEIGHTS             \
-#   --data_dir        $DATA_DIR            &
-
-
-
-
-# TAG=ccam-fgh@rs101@rs269-poc
-# ARCHITECTURE=resnest101
-# S4_OUT_FEATURES=1024
-# WEIGHTS=./experiments/models/ccam-fg-hints@resnest101@resnest269-poc@0.4@h1.0-e10-b64-lr0.001.pth
-# # THRESHOLD=0.3
-# # CRF=10
-
-# CUDA_VISIBLE_DEVICES=2 $PY $SOURCE       \
-#   --tag             $TAG                 \
-#   --domain          $DOMAIN              \
-#   --num_workers     $WORKERS             \
-#   --architecture    $ARCHITECTURE        \
-#   --dilated         $DILATED             \
-#   --stage4_out_features $S4_OUT_FEATURES \
-#   --mode            $MODE                \
-#   --trainable-stem  $TRAINABLE_STEM      \
-#   --pretrained      $WEIGHTS             \
-#   --data_dir        $DATA_DIR            &
-
-wait
-
-# python3.9 ccam_inference_crf.py --experiment_name ccam-fg-hints@resnest101@rs101-ra@train@scale=0.5,1.0,1.5,2.0 --threshold 0.3 --domain train --crf_iteration 10 --data_dir $DATA_DIR &
-# python3.9 ccam_inference_crf.py --experiment_name ccam-fg-hints@resnest101@rs269-poc@train@scale=0.5,1.0,1.5,2.0 --threshold 0.3 --domain train --crf_iteration 10 --data_dir $DATA_DIR &
-
-# wait
+python3.9 ccam_inference_crf.py \
+  --experiment_name $EXP        \
+  --domain          train_aug   \
+  --threshold       0.5         \
+  --crf_iteration   10          \
+  --data_dir        $DATA_DIR

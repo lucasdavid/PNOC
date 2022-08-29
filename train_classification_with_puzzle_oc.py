@@ -55,7 +55,7 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
-parser.add_argument('--oc-strategy', default='random', type=str)
+parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
 parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 
@@ -71,10 +71,11 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.3, type=float)
+parser.add_argument('--print_ratio', default=1.0, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
+parser.add_argument('--cutmix_prob', default=1.0, type=float)
 
 # For Puzzle-CAM
 parser.add_argument('--num_pieces', default=4, type=int)
@@ -106,6 +107,12 @@ if __name__ == '__main__':
   # Arguments
   args = parser.parse_args()
 
+  CUTMIX = 'cutmix' in args.augment
+
+  META = read_json('./data/VOC_2012.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
+
   print('Train Configuration')
   pad = max(map(len, vars(args))) + 1
   for k, v in vars(args).items():
@@ -131,47 +138,54 @@ if __name__ == '__main__':
   imagenet_mean = [0.485, 0.456, 0.406]
   imagenet_std = [0.229, 0.224, 0.225]
 
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
+  tt = []
 
-  train_transforms = [
-    RandomResize(args.min_image_size, args.max_image_size),
-    RandomHorizontalFlip(),
-  ]
+  if CUTMIX:
+    tt.append(transforms.Resize((args.image_size, args.image_size)))
+  else:
+    tt.append(RandomResize(args.min_image_size, args.max_image_size))
+
+  tt.append(RandomHorizontalFlip())
+
   if 'colorjitter' in args.augment:
-    train_transforms.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+    tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
 
   if 'randaugment' in args.augment:
-    train_transforms.append(RandAugmentMC(n=2, m=10))
+    tt.append(RandAugmentMC(n=2, m=10))
 
-  train_transform = transforms.Compose(train_transforms + [
+  tt += [
     Normalize(imagenet_mean, imagenet_std),
-    RandomCrop(args.image_size),
-    Transpose()
-  ])
-  test_transform = transforms.Compose([
+  ]
+
+  if not CUTMIX:
+    tt.append(RandomCrop(args.image_size))
+
+  tt.append(Transpose())
+  tt = transforms.Compose(tt)
+
+  tv = transforms.Compose([
     Normalize_For_Segmentation(imagenet_mean, imagenet_std),
     Top_Left_Crop_For_Segmentation(args.image_size),
     Transpose_For_Segmentation()
   ])
 
-  meta_dic = read_json('./data/VOC_2012.json')
-  class_names = np.asarray(meta_dic['class_names'])
-  classes = meta_dic['classes']
+  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
 
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
+  if CUTMIX:
+    log_func('[i] Using cutmix')
+    train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
 
-  train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  # valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
+  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
-  train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
   # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
   log_func('[i] mean values is {}'.format(imagenet_mean))
   log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(classes))
-  log_func('[i] train_transform is {}'.format(train_transform))
-  log_func('[i] test_transform is {}'.format(test_transform))
+  log_func('[i] The number of class is {}'.format(NUM_CLASSES))
+  log_func('[i] train_transform is {}'.format(tt))
+  log_func('[i] test_transform is {}'.format(tv))
   log_func()
 
   val_iteration = len(train_loader)
@@ -186,7 +200,7 @@ if __name__ == '__main__':
   # Network
   model = Classifier(
     args.architecture,
-    classes,
+    NUM_CLASSES,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -213,11 +227,11 @@ if __name__ == '__main__':
     ps = 'avg'
     topN = 4
     threshold = 0.5
-    oc_nn = mcar_resnet101(classes, ps, topN, threshold, inference_mode=True, with_logits=True)
+    oc_nn = mcar_resnet101(NUM_CLASSES, ps, topN, threshold, inference_mode=True, with_logits=True)
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode, regularization=args.oc_regularization)
+    oc_nn = Classifier(args.oc_architecture, NUM_CLASSES, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.cuda()
@@ -278,8 +292,8 @@ if __name__ == '__main__':
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(classes).cuda()
-  focal_factor = torch.ones(classes).cuda()
+  choices = torch.ones(NUM_CLASSES).cuda()
+  focal_factor = torch.ones(NUM_CLASSES).cuda()
 
   def evaluate(loader):
     model.eval()
@@ -335,12 +349,6 @@ if __name__ == '__main__':
 
             meter_dic[th].add(pred_mask, gt_mask)
 
-        # break
-
-        sys.stdout.write('\r# Evaluation [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
-        sys.stdout.flush()
-
-    print(' ')
     model.train()
 
     best_th = 0.0
@@ -352,7 +360,7 @@ if __name__ == '__main__':
       if best_mIoU < mIoU:
         best_th = th
         best_mIoU = mIoU
-        best_iou = [round(iou[c], 2) for c in class_names]
+        best_iou = [round(iou[c], 2) for c in CLASSES]
 
     return best_th, best_mIoU, best_iou
 
@@ -382,7 +390,7 @@ if __name__ == '__main__':
     r_loss = (r_loss_fn(features, re_features) * labels.unsqueeze(2).unsqueeze(3)).mean()
 
     # OC-CSE
-    labels_mask, indices = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
+    labels_mask, _ = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
     labels_oc = labels - labels_mask
     cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
     o_loss = class_loss_fn(cl_logits, labels_oc).mean()
@@ -432,7 +440,8 @@ if __name__ == '__main__':
       ) = train_meter.get(clear=True)
       
       lr = float(get_learning_rate_from_optimizer(optimizer))
-      ffs = focal_factor.cpu().detach().numpy().astype(float).round(2).tolist()
+      cs = to_numpy(choices).tolist()
+      ffs = to_numpy(focal_factor).astype(float).round(2).tolist()
 
       data = {
         'iteration': step + 1,
@@ -446,13 +455,14 @@ if __name__ == '__main__':
         'oc_alpha': ao,
         'k': k,
         'time': train_timer.tok(clear=True),
-        'focal_factor': ffs
+        'choices': cs,
+        'focal_factor': ffs,
       }
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
       log_func(
-        '\niteration  = {iteration:,}\n'
+        'iteration    = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
         'alpha        = {alpha:.2f}\n'
@@ -464,6 +474,7 @@ if __name__ == '__main__':
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
         'focal_factor = {focal_factor}\n'
+        'choices      = {choices}\n'
         .format(**data)
       )
 
@@ -480,7 +491,7 @@ if __name__ == '__main__':
 
     # region evaluation
     if (step + 1) % val_iteration == 0:
-      threshold, mIoU, iou = evaluate(train_loader_for_seg)
+      threshold, mIoU, iou = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU

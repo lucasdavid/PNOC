@@ -334,12 +334,6 @@ if __name__ == '__main__':
 
             meter_dic[th].add(pred_mask, gt_mask)
 
-        # break
-
-        sys.stdout.write('\r# Evaluation [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
-        sys.stdout.flush()
-
-    print(' ')
     model.train()
 
     best_th = 0.0
@@ -355,8 +349,6 @@ if __name__ == '__main__':
 
   writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
-
-  # loss_option = args.loss_option.split('_')
 
   for step in range(step_init, step_max):
     images, labels = train_iterator.get()
@@ -379,7 +371,7 @@ if __name__ == '__main__':
     # r_loss = (r_loss_fn(features, re_features) * labels.unsqueeze(2).unsqueeze(3)).mean()
 
     # OC-CSE
-    labels_mask, indices = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
+    labels_mask, _ = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
     labels_oc = labels - labels_mask
     cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
     o_loss = class_loss_fn(cl_logits, labels_oc).mean()

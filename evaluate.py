@@ -6,7 +6,10 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+
 from tools.general.io_utils import load_saliency_file
+
+SAL_MODES = ('saliency', 'segmentation')
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -17,7 +20,8 @@ parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--predict_dir", default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
-parser.add_argument('--sal_mode', default='saliency', type=str)
+parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODES)
+parser.add_argument("--sal_threshold", default=None, type=float)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
 parser.add_argument('--logfile', default='', type=str)
@@ -33,8 +37,6 @@ args = parser.parse_args()
 predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
 gt_dir = args.gt_dir
 sal_dir = args.sal_dir
-
-assert args.sal_mode in ('saliency', 'segmentation')
 
 args.list = './data/' + args.domain + '.txt'
 args.predict_dir = predict_folder
@@ -68,7 +70,13 @@ def compare(start, step, TP, P, T, name_list):
 
       if sal_file:
         sal = load_saliency_file(sal_file, args.sal_mode)
-        cams = np.concatenate((1 - sal, cams), axis=0)
+        bg = (
+          (2 * (sal < args.sal_threshold).astype(float))
+          if args.sal_threshold
+          else (1 - sal)
+        )
+
+        cams = np.concatenate((bg, cams), axis=0)
       else:
         cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 

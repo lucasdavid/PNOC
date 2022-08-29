@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-vanilla
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/van-%j.out
-#SBATCH --time=16:00:00
+#SBATCH -J tr-ccam
+#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/tr-%j.out
+#SBATCH --time=04:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -29,24 +29,34 @@ echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S
 
 nodeset -e $SLURM_JOB_NODELIST
 
-cd $SCRATCH/PuzzleCAM
+cd $SCRATCH/PuzzleCAM/poolnet
 
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
-SOURCE=train_classification.py
+SOURCE=main_voc.py
+
+
+LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest101
-AUGMENT=cutmix_colorjitter
-CUTMIX_PROB=0.5
-TAG=$ARCHITECTURE@cutmix-rr-$CUTMIX_PROB
+ARCHITECTURE=resnet  # resnet vgg
+PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/ccam-fgh@rs269@rs269-poc@train@scale=0.5,1.0,1.5,2.0@t=0.5@crf=10/
 
-CUDA_VISIBLE_DEVICES=0,1,2,3         \
-    $PY $SOURCE                      \
-    --architecture   $ARCHITECTURE   \
-    --augment        $AUGMENT        \
-    --cutmix_prob    $CUTMIX_PROB    \
-    --tag            $TAG            \
-    --data_dir       $DATA_DIR
+TAG=poolnet@ccam-fgh@rs269@rs269-poc
+
+# CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
+#   --arch $ARCHITECTURE             \
+#   --mode "train"                   \
+#   --train_root $DATA_DIR           \
+#   --pseudo_root $PSEUDO_CUES
+
+CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
+  --arch $ARCHITECTURE             \
+  --mode "test"                    \
+  --model ./results/run-1/models/epoch_9.pth  \
+  --train_root $DATA_DIR           \
+  --pseudo_root $PSEUDO_CUES       \
+  --sal_folder ./results/$TAG
