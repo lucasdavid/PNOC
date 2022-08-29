@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.model_zoo as model_zoo
-
-from .arch_resnet import resnet
 
 
 def cos_simi(embedded_fg, embedded_bg):

@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+from tools.general.io_utils import load_saliency_file
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
   '--experiment_name', default='resnet50@seed=0@nesterov@train@bg=0.20@scale=0.5,1.0,1.5,2.0@png', type=str
@@ -57,6 +59,7 @@ def compare(start, step, TP, P, T, name_list):
       y_pred = np.array(Image.open(predict_folder + name + '.png'))
     elif os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
+      keys = data['keys']
 
       if 'hr_cam' in data.keys():
         cams = data['hr_cam']
@@ -64,18 +67,11 @@ def compare(start, step, TP, P, T, name_list):
         cams = data['rw']
 
       if sal_file:
-        if args.sal_mode == 'saliency':
-          sal = np.array(Image.open(sal_file)).astype(float)
-          sal = 1 - sal / 255.
-        elif args.sal_mode == 'segmentation':
-          sal = np.array(Image.open(sal_file))
-          sal = np.isin(sal, [0, 255]).astype(float)
-
-        cams = np.concatenate((sal[np.newaxis, ...], cams), axis=0)
+        sal = load_saliency_file(sal_file, args.sal_mode)
+        cams = np.concatenate((1 - sal, cams), axis=0)
       else:
         cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
-      keys = data['keys']
       y_pred = keys[np.argmax(cams, axis=0)]
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')

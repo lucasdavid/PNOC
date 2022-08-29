@@ -69,7 +69,7 @@ def _work(process_id, dataset, args):
 
     imageio.imwrite(png_path, (cams * 255).clip(0, 255).astype(np.uint8))
 
-    if process_id == args.num_workers - 1 and step % (length // 20) == 0:
+    if process_id == args.num_workers - 1 and step % max(1, length // 20) == 0:
       sys.stdout.write(
         '\r# CAMs CRF Inference [{}/{}] = {:.2f}%, ({}, {})'.format(
           step + 1, length, (step + 1) / length * 100, tuple(reversed(image.size)), cams.shape

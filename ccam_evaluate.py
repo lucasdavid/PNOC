@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from tools.general.io_utils import str2bool
+from tools.general.io_utils import load_saliency_file, str2bool
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -60,7 +60,7 @@ def compare(start, step, TP, P, T, name_list):
     label_file = os.path.join(ground_truth_folder, name + '.png')
 
     if os.path.exists(png_file):
-      s_pred = np.array(Image.open(predict_folder + name + '.png'))[np.newaxis, ...] / 255.
+      s_pred = load_saliency_file(png_file)
     elif os.path.exists(npy_file):
       data = np.load(npy_file, allow_pickle=True).item()
 
@@ -71,17 +71,17 @@ def compare(start, step, TP, P, T, name_list):
       s_pred = s_pred
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
-    
+
     if p_mode == 'logit':
       s_pred = np.pad(s_pred, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
     else:
-      s_pred = np.concatenate((1-s_pred, s_pred), axis=0)
+      s_pred = np.concatenate((1 - s_pred, s_pred), axis=0)
 
     s_pred = np.argmax(s_pred, axis=0)
 
     if args.predict_flip:
       s_pred = 1 - s_pred
-    
+
     y_true = np.array(Image.open(label_file))
     valid_mask = y_true < 255
 
@@ -97,7 +97,7 @@ def compare(start, step, TP, P, T, name_list):
       # Predicted saliency to segmentation map, assuming perfect pixel segm.:
       fg_pred = s_pred == 1
       fg_true = ~np.isin(y_true, [0, 255])
-      
+
       # does not leak true bg:
       random_pixels = np.unique(y_true[fg_true].ravel())
       random_pixels = np.random.choice(random_pixels, size=y_true.shape)
@@ -170,7 +170,7 @@ if __name__ == '__main__':
   if not os.path.exists(predict_folder):
     print(f'Predicted saliency maps folder `{predict_folder}` does not exist.', file=sys.stderr)
     exit(1)
-  
+
   if not os.path.exists(ground_truth_folder):
     print(f'True saliency maps folder `{ground_truth_folder}` does not exist.', file=sys.stderr)
     exit(1)
@@ -185,17 +185,18 @@ if __name__ == '__main__':
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and p_mode == 'logit'
-    else [args.threshold]
+    if args.threshold is None and p_mode == 'logit' else [args.threshold]
   )
 
   for t in thresholds:
     args.threshold = t
     r = do_python_eval(filenames)
 
-    print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
-          f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
-          f"FP={r['fp_all']:.3%}")
+    print(
+      f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
+      f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
+      f"FP={r['fp_all']:.3%}"
+    )
 
     fp_history.append(r['fp_all'])
     miou_history.append(r['mIoU'])
