@@ -40,9 +40,9 @@ SOURCE=run_sample.py
 LOGS_DIR=$SCRATCH/logs/irn
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-TAG=irn-rs269@fg40-bg@10@ResNeSt269@puzzleoc
+TAG=irn@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.50_bg=0.05
 ARCHITECTURE=resnest269
-PROPOSALS=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0@aff_fg=0.40_bg=0.10
+PROPOSALS=$SCRATCH/PuzzleCAM/experiments/predictions/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.50_bg=0.05
 CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 CAM_FORMAT=puzzle
 
@@ -59,22 +59,16 @@ CAM_FORMAT=puzzle
 # irn_weight_decay=1e-4, type=float
 
 # Random Walk Params
-# beta=10
-# exp_times=8, Hyper-parameter that controls the number of random walk iterations, The random walk is performed 2^{exp_times}.
-# ins_seg_bg_thres=0.25
-# sem_seg_bg_thres=0.25
-
-BG_THRESHOLD=0.30
+# BETA=10
+# EXP_TIMES=8, Hyper-parameter that controls the number of random walk iterations, the random walk is performed 2^{exp_times}.
 
 CUDA_VISIBLE_DEVICES=0,1,2,3             \
     $PY $SOURCE                          \
     --log_name             $TAG          \
     --model_name           $ARCHITECTURE \
     --irn_weights_name     sess/$TAG.pth \
-    --sem_seg_bg_thres     $BG_THRESHOLD \
-    --ins_seg_bg_thres     $BG_THRESHOLD \
-    --sem_seg_out_dir      "result/$TAG-seg-bg-$BG_THRESHOLD" \
-    --ins_seg_out_dir      "result/$TAG-ins-bg-$BG_THRESHOLD" \
+    --sem_seg_out_dir      "result/$TAG-seg" \
+    --ins_seg_out_dir      "result/$TAG-ins" \
     --ir_label_out_dir     $PROPOSALS    \
     --cam_out_dir          $CAMS_DIR     \
     --cam_saved_format     $CAM_FORMAT   \
@@ -83,8 +77,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3             \
     --make_cam_pass        false \
     --eval_cam_pass        false \
     --cam_to_ir_label_pass false \
-    --train_irn_pass       false \
+    --train_irn_pass       true  \
     --make_ins_seg_pass    false \
     --eval_ins_seg_pass    false \
     --make_sem_seg_pass    true  \
-    --eval_sem_seg_pass    true
+    --eval_sem_seg_pass    false

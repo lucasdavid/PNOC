@@ -310,17 +310,21 @@ def rand_bbox(h, w, lam):
 
 class CutMix(torch.utils.data.Dataset):
 
-  def __init__(self, dataset, num_mix=1, beta=1., prob=1.0):
+  def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0):
     self.dataset = dataset
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
+    self.random_crop = RandomCrop(crop)
 
   def __len__(self):
     return len(self.dataset)
 
   def __getitem__(self, index):
     x, y = self.dataset[index]
+
+    x = self.random_crop(x)
+    x = x.transpose((2, 0, 1))
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -331,29 +335,26 @@ class CutMix(torch.utils.data.Dataset):
       lam = np.random.beta(self.beta, self.beta)
       r = random.choice(range(len(self)))
       xb, yb = self.dataset[r]
+      xb = xb.transpose((2, 0, 1))
 
       # Cut random bbox.
       bH, bW = xb.shape[1:]
+      bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
+      xb = xb[:, bh1:bh2, bw1:bw2]
 
-      h1, w1, h2, w2 = rand_bbox(bH, bW, lam)
-      x[:, h1:h2, w1:w2] = xb[:, h1:h2, w1:w2]
+      # Central crop if B larger than A.
+      aH, aW = x.shape[1:]
+      bH, bW = xb.shape[1:]
+      bhs = (bH-aH) // 2 if bH > aH else 0
+      bws = (bW-aW) // 2 if bW > aW else 0
+      xb = xb[:, bhs:bhs+aH, bws:bws+aW]
 
-      # For images with different sizes:
-      # bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
-      # xb = xb[:, bh1:bh2, bw1:bw2]
+      # Random (x,y) placement if A larger than B.
+      bH, bW = xb.shape[1:]
+      bhs, bws = random.randint(0, aH-bH), random.randint(0, aW-bW)
+      x[:, bhs:bhs+bH, bws:bws+bW] = xb
 
-      # # Central crop if B larger than A.
-      # aH, aW = x.shape[1:]
-      # bH, bW = xb.shape[1:]
-      # bhs = (bH-aH) // 2 if bH > aH else 0
-      # bws = (bW-aW) // 2 if bW > aW else 0
-      # xb = xb[:, bhs:bhs+aH, bws:bws+aW]
-
-      # # Random (x,y) placement if A larger than B.
-      # bH, bW = xb.shape[1:]
-      # x[:, 0:bH, 0:bW] = xb
-
-      lam = 1 - ((h2 - h1) * (w2 - w1) / (bH * bW))
+      lam = 1 - ((bH * bW) / (aH * aW))
       y = y * lam + yb * (1. - lam)
 
     return x, y

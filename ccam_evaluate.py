@@ -6,6 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 from PIL import Image
+from tools.ai.demo_utils import crf_inference_label
 
 from tools.general.io_utils import load_saliency_file, str2bool
 
@@ -18,7 +19,10 @@ parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument('--predict_mode', default='logit', type=str)
 parser.add_argument('--predict_flip', default=False, type=str2bool)
+parser.add_argument('--crf_t', default=0, type=int)
+parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
 parser.add_argument('--logfile', default='', type=str)
@@ -55,6 +59,7 @@ def compare(start, step, TP, P, T, name_list):
   for idx in range(start, len(name_list), step):
     name = name_list[idx]
 
+    img_file = os.path.join(args.data_dir, 'JPEGImages', name + '.jpg')
     npy_file = os.path.join(predict_folder, name + '.npy')
     png_file = os.path.join(predict_folder, name + '.png')
     label_file = os.path.join(ground_truth_folder, name + '.png')
@@ -81,6 +86,10 @@ def compare(start, step, TP, P, T, name_list):
 
     if args.predict_flip:
       s_pred = 1 - s_pred
+    
+    if args.crf_t:
+      img = np.asarray(Image.open(img_file).convert('RGB'))
+      s_pred = crf_inference_label(img, s_pred, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
 
     y_true = np.array(Image.open(label_file))
     valid_mask = y_true < 255
@@ -150,7 +159,7 @@ def do_python_eval(name_list, num_cores=8):
   loglist = {}
   for i in range(NUM_CLASSES):
     loglist[CLASSES[i]] = IoU[i] * 100
-
+  
   miou = np.mean(np.array(IoU))
   t_tp = np.mean(np.array(T_TP)[1:])
   p_tp = np.mean(np.array(P_TP)[1:])
@@ -162,6 +171,8 @@ def do_python_eval(name_list, num_cores=8):
   loglist['p_tp'] = p_tp
   loglist['fp_all'] = fp_all
   loglist['fn_all'] = fn_all
+  loglist['fp_bg'] = FP_ALL[0]
+  loglist['fn_bg'] = FN_ALL[0]
   loglist['miou_foreground'] = miou_foreground
   return loglist
 
@@ -178,7 +189,7 @@ if __name__ == '__main__':
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
-  miou_ = threshold_ = fp_ = 0.
+  miou_ = threshold_ = fp_ = fn_ = 0.
   iou_ = {}
   miou_history = []
   fp_history = []
@@ -195,7 +206,10 @@ if __name__ == '__main__':
     print(
       f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
       f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
-      f"FP={r['fp_all']:.3%}"
+      f"FP_bg={r['fp_bg']:.3%} "
+      f"FN_bg={r['fn_bg']:.3%} "
+      f"FP_fg={r['fp_all']:.3%} "
+      f"FN_fg={r['fn_all']:.3%}"
     )
 
     fp_history.append(r['fp_all'])
@@ -205,10 +219,11 @@ if __name__ == '__main__':
       threshold_ = t
       miou_ = r['mIoU']
       fp_ = r['fp_all']
+      fn_ = r['fn_all']
       iou_ = r
 
   print(
-    f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}',
+    f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%} FN={fn_:.3%}',
     '-' * 80,
     *(f'{k:<12}\t{v:.5f}' for k, v in iou_.items()),
     '-' * 80,

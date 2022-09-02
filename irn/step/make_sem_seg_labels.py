@@ -29,6 +29,10 @@ def _work(process_id, model, dataset, args):
       img_name = voc12.dataloader.decode_int_filename(pack['name'][0])
       orig_img_size = np.asarray(pack['size'])
 
+      npy_path = os.path.join(args.sem_seg_out_dir, img_name + '.npy')
+      if os.path.isfile(npy_path):
+        continue
+
       edge, dp = model(pack['img'][0].cuda(non_blocking=True))
 
       cam_dict = np.load(os.path.join(args.cam_out_dir, img_name + '.npy'), allow_pickle=True).item()
@@ -47,12 +51,7 @@ def _work(process_id, model, dataset, args):
       rw_up = rw_up[..., 0, :orig_img_size[0], :orig_img_size[1]]
       rw_up = rw_up / torch.max(rw_up)
 
-      rw_up_bg = F.pad(rw_up, (0, 0, 0, 0, 1, 0), value=args.sem_seg_bg_thres)
-      rw_pred = torch.argmax(rw_up_bg, dim=0).cpu().numpy()
-
-      rw_pred = keys[rw_pred]
-
-      imageio.imsave(os.path.join(args.sem_seg_out_dir, img_name + '.png'), rw_pred.astype(np.uint8))
+      np.save(npy_path, {"keys": cam_dict['keys'], "rw": rw_up.cpu().numpy()})
 
       if process_id == n_gpus - 1 and iter % (len(databin) // 20) == 0:
         print("%d " % ((5 * iter + 1) // (len(databin) // 20)), end='')

@@ -2,6 +2,7 @@ import argparse
 from heapq import nlargest
 import multiprocessing
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -65,7 +66,12 @@ def compare(start, step, TP, P, T, name_list):
     if os.path.exists(png_file):
       y_pred = np.array(Image.open(predict_folder + name + '.png'))
     elif os.path.exists(npy_file):
-      data = np.load(npy_file, allow_pickle=True).item()
+      try:
+        data = np.load(npy_file, allow_pickle=True).item()
+      except:
+        print(f'File {npy_file} is corrupted', file=sys.stderr)
+        continue
+
       keys = data['keys']
 
       if 'hr_cam' in data.keys():
@@ -159,8 +165,7 @@ def do_python_eval(name_list, num_workers=8):
   loglist['miou_foreground'] = miou_foreground
   return loglist
 
-
-if __name__ == '__main__':
+def run():
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
@@ -222,3 +227,10 @@ if __name__ == '__main__':
     print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_ or 0., miou_, fp_))
     print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th or 0., over_mIoU, fp_over))
     print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th or 0., under_mIoU, fp_under))
+
+
+if __name__ == '__main__':
+  try:
+    run()
+  except KeyboardInterrupt:
+    ...

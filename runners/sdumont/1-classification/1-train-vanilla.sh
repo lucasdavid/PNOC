@@ -38,14 +38,16 @@ PY=python3.9
 SOURCE=train_classification.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest101
-AUGMENT=cutmix_colorjitter
-CUTMIX_PROB=0.5
-TAG=$ARCHITECTURE@cutmix-rr-$CUTMIX_PROB
+ARCHITECTURE=resnest269
+REGULAR=kernel_usage
+AUGMENT=cutmix_colorjitter_randaugment
+CUTMIX_PROB=1.0
+TAG=$ARCHITECTURE@ku-ra-cutmix-rr$CUTMIX_PROB-rep2
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \
     --architecture   $ARCHITECTURE   \
+    --regularization $REGULAR        \
     --augment        $AUGMENT        \
     --cutmix_prob    $CUTMIX_PROB    \
     --tag            $TAG            \

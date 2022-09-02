@@ -117,12 +117,7 @@ if __name__ == '__main__':
   imagenet_std = [0.229, 0.224, 0.225]
 
   tt = []
-
-  if CUTMIX:
-    tt.append(transforms.Resize((args.image_size, args.image_size)))
-  else:
-    tt.append(RandomResize(args.min_image_size, args.max_image_size))
-
+  tt.append(RandomResize(args.min_image_size, args.max_image_size))
   tt.append(RandomHorizontalFlip())
 
   if 'colorjitter' in args.augment:
@@ -131,14 +126,12 @@ if __name__ == '__main__':
   if 'randaugment' in args.augment:
     tt.append(RandAugmentMC(n=2, m=10))
 
-  tt += [
-    Normalize(imagenet_mean, imagenet_std),
-  ]
+  tt.append(Normalize(imagenet_mean, imagenet_std))
 
   if not CUTMIX:
     tt.append(RandomCrop(args.image_size))
+    tt.append(Transpose())
 
-  tt.append(Transpose())
   tt = transforms.Compose(tt)
 
   tv = transforms.Compose([
@@ -152,7 +145,7 @@ if __name__ == '__main__':
 
   if CUTMIX:
     log_func('[i] Using cutmix')
-    train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
+    train_dataset = CutMix(train_dataset, args.image_size, num_mix=1, beta=1., prob=args.cutmix_prob)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)

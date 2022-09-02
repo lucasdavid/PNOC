@@ -23,18 +23,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--cams_dir', required=True, type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
 
 ###############################################################################
 # Inference parameters
 ###############################################################################
-parser.add_argument(
-  '--experiment_name', default='resnet50@seed=0@bs=16@ep=5@nesterov@train@scale=0.5,1.0,1.5,2.0', type=str
-)
+parser.add_argument('--tag', type=str, required=True)
 parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--fg_threshold', default=0.30, type=float)
 parser.add_argument('--bg_threshold', default=0.05, type=float)
+
+parser.add_argument('--crf_t', default=0, type=int)
+parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
 
 def split_dataset(dataset, n_splits):
@@ -45,49 +47,57 @@ def _work(process_id, dataset, args):
   subset = dataset[process_id]
   length = len(subset)
 
-  tag = args.experiment_name
+  tag = args.tag
   sal_dir = args.sal_dir
 
-  pred_dir = f'./experiments/predictions/{tag}/'
+  cams_dir = args.cams_dir
   aff_dir = f'./experiments/predictions/{tag}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/'
 
-  for step, (ori_image, image_id, _, _) in enumerate(dataset):
-    png_path = aff_dir + image_id + '.png'
+  for step, (ori_image, image_id, _, _) in enumerate(subset):
+    png_path = os.path.join(aff_dir, image_id + '.png')
+    cam_path = os.path.join(cams_dir, image_id + '.npy')
+    
     if os.path.isfile(png_path):
       continue
 
     # load
     image = np.asarray(ori_image)
-    data = np.load(pred_dir + image_id + '.npy', allow_pickle=True).item()
+    data = np.load(cam_path, allow_pickle=True).item()
 
     keys = data['keys']
-    cams = data['hr_cam']
+    cam = data['hr_cam']
 
     if sal_dir is None:
       # 1. find confident fg & bg
-      fg_cam = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.fg_threshold)
+      fg_cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.fg_threshold)
       fg_cam = np.argmax(fg_cam, axis=0)
       fg_conf = keys[crf_inference_label(image, fg_cam, n_labels=keys.shape[0])]
 
-      bg_cam = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.bg_threshold)
+      bg_cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.bg_threshold)
       bg_cam = np.argmax(bg_cam, axis=0)
       bg_conf = keys[crf_inference_label(image, bg_cam, n_labels=keys.shape[0])]
-
-      # 2. combine confident fg & bg
-      conf = fg_conf.copy()
-      conf[fg_conf == 0] = 255
-      conf[bg_conf + fg_conf == 0] = 0
     else:
+      # If saliency maps are available.
       sal_file = os.path.join(sal_dir, image_id + '.png')
       sal = load_saliency_file(sal_file, kind='saliency')
-      cams = np.concatenate((1 - sal, cams), axis=0)
+
+      fg_mask = (sal > args.bg_threshold).squeeze().astype('int')
+      bg_conf = crf_inference_label(image, fg_mask, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
+
+      fg_cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.fg_threshold)
+      fg_cam = bg_conf * np.argmax(fg_cam, axis=0)
+      fg_conf = keys[crf_inference_label(image, fg_cam, n_labels=keys.shape[0], t=args.crf_t, gt_prob=args.crf_gt_prob)]
+
+    conf = fg_conf.copy()
+    conf[fg_conf == 0] = 255
+    conf[bg_conf + fg_conf == 0] = 0
 
     imageio.imwrite(png_path, conf.astype(np.uint8))
 
     if process_id == args.num_workers - 1 and step % max(1, length // 20) == 0:
       sys.stdout.write(
         '\r# Make affinity labels [{}/{}] = {:.2f}%, ({}, {})'.format(
-          step + 1, length, (step + 1) / length * 100, tuple(reversed(image.size)), cams.shape
+          step + 1, length, (step + 1) / length * 100, image.shape, cam.shape
         )
       )
       sys.stdout.flush()
@@ -95,7 +105,7 @@ def _work(process_id, dataset, args):
 
 if __name__ == '__main__':
   args = parser.parse_args()
-  tag = args.experiment_name
+  tag = args.tag
 
   set_seed(args.seed)
   create_directory(f'./experiments/predictions/{tag}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/')

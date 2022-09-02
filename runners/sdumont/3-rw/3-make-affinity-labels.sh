@@ -42,13 +42,41 @@ ARCHITECTURE=resnest269
 DILATED=false
 
 DOMAIN=train_aug
-EXPERIMENT=resnest269@puzzlerep@train@scale=0.5,1.0,1.5,2.0
 
-$PY $SOURCE                       \
-    --experiment_name $EXPERIMENT \
-    --domain train_aug            \
-    --fg_threshold 0.4            \
-    --bg_threshold 0.1            \
-    --data_dir $DATA_DIR &
+CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
+SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
+
+FG=0.4
+BG=0.1
+CRF_T=10
+CRF_GT=0.9
+
+TAG=affnet@rs269-poc@pn-fgh@crf-$CRF_T-gt-$CRF_GT
+
+$PY $SOURCE               \
+    --tag     $TAG        \
+    --domain  $DOMAIN     \
+    --fg_threshold $FG    \
+    --bg_threshold $BG    \
+    --crf_t $CRF_T        \
+    --crf_gt_prob $CRF_GT \
+    --cams_dir $CAMS_DIR  \
+    --sal_dir  $SAL_DIR   \
+    --data_dir $DATA_DIR  &
+
+# FG=0.5
+# BG=0.05
+# TAG=affnet@rs269-poc@pn-fgh@crf-$CRF_T-gt-$CRF_GT
+
+# $PY $SOURCE               \
+#     --tag     $TAG        \
+#     --domain  $DOMAIN     \
+#     --fg_threshold $FG    \
+#     --bg_threshold $BG    \
+#     --crf_t $CRF_T        \
+#     --crf_gt_prob $CRF_GT \
+#     --cams_dir $CAMS_DIR  \
+#     --sal_dir  $SAL_DIR   \
+#     --data_dir $DATA_DIR  &
 
 wait

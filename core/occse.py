@@ -26,11 +26,14 @@ def balanced_label_split(label, k, choices, gamma=1.0):
   indices = []
 
   for i in range(bs):
-    p = (1 / choices**gamma)    # inv. prop. to the number of times chosen
-    p[choices == 0] = 1  # not chosen so far are a priority
-    p = p * label[i]     # suppress if label not present
+    di = label[i] > 0.5
+    ci = choices[di]
+    p = 1 / ci.clip(min=1)**gamma  # inv. prop. to the number of times chosen
+    p /= p.sum()
 
-    target = torch.multinomial(p, k)
+    targets = torch.where(di)[0]
+    target = targets[torch.multinomial(p, k)]
+
     y_mask[i, target] = 1
     choices[target] += 1
 
