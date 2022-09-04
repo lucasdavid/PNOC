@@ -25,9 +25,6 @@ parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
-parser.add_argument('--logfile', default='', type=str)
-parser.add_argument('--comment', default='', type=str)
-
 parser.add_argument('--mode', default='npy', type=str, choices=['npy', 'png'])
 parser.add_argument('--eval_mode', default='saliency', type=str, choices=['saliency', 'segmentation'])
 parser.add_argument('--min_th', default=0.05, type=float)

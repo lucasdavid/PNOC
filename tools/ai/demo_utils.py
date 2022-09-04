@@ -27,7 +27,7 @@ def transpose(image):
 def denormalize(image, mean=None, std=None, dtype=np.uint8, tp=True):
     if tp:
         image = transpose(image)
-        
+
     if mean is not None:
         image = (image * std) + mean
     

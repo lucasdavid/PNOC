@@ -42,7 +42,7 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Dataset
 BATCH=16
-AUGMENT=cutmix_colorjitter
+AUGMENT=none
 # Arch
 ARCHITECTURE=resnest269
 REG=none
@@ -53,21 +53,20 @@ EPOCHS=15
 MODE=normal
 # OC
 OC_ARCHITECTURE=resnest269
-OC_REG=kernel_usage
-OC_PRETRAINED=experiments/models/resnest269@ku-ra-cutmix-rr1.0-rep2.pth
+OC_REG=none
+OC_PRETRAINED=experiments/models/resnest269@ra-cutmix-rr1.0-rep2.pth
 OC_STRATEGY=random
 OC_FOCAL_MOMENTUM=0.8
 OC_FOCAL_GAMMA=5.0
 # Schedule
 P_INIT=0.0
 P_ALPHA=4.0
-P_SCHEDULE=0.35
-
+P_SCHEDULE=0.5
 OC_INIT=0.3
 OC_ALPHA=1.0
-OC_SCHEDULE=0.75
+OC_SCHEDULE=1.0
 
-TAG=$ARCHITECTURE@poc-cm-rs269-ku-ra-cm-r2-@$OC_STRATEGY@b$BATCH
+TAG=$ARCHITECTURE@poc-rs269-ra-cm-r2-@$OC_STRATEGY@b$BATCH
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \

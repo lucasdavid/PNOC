@@ -26,9 +26,6 @@ parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODE
 parser.add_argument("--sal_threshold", default=None, type=float)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
-parser.add_argument('--logfile', default='', type=str)
-parser.add_argument('--comment', default='', type=str)
-
 parser.add_argument('--crf_t', default=0, type=int)
 parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
@@ -65,6 +62,10 @@ def compare(start, step, TP, P, T, name_list):
 
     if os.path.exists(png_file):
       y_pred = np.array(Image.open(predict_folder + name + '.png'))
+
+      keys, cam = np.unique(y_pred, return_inverse=True)
+      cam = cam.reshape(y_pred.shape)
+
     elif os.path.exists(npy_file):
       try:
         data = np.load(npy_file, allow_pickle=True).item()
@@ -92,14 +93,14 @@ def compare(start, step, TP, P, T, name_list):
         cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
       cam = np.argmax(cam, axis=0)
-
-      if args.crf_t:
-        img = np.asarray(Image.open(img_file).convert('RGB'))
-        cam = crf_inference_label(img, cam, n_labels=len(keys), t=args.crf_t, gt_prob=args.crf_gt_prob)
-
-      y_pred = keys[cam]
     else:
       raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
+    
+    if args.crf_t:
+      img = np.asarray(Image.open(img_file).convert('RGB'))
+      cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+
+    y_pred = keys[cam]
 
     y_true = np.array(Image.open(label_file))
 

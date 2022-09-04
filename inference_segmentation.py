@@ -50,8 +50,9 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='DeepLabv3+', type=str)
-parser.add_argument('--backbone', default='resnest101', type=str)
+parser.add_argument('--backbone', default='resnest269', type=str)
 parser.add_argument('--mode', default='fix', type=str)
+parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 
 ###############################################################################
@@ -84,7 +85,7 @@ if __name__ == '__main__':
     pred_dir = create_directory('./experiments/predictions/{}/'.format(args.tag))
     
     set_seed(args.seed)
-    log_func = lambda string='': print(string)
+    log = lambda string='': print(string)
     
     ###################################################################################
     # Transform, Dataset, DataLoader
@@ -111,9 +112,9 @@ if __name__ == '__main__':
     model = model.cuda()
     model.eval()
 
-    log_func('[i] Architecture is {}'.format(args.architecture))
-    log_func('[i] Total Params: %.2fM'%(calculate_parameters(model)))
-    log_func()
+    log('[i] Architecture is {}'.format(args.architecture))
+    log('[i] Total Params: %.2fM'%(calculate_parameters(model)))
+    log()
 
     load_model(model, model_path, parallel=False)
     
@@ -167,16 +168,6 @@ if __name__ == '__main__':
                 pred_mask = np.argmax(preds, axis=0)
             else:
                 pred_mask = np.argmax(preds, axis=-1)
-
-            ###############################################################################
-            # cv2.imwrite('./demo.jpg', np.concatenate([np.asarray(ori_image)[..., ::-1], decode_from_colormap(pred_mask, dataset.colors)], axis=1))
-            # input('write')
-
-            # cv2.imshow('Image', np.asarray(ori_image)[..., ::-1])
-            # cv2.imshow('Prediction', decode_from_colormap(pred_mask, dataset.colors))
-            # cv2.imshow('GT', decode_from_colormap(gt_mask, dataset.colors))
-            # cv2.waitKey(0)
-            ###############################################################################
 
             if args.domain == 'test':
                 pred_mask = decode_from_colormap(pred_mask, dataset.colors)[..., ::-1]
