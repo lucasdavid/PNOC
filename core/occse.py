@@ -130,7 +130,7 @@ def update_focal_factor(
 
 
 def images_with_masked_objects(images, features, label_mask):
-  mask = torch.einsum('bc,bchw->bhw', label_mask, features).unsqueeze(1)
+  mask = features[label_mask == 1, :, :].unsqueeze(1)
   mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
   mask = F.relu(mask)
   mask = mask / (mask.max() + 1e-5)

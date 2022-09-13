@@ -184,7 +184,7 @@ if __name__ == '__main__':
       regularization=args.regularization,
       trainable_stem=args.trainable_stem,
     )
-    param_groups = model.get_parameter_groups(exclude_partial_names=['bn'])
+    param_groups = model.get_parameter_groups()
     
     gap_fn = model.global_average_pooling_2d
 
@@ -231,7 +231,7 @@ if __name__ == '__main__':
         {'params': param_groups[1], 'lr': 2*args.lr, 'weight_decay': 0},
         {'params': param_groups[2], 'lr': 10*args.lr, 'weight_decay': args.wd},
         {'params': param_groups[3], 'lr': 20*args.lr, 'weight_decay': 0},
-    ], lr=args.lr, momentum=0.9, weight_decay=0, max_step=max_iteration)
+    ], lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
 
     #################################################################################################
     # Train

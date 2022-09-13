@@ -99,9 +99,9 @@ parser.add_argument('--alpha_schedule', default=0.50, type=float)
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
 parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
-parser.add_argument('--oc-k', default=1.0, type=float)
-parser.add_argument('--oc-k-init', default=1.0, type=float)
-parser.add_argument('--oc-k-schedule', default=0.0, type=float)
+# parser.add_argument('--oc-k', default=1.0, type=float)
+# parser.add_argument('--oc-k-init', default=1.0, type=float)
+# parser.add_argument('--oc-k-schedule', default=0.0, type=float)
 
 if __name__ == '__main__':
   # Arguments
@@ -368,7 +368,7 @@ if __name__ == '__main__':
 
     ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
-    k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
+    k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
     # Normal
     logits, features = model(images, with_cam=True)
@@ -384,8 +384,8 @@ if __name__ == '__main__':
 
     # OC-CSE
     labels_mask, _ = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
-    labels_oc = labels - labels_mask
     cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
+    labels_oc = labels - labels_mask
     o_loss = class_loss_fn(cl_logits, labels_oc).mean()
 
     loss = (
