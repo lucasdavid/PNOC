@@ -42,6 +42,7 @@ parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type
 ###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--pretrained', type=str, required=True)
@@ -74,7 +75,6 @@ if __name__ == '__main__':
   cam_path = create_directory(f'{args.vis_dir}/{tag}')
 
   model_path = args.pretrained
-  print(f'Loading weights from {model_path}.')
 
   set_seed(args.seed)
   log_func = lambda string='': print(string)
@@ -94,7 +94,13 @@ if __name__ == '__main__':
   ###################################################################################
   # Network
   ###################################################################################
-  model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated, stage4_out_features=args.stage4_out_features)
+  model = CCAM(
+    args.architecture,
+    weights=args.weights,
+    mode=args.mode,
+    dilated=args.dilated,
+    stage4_out_features=args.stage4_out_features
+  )
 
   log_func('[i] Architecture is {}'.format(args.architecture))
   log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
@@ -106,6 +112,7 @@ if __name__ == '__main__':
 
   model = model.to(DEVICE)
 
+  print(f'Loading weights from {model_path}.')
   load_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   #################################################################################################

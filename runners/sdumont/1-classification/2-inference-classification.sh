@@ -37,12 +37,12 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 PY=python3.9
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-DOMAIN=train_aug
+DOMAIN=train
 DILATED=false
 
 ARCHITECTURE=resnest269
-WEIGHTS=resnest269@puzzlerep2
-TAG=$WEIGHTS
+WEIGHTS=resnest269@puzzlerep
+TAG=puzzle/$WEIGHTS
 
 CUDA_VISIBLE_DEVICES=0                    \
     $PY inference_classification.py       \

@@ -35,7 +35,7 @@ def group_norm(features):
 #######################################################################
 
 
-def build_backbone(name, dilated, strides, norm_fn):
+def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
   if dilated:
     dilation, dilated = 4, True
   else:
@@ -63,16 +63,18 @@ def build_backbone(name, dilated, strides, norm_fn):
         resnet.Bottleneck, resnet.layers_dic[name], strides=strides or (2, 2, 2, 1), batch_norm_fn=norm_fn
       )
 
-      state_dict = model_zoo.load_url(resnet.urls_dic[name])
-      state_dict.pop('fc.weight')
-      state_dict.pop('fc.bias')
+      if weights == 'imagenet':
+        print(f'loading weights from {resnet.urls_dic[name]}')
+        state_dict = model_zoo.load_url(resnet.urls_dic[name])
+        state_dict.pop('fc.weight')
+        state_dict.pop('fc.bias')
 
-      model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict)
     elif 'resnest' in name:
       from .arch_resnest import resnest
 
       model_fn = getattr(resnest, name)
-      model = model_fn(pretrained=True, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+      model = model_fn(pretrained=weights == 'imagenet', dilated=dilated, dilation=dilation, norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc
@@ -80,10 +82,15 @@ def build_backbone(name, dilated, strides, norm_fn):
       from .res2net import res2net_v1b
 
       model_fn = getattr(res2net_v1b, name)
-      model = model_fn(pretrained=True, strides=strides or (1, 2, 2, 1), norm_layer=norm_fn)
+      model = model_fn(pretrained=weights == 'imagenet', strides=strides or (1, 2, 2, 1), norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc
+
+    if weights and weights != 'imagenet':
+      print(f'loading weights from {weights}')
+      checkpoint = torch.load(weights, map_location="cpu")
+      model.load_state_dict(checkpoint['state_dict'], strict=False)
 
     stage1 = nn.Sequential(model.conv1, model.bn1, model.relu, model.maxpool)
     stage2 = nn.Sequential(model.layer1)
@@ -99,6 +106,7 @@ class Backbone(nn.Module, ABC_Model):
   def __init__(
       self,
       model_name,
+      weights='imagenet',
       mode='fix',
       dilated=False,
       strides=None,
@@ -116,7 +124,14 @@ class Backbone(nn.Module, ABC_Model):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    (out_features, model, stages) = build_backbone(model_name, dilated, strides, self.norm_fn)
+    (out_features, model, stages) = build_backbone(
+      name=model_name,
+      dilated=dilated,
+      strides=strides,
+      norm_fn=self.norm_fn,
+      weights=weights
+    )
+
     self.model = model
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
@@ -193,6 +208,7 @@ class CCAM(Backbone):
   def __init__(
     self,
     model_name,
+    weights='imagenet',
     mode='fix',
     dilated=False,
     strides=(1, 2, 2, 1),
@@ -201,6 +217,7 @@ class CCAM(Backbone):
   ):
     super().__init__(
       model_name,
+      weights=weights,
       mode=mode,
       dilated=dilated,
       strides=strides,
@@ -220,6 +237,23 @@ class CCAM(Backbone):
     feats = torch.cat([x2, x1], dim=1)
 
     return self.ac_head(feats)
+  
+  def get_parameter_groups(self):
+    groups = ([], [], [], [])
+    for m in self.modules():
+      if (isinstance(m, nn.Conv2d) or isinstance(m, nn.modules.normalization.GroupNorm)):
+        if m.weight.requires_grad:
+          if m in self.from_scratch_layers:
+            groups[2].append(m.weight)
+          else:
+            groups[0].append(m.weight)
+
+        if m.bias is not None and m.bias.requires_grad:
+          if m in self.from_scratch_layers:
+            groups[3].append(m.bias)
+          else:
+            groups[1].append(m.bias)
+    return groups
 
 
 class AffinityNet(Backbone):

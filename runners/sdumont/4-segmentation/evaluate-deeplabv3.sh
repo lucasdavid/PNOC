@@ -46,10 +46,12 @@ MODE=normal
 LR=0.1
 
 TAG=dlv3p-$MODE-gn@pn-fgh@rs269-poc
-LABEL=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10@train@beta=10@exp_times=8@rw@crf=1
+CRF_T=10
+
+# MODE=fix
+# TAG=DeepLabv3+@ResNeSt-269@Fix@GN
 
 echo "==========\nInference"
-CRF_T=0
 
 CUDA_VISIBLE_DEVICES=0           \
 $PY inference_segmentation.py    \

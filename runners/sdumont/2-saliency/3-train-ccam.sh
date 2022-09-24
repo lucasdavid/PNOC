@@ -46,18 +46,20 @@ WORKERS=8
 IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=64
-ACCUMULATE_STEPS=2
+ACCUMULATE_STEPS=1
 
-ARCHITECTURE=resnet38d
+ARCHITECTURE=resnet50
+ARCH=rn50
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
+WEIGHTS=./experiments/models/moco_r50_v2-e3b0c442.pth  # imagenet
 S4_OUT_FEATURES=1024
 
 ALPHA=0.25
-LR=0.001
+LR=0.0001
 
-TAG=ccam@$ARCHITECTURE@e$EPOCHS-b$BATCH_SIZE-lr$LR
+TAG=ccam-$ARCH-moco-e$EPOCHS-b$BATCH_SIZE-lr$LR-r2
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
   --tag             $TAG                 \
@@ -71,6 +73,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
   --stage4_out_features $S4_OUT_FEATURES \
   --dilated         $DILATED             \
   --mode            $MODE                \
+  --weights         $WEIGHTS             \
   --trainable-stem  $TRAINABLE_STEM      \
   --image_size      $IMAGE_SIZE          \
   --data_dir        $DATA_DIR

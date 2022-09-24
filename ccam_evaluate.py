@@ -23,7 +23,6 @@ parser.add_argument('--crf_t', default=0, type=int)
 parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
-parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 
 parser.add_argument('--mode', default='npy', type=str, choices=['npy', 'png'])
 parser.add_argument('--eval_mode', default='saliency', type=str, choices=['saliency', 'segmentation'])
@@ -34,7 +33,6 @@ parser.add_argument('--step_th', default=0.05, type=float)
 args = parser.parse_args()
 
 predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
-ground_truth_folder = args.gt_dir
 p_mode = args.predict_mode
 
 assert p_mode in ('logit', 'sigmoid')
@@ -57,9 +55,9 @@ def compare(start, step, TP, P, T, name_list):
     name = name_list[idx]
 
     img_file = os.path.join(args.data_dir, 'JPEGImages', name + '.jpg')
+    lbl_file = os.path.join(args.data_dir, 'SegmentationClass', name + '.png')
     npy_file = os.path.join(predict_folder, name + '.npy')
     png_file = os.path.join(predict_folder, name + '.png')
-    label_file = os.path.join(ground_truth_folder, name + '.png')
 
     if os.path.exists(png_file):
       s_pred = load_saliency_file(png_file)
@@ -88,7 +86,7 @@ def compare(start, step, TP, P, T, name_list):
       img = np.asarray(Image.open(img_file).convert('RGB'))
       s_pred = crf_inference_label(img, s_pred, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
 
-    y_true = np.array(Image.open(label_file))
+    y_true = np.array(Image.open(lbl_file))
     valid_mask = y_true < 255
 
     if args.eval_mode == 'saliency':
@@ -179,10 +177,6 @@ if __name__ == '__main__':
     print(f'Predicted saliency maps folder `{predict_folder}` does not exist.', file=sys.stderr)
     exit(1)
 
-  if not os.path.exists(ground_truth_folder):
-    print(f'True saliency maps folder `{ground_truth_folder}` does not exist.', file=sys.stderr)
-    exit(1)
-
   df = pd.read_csv(args.list, names=['filename'])
   filenames = df['filename'].values
 
@@ -196,28 +190,31 @@ if __name__ == '__main__':
     if args.threshold is None and p_mode == 'logit' else [args.threshold]
   )
 
-  for t in thresholds:
-    args.threshold = t
-    r = do_python_eval(filenames)
+  try:
+    for t in thresholds:
+      args.threshold = t
+      r = do_python_eval(filenames)
 
-    print(
-      f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
-      f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
-      f"FP_bg={r['fp_bg']:.3%} "
-      f"FN_bg={r['fn_bg']:.3%} "
-      f"FP_fg={r['fp_all']:.3%} "
-      f"FN_fg={r['fn_all']:.3%}"
-    )
+      print(
+        f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
+        f"iou=[{r['background']:.3f}, {r['miou_foreground']:.3f}] "
+        f"FP_bg={r['fp_bg']:.3%} "
+        f"FN_bg={r['fn_bg']:.3%} "
+        f"FP_fg={r['fp_all']:.3%} "
+        f"FN_fg={r['fn_all']:.3%}"
+      )
 
-    fp_history.append(r['fp_all'])
-    miou_history.append(r['mIoU'])
+      fp_history.append(r['fp_all'])
+      miou_history.append(r['mIoU'])
 
-    if r['mIoU'] > miou_:
-      threshold_ = t
-      miou_ = r['mIoU']
-      fp_ = r['fp_all']
-      fn_ = r['fn_all']
-      iou_ = r
+      if r['mIoU'] > miou_:
+        threshold_ = t
+        miou_ = r['mIoU']
+        fp_ = r['fp_all']
+        fn_ = r['fn_all']
+        iou_ = r
+  except KeyboardInterrupt:
+    print('interrupted')
 
   print(
     f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%} FN={fn_:.3%}',

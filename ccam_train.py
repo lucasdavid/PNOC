@@ -39,6 +39,7 @@ parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type
 # Network
 ###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
+parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
@@ -166,7 +167,13 @@ if __name__ == '__main__':
   ###################################################################################
   # Network
   ###################################################################################
-  model = CCAM(args.architecture, mode=args.mode, dilated=args.dilated, stage4_out_features=args.stage4_out_features)
+  model = CCAM(
+    args.architecture,
+    weights=args.weights,
+    mode=args.mode,
+    dilated=args.dilated,
+    stage4_out_features=args.stage4_out_features,
+  )
   param_groups = model.get_parameter_groups()
 
   log('[i] Architecture is {}'.format(args.architecture))
@@ -225,7 +232,7 @@ if __name__ == '__main__':
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
         B, C, H, W = images.size()
-        _, _, ccams = model(images.to(DEVICE), inference=True)
+        _, _, ccams = model(images.to(DEVICE))
 
         ccams = resize_for_tensors(ccams.cpu(), (H, W))
         ccams = make_cam(ccams)
@@ -269,9 +276,7 @@ if __name__ == '__main__':
     model.train()
 
     for step, (images, labels) in enumerate(train_loader):
-      images, labels = images.to(DEVICE), labels.to(DEVICE)
-
-      fg_feats, bg_feats, ccam = model(images)
+      fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
       loss1 = criterion[0](fg_feats)
       loss2 = criterion[1](bg_feats, fg_feats)
@@ -283,12 +288,12 @@ if __name__ == '__main__':
       if (step + 1) % args.accumule_steps == 0:
         optimizer.step()
         optimizer.zero_grad()
-
+      
       if epoch == 0 and step == 600:
-        IS_POSITIVE = check_positive(ccam)
+        IS_POSITIVE = check_positive(ccams)
         print(f"Is Negative: {IS_POSITIVE}")
       if IS_POSITIVE:
-        ccam = 1 - ccam
+        ccams = 1 - ccams
 
       train_meter.add(
         {
@@ -303,7 +308,7 @@ if __name__ == '__main__':
       #################################################################################################
 
       if (step + 1) % 100 == 0:
-        visualize_heatmap(args.tag, images.clone().detach(), ccam, 0, step)
+        visualize_heatmap(args.tag, images.clone().detach(), ccams, 0, step)
         loss, positive_loss, negative_loss = train_meter.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
 

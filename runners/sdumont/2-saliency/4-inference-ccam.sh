@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J mk-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-%j.out
-#SBATCH --time=04:00:00
+#SBATCH --time=02:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -43,21 +43,41 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 WORKERS=8
 
-DILATED=false
+DOMAIN=train
+
+# ARCHITECTURE=resnest269
+# TRAINABLE_STEM=true
+# DILATED=false
+# MODE=normal
+# TAG=ccam-rs269-e10-b64-lr0.001
+# S4_OUT_FEATURES=1024
+# WEIGHTS=imagenet
+# PRETRAINED=./experiments/models/ccam-rs269-e10-b64-lr0.001.pth
+
+# CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
+#   --tag             $TAG                 \
+#   --domain          $DOMAIN              \
+#   --num_workers     $WORKERS             \
+#   --architecture    $ARCHITECTURE        \
+#   --dilated         $DILATED             \
+#   --stage4_out_features $S4_OUT_FEATURES \
+#   --mode            $MODE                \
+#   --weights         $WEIGHTS             \
+#   --trainable-stem  $TRAINABLE_STEM      \
+#   --pretrained      $PRETRAINED          \
+#   --data_dir        $DATA_DIR
+
+
+ARCHITECTURE=resnet50
 TRAINABLE_STEM=true
+DILATED=false
 MODE=normal
-
-DOMAIN=train_aug
-
-
-TAG=ccam-fgh@rs269@rs269-poc
-ARCHITECTURE=resnest269
+TAG=ccam-rn50-moco-e10-b64-lr0.0001-r2
 S4_OUT_FEATURES=1024
-WEIGHTS=./experiments/models/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
-# THRESHOLD=0.3
-# CRF=10
+WEIGHTS=imagenet
+PRETRAINED=./experiments/models/ccam-rn50-moco-e10-b64-lr0.0001-r2.pth
 
-CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
+CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
   --tag             $TAG                 \
   --domain          $DOMAIN              \
   --num_workers     $WORKERS             \
@@ -65,15 +85,38 @@ CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
   --dilated         $DILATED             \
   --stage4_out_features $S4_OUT_FEATURES \
   --mode            $MODE                \
+  --weights         $WEIGHTS             \
   --trainable-stem  $TRAINABLE_STEM      \
-  --pretrained      $WEIGHTS             \
+  --pretrained      $PRETRAINED          \
   --data_dir        $DATA_DIR
 
-EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
 
-python3.9 ccam_inference_crf.py \
-  --experiment_name $EXP        \
-  --domain          train_aug   \
-  --threshold       0.5         \
-  --crf_iteration   10          \
-  --data_dir        $DATA_DIR
+# EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
+# T=0.05
+# CRF=10
+
+# $PY ccam_inference_crf.py       \
+#   --experiment_name $EXP        \
+#   --domain          train_aug   \
+#   --threshold       $T          \
+#   --crf_iteration   $CRF        \
+#   --data_dir        $DATA_DIR
+
+# echo "==================="
+# echo "C²AM Evaluation"
+
+# $PY ccam_evaluate.py       \
+#   --experiment_name $EXP   \
+#   --domain train           \
+#   --eval_mode segmentation \
+#   --data_dir $DATA_DIR
+
+# echo "==================="
+# echo "C²AM+CRF Evaluation"
+
+# $PY ccam_evaluate.py                    \
+#   --experiment_name $EXP@t=$T@crf=$CRF  \
+#   --domain train                        \
+#   --eval_mode segmentation \
+#   --mode png               \
+#   --data_dir $DATA_DIR
