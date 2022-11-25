@@ -87,7 +87,7 @@ class VOCDatasetWithCAMs(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/VOC_2012.json')
+    data = read_json('./data/voc12/VOC_2012.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -150,7 +150,7 @@ if __name__ == '__main__':
   BATCH_TRAIN = args.batch_size
   BATCH_VALID = 32
 
-  META = read_json('./data/VOC_2012.json')
+  META = read_json('./data/voc12/VOC_2012.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = len(CLASSES)
 

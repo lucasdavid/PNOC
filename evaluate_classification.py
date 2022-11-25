@@ -16,7 +16,7 @@ model = mcar_resnet101(
   inference_mode=True,
 )
 
-ckpt_file = '/mnt/files/Workspace/logs/sdumont/mcar/model_best.pth.tar'
+ckpt_file = '/home/ldavid/workspace/logs/sdumont/mcar/model_best.pth.tar'
 ckpt = torch.load(ckpt_file, map_location=torch.device('cpu'))
 model.load_state_dict(ckpt['state_dict'], strict=True)
 model.eval()
@@ -31,7 +31,7 @@ classes = np.asarray([
 imagenet_mean = [0.485, 0.456, 0.406]
 imagenet_std = [0.229, 0.224, 0.225]
 
-meta_dic = read_json('./data/VOC_2012.json')
+meta_dic = read_json('./data/voc12/VOC_2012.json')
 
 import torchmetrics
 from core.datasets import *
@@ -39,7 +39,7 @@ from tools.ai.augment_utils import *
 from torch.utils.data import DataLoader
 
 val_dataset = VOC_Dataset_For_Classification(
-  '/mnt/files/Workspace/datasets/voc/VOCdevkit/VOC2012/', 'val',
+  '/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/', 'val',
   transforms.Compose([Normalize(imagenet_mean, imagenet_std),
                       Top_Left_Crop(512), Transpose()])
 )

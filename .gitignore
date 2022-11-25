@@ -17,3 +17,5 @@ data/
 
 .ipynb_checkpoints/
 experiments
+
+notebooks/

@@ -131,7 +131,7 @@ if __name__ == '__main__':
     ]
   )
 
-  meta_dic = read_json('./data/VOC_2012.json')
+  meta_dic = read_json('./data/voc12/VOC_2012.json')
   class_names = np.asarray(meta_dic['class_names'])
   classes = len(class_names)
 

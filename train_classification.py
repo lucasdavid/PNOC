@@ -42,6 +42,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 ###############################################################################
@@ -85,7 +86,7 @@ if __name__ == '__main__':
   DEVICE = args.device
   CUTMIX = 'cutmix' in args.augment
 
-  META = read_json('./data/VOC_2012.json')
+  META = read_json('./data/voc12/VOC_2012.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 
@@ -140,8 +141,14 @@ if __name__ == '__main__':
     Transpose_For_Segmentation()
   ])
 
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
-  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
+  if args.dataset == 'voc12':
+    train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
+    valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
+  else:
+    from data.coco14 import dataloader as coco14
+    train_dataset = coco14.COCO14ClassificationDataset(
+      
+    )
 
   if CUTMIX:
     log_func('[i] Using cutmix')
@@ -241,7 +248,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
 
     outputs = {'labels': [], 'preds': []}
 

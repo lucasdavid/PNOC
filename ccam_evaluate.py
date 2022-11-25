@@ -37,7 +37,7 @@ p_mode = args.predict_mode
 
 assert p_mode in ('logit', 'sigmoid')
 
-args.list = './data/' + args.domain + '.txt'
+args.list = './data/voc12/' + args.domain + '.txt'
 
 if args.eval_mode == 'saliency':
   CLASSES = ['background', 'foreground']

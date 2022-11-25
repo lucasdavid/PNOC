@@ -46,7 +46,7 @@ class VOC_Dataset(torch.utils.data.Dataset):
     self.xml_dir = os.path.join(self.root_dir, 'Annotations/')
     self.mask_dir = os.path.join(self.root_dir, 'SegmentationClass/')
 
-    self.image_id_list = [image_id.strip() for image_id in open('./data/%s.txt' % domain).readlines()]
+    self.image_id_list = [image_id.strip() for image_id in open('./data/voc12/%s.txt' % domain).readlines()]
 
     self.with_id = with_id
     self.with_tags = with_tags
@@ -94,7 +94,7 @@ class VOC_Dataset_For_Classification(VOC_Dataset):
     super().__init__(root_dir, domain, with_tags=True)
     self.transform = transform
 
-    data = read_json('./data/VOC_2012.json')
+    data = read_json('./data/voc12/VOC_2012.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -186,7 +186,7 @@ class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/VOC_2012.json')
+    data = read_json('./data/voc12/VOC_2012.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -220,7 +220,7 @@ class VOC_Dataset_For_Making_CAM(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/VOC_2012.json')
+    data = read_json('./data/voc12/VOC_2012.json')
 
     self.class_names = np.asarray(class_names[1:21])
     self.class_dic = data['class_dic']
@@ -238,7 +238,7 @@ class VOC_Dataset_For_Affinity(VOC_Dataset):
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
     super().__init__(root_dir, domain, with_id=True)
 
-    data = read_json('./data/VOC_2012.json')
+    data = read_json('./data/voc12/VOC_2012.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']

@@ -109,7 +109,7 @@ if __name__ == '__main__':
 
   CUTMIX = 'cutmix' in args.augment
 
-  META = read_json('./data/VOC_2012.json')
+  META = read_json('./data/voc12/VOC_2012.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 
@@ -292,7 +292,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)

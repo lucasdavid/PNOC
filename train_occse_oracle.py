@@ -143,7 +143,7 @@ if __name__ == '__main__':
     Transpose_For_Segmentation()
   ])
 
-  meta_dic = read_json('./data/VOC_2012.json')
+  meta_dic = read_json('./data/voc12/VOC_2012.json')
   class_names = np.asarray(meta_dic['class_names'])
   classes = meta_dic['classes']
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)

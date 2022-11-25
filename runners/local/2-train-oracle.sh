@@ -3,7 +3,7 @@ PY=python
 SOURCE=train_occse_oracle.py
 DEVICE=cpu
 WORKERS=8
-DATA_DIR=/mnt/files/Workspace/datasets/voc/VOCdevkit/VOC2012/
+DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
 
 IMAGE_SIZE=64
 

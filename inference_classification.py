@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
   TAG = args.tag
 
-  META = read_json('./data/VOC_2012.json')
+  META = read_json('./data/voc12/VOC_2012.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 

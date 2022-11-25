@@ -40,7 +40,7 @@ predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
 gt_dir = args.gt_dir
 sal_dir = args.sal_dir
 
-args.list = './data/' + args.domain + '.txt'
+args.list = './data/voc12/' + args.domain + '.txt'
 args.predict_dir = predict_folder
 
 CLASSES = [

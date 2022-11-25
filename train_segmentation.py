@@ -96,7 +96,7 @@ if __name__ == '__main__':
   # Transform, Dataset, DataLoader
   ###################################################################################
 
-  META = read_json('./data/VOC_2012.json')
+  META = read_json('./data/voc12/VOC_2012.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = len(CLASSES)
 
@@ -242,7 +242,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter = Calculator_For_mIoU('./data/VOC_2012.json')
+    meter = Calculator_For_mIoU('./data/voc12/VOC_2012.json')
 
     with torch.no_grad():
       length = len(loader)

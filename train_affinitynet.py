@@ -108,7 +108,7 @@ if __name__ == '__main__':
         Resize_For_Mask(args.image_size // 4),
     ])
     
-    meta_dic = read_json('./data/VOC_2012.json')
+    meta_dic = read_json('./data/voc12/VOC_2012.json')
     class_names = np.asarray(meta_dic['class_names'])
     
     path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
