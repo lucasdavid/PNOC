@@ -65,3 +65,30 @@ def get_transforms(
   )
 
   return tt, tv
+
+
+def get_dataset_classification(
+  dataset,
+  data_dir,
+  augment,
+  image_size,
+  cutmix_prob=0.,
+  train_transforms=None,
+  valid_transforms=None,
+):
+  print(f'Loading {dataset} dataset')
+
+  if dataset == 'voc12':  
+    from . import voc12
+    train_dataset = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
+    valid_dataset = voc12.VOC12CAMTestingDataset(data_dir, 'train', valid_transforms)
+  else:
+    from . import coco14
+    train_dataset = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
+    valid_dataset = coco14.COCO14SegmentationDataset(data_dir, 'train2014', valid_transforms)
+  
+  if 'cutmix' in augment:
+    print('[i] Using cutmix')
+    train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+  
+  return train_dataset, valid_dataset

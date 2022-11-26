@@ -25,6 +25,21 @@ class PolyOptimizer(torch.optim.SGD):
     self.global_step += 1
 
 
+def get_optimizer(lr, wd, max_step, param_groups):
+  return PolyOptimizer(
+    [
+      {'params': param_groups[0], 'lr': lr, 'weight_decay': wd},
+      {'params': param_groups[1], 'lr': 2 * lr, 'weight_decay': 0},
+      {'params': param_groups[2], 'lr': 10 * lr, 'weight_decay': wd},
+      {'params': param_groups[3], 'lr': 20 * lr, 'weight_decay': 0},
+    ],
+    lr=lr,
+    momentum=0.9,
+    weight_decay=wd,
+    max_step=max_step,
+  )
+
+
 def linear_schedule(step, max_step, a_0=0., a_n=1.0, rate=1.0, contraint=min):
   if rate == 0:
     return a_n

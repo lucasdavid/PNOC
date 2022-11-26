@@ -11,6 +11,8 @@ IMG_FOLDER_NAME = "JPEGImages"
 ANNOT_FOLDER_NAME = "Annotations"
 IGNORE = 255
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'coco14')
+
 
 def decode_int_filename(int_filename):
   s = str(int_filename).split('\n')[0]
@@ -20,12 +22,14 @@ def decode_int_filename(int_filename):
 
 
 def load_image_label_list_from_npy(img_name_list):
-  cls_labels_dict = np.load('data/coco14/cls_labels_coco.npy', allow_pickle=True).item()
+  filepath = os.path.join(DATA_DIR, 'cls_labels_coco.npy')
+  cls_labels_dict = np.load(filepath, allow_pickle=True).item()
   return np.array([cls_labels_dict[int(img_name)] for img_name in img_name_list])
 
 
 def load_img_name_list(domain):
-  return np.loadtxt(f"./data/coco14/{domain}.txt", dtype=np.int32)[::-1]
+  filepath = os.path.join(DATA_DIR, f"{domain}.txt")
+  return np.loadtxt(filepath, dtype=np.int32)[::-1]
 
 
 class COCO14Dataset(Dataset):

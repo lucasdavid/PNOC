@@ -117,19 +117,9 @@ if __name__ == '__main__':
   NUM_CLASSES = META['classes']
 
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-
-  if args.dataset == 'voc12':
-    from core.datasets import voc12
-    train_dataset = voc12.VOC12ClassificationDataset(args.data_dir, 'train_aug', tt)
-    valid_dataset = voc12.VOC12CAMTestingDataset(args.data_dir, 'train', tv)
-  else:
-    from core.datasets import coco14
-    train_dataset = coco14.COCO14ClassificationDataset(args.data_dir, 'train2014', tt)
-    valid_dataset = coco14.COCO14SegmentationDataset(args.data_dir, 'train2014', tv)
-
-  if 'cutmix' in args.augment:
-    log('[i] Using cutmix')
-    train_dataset = CutMix(train_dataset, args.image_size, num_mix=1, beta=1., prob=args.cutmix_prob)
+  train_dataset, valid_dataset = get_dataset_classification(
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+  )
 
   train_loader = DataLoader(
     train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
@@ -202,34 +192,7 @@ if __name__ == '__main__':
   log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
   log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
-  optimizer = PolyOptimizer(
-    [
-      {
-        'params': param_groups[0],
-        'lr': args.lr,
-        'weight_decay': args.wd
-      },
-      {
-        'params': param_groups[1],
-        'lr': 2 * args.lr,
-        'weight_decay': 0
-      },
-      {
-        'params': param_groups[2],
-        'lr': 10 * args.lr,
-        'weight_decay': args.wd
-      },
-      {
-        'params': param_groups[3],
-        'lr': 20 * args.lr,
-        'weight_decay': 0
-      },
-    ],
-    lr=args.lr,
-    momentum=0.9,
-    weight_decay=args.wd,
-    max_step=max_iteration
-  )
+  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
 
   #################################################################################################
   # Train
