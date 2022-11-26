@@ -41,6 +41,9 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
   else:
     dilation, dilated = 2, False
 
+  if not strides:
+    strides = [1, 2, 2, 1]
+
   if 'resnet38d' == name:
     from .arch_resnet import resnet38d
     out_features = 4096
@@ -60,7 +63,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
     if 'resnet' in name:
       from .arch_resnet import resnet
       model = resnet.ResNet(
-        resnet.Bottleneck, resnet.layers_dic[name], strides=strides or (2, 2, 2, 1), batch_norm_fn=norm_fn
+        resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn
       )
 
       if weights == 'imagenet':
@@ -82,7 +85,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
       from .res2net import res2net_v1b
 
       model_fn = getattr(res2net_v1b, name)
-      model = model_fn(pretrained=weights == 'imagenet', strides=strides or (1, 2, 2, 1), norm_layer=norm_fn)
+      model = model_fn(pretrained=weights == 'imagenet', strides=strides, norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc

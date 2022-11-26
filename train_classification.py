@@ -243,27 +243,34 @@ if __name__ == '__main__':
 
     meter_dic = {th: Calculator_For_mIoU('./data/VOC_2012.json') for th in thresholds}
 
+    outputs = {'labels': [], 'preds': []}
+
     with torch.no_grad():
       length = len(loader)
       for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.to(DEVICE)
-        labels = labels.to(DEVICE)
-
-        _, features = model(images, with_cam=True)
+        logits, features = model(images.to(DEVICE), with_cam=True)
 
         # features = resize_for_tensors(features, images.size()[-2:])
         # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
 
         mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = (make_cam(features) * mask)
+        cams = make_cam(features).cpu() * mask
+
+        images = to_numpy(images)
+        labels = to_numpy(labels)
+        preds = to_numpy(torch.sigmoid(logits))
+        cams = to_numpy(cams)
+
+        outputs['labels'].append(labels)
+        outputs['preds'].append(preds)
 
         # for visualization
         if step == 0:
-          obj_cams = cams.max(dim=1)[0]
+          obj_cams = cams.max(axis=1)
 
           for b in range(8):
-            image = to_numpy(images[b])
-            cam = to_numpy(obj_cams[b])
+            image = images[b]
+            cam = obj_cams[b]
 
             image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
             h, w, c = image.shape
@@ -279,8 +286,8 @@ if __name__ == '__main__':
 
         for batch_index in range(images.size()[0]):
           # c, h, w -> h, w, c
-          cam = to_numpy(cams[batch_index]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[batch_index])
+          cam = cams[batch_index].transpose((1, 2, 0))
+          gt_mask = gt_masks[batch_index]
 
           h, w, c = cam.shape
           gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -301,6 +308,8 @@ if __name__ == '__main__':
       if best_mIoU < mIoU:
         best_th = th
         best_mIoU = mIoU
+      
+    from sklearn.metrics import 
 
     return best_th, best_mIoU
 
