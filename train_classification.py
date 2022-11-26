@@ -308,8 +308,6 @@ if __name__ == '__main__':
       if best_mIoU < mIoU:
         best_th = th
         best_mIoU = mIoU
-      
-    from sklearn.metrics import 
 
     return best_th, best_mIoU
 
