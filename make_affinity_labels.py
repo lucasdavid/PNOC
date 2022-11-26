@@ -10,7 +10,7 @@ import numpy as np
 from torch import multiprocessing
 from torch.utils.data import Subset
 
-from core.datasets import VOC_Dataset_For_Making_CAM
+from core.datasets import VOC12InferenceDataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import create_directory, load_saliency_file
@@ -110,7 +110,7 @@ if __name__ == '__main__':
   set_seed(args.seed)
   create_directory(f'./experiments/predictions/{tag}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/')
 
-  dataset = VOC_Dataset_For_Making_CAM(args.data_dir, args.domain)
+  dataset = VOC12InferenceDataset(args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)

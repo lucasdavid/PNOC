@@ -131,17 +131,17 @@ if __name__ == '__main__':
     ]
   )
 
-  meta_dic = read_json('./data/voc12/VOC_2012.json')
+  meta_dic = read_json('./data/voc12/meta.json')
   class_names = np.asarray(meta_dic['class_names'])
   classes = len(class_names)
 
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', train_transform)
+  train_dataset = VOC12ClassificationDataset(args.data_dir, 'train_aug', train_transform)
   if CUTMIX:
     log('[i] Using cutmix')
     train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
 
-  train_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
+  train_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'train', test_transform)
+  valid_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'val', test_transform)
 
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
   train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)

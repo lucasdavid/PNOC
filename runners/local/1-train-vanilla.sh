@@ -4,7 +4,11 @@ PY=python
 SOURCE=train_classification.py
 DEVICE=cuda
 WORKERS=8
-DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
+
+# DATASET=voc12
+# DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
+DATASET=coco14
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
 IMAGE_SIZE=64
 
@@ -14,7 +18,7 @@ MODE=normal
 TRAINABLE_STEM=true
 AUGMENT=colorjitter_randaugment
 
-TAG=rs101-rr
+TAG=rs101-rr-$DATASET
 
 export PYTHONDONTWRITEBYTECODE=1
 
@@ -28,4 +32,5 @@ $PY $SOURCE                          \
   --trainable-stem  $TRAINABLE_STEM  \
   --image_size      $IMAGE_SIZE      \
   --augment         $AUGMENT         \
+  --dataset         $DATASET         \
   --data_dir        $DATA_DIR

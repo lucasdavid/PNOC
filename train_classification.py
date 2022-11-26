@@ -1,38 +1,32 @@
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
-import os
-import sys
-import copy
-import shutil
-import random
 import argparse
-import numpy as np
+import copy
+import os
+import random
+import shutil
+import sys
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchvision import transforms
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from torch.utils.data import DataLoader
-
-from core.networks import *
 from core.datasets import *
-
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
-
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
-
+from core.networks import *
 from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
@@ -54,7 +48,6 @@ parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
-
 
 ###############################################################################
 # Hyperparameter
@@ -84,11 +77,6 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device
-  CUTMIX = 'cutmix' in args.augment
-
-  META = read_json('./data/voc12/VOC_2012.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
 
   print('Train Configuration')
   pad = max(map(len, vars(args))) + 1
@@ -106,63 +94,42 @@ if __name__ == '__main__':
   model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
-  log_func = lambda string='': log_print(string, log_path)
+  log = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(TAG))
-  log_func()
+  log('[i] {}'.format(TAG))
+  log()
 
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
+  META = read_json(f'./data/{args.dataset}/meta.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
-  tt = []
-  tt.append(RandomResize(args.min_image_size, args.max_image_size))
-  tt.append(RandomHorizontalFlip())
-
-  if 'colorjitter' in args.augment:
-    tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
-
-  if 'randaugment' in args.augment:
-    tt.append(RandAugmentMC(n=2, m=10))
-
-  tt.append(Normalize(imagenet_mean, imagenet_std))
-
-  if not CUTMIX:
-    tt.append(RandomCrop(args.image_size))
-    tt.append(Transpose())
-
-  tt = transforms.Compose(tt)
-
-  tv = transforms.Compose([
-    Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-    Top_Left_Crop_For_Segmentation(args.image_size),
-    Transpose_For_Segmentation()
-  ])
+  tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
 
   if args.dataset == 'voc12':
-    train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
-    valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
+    from core.datasets import voc12
+    train_dataset = voc12.VOC12ClassificationDataset(args.data_dir, 'train_aug', tt)
+    valid_dataset = voc12.VOC12CAMTestingDataset(args.data_dir, 'train', tv)
   else:
-    from data.coco14 import dataloader as coco14
-    train_dataset = coco14.COCO14ClassificationDataset(
-      
-    )
+    from core.datasets import coco14
+    train_dataset = coco14.COCO14ClassificationDataset(args.data_dir, 'train2014', tt)
+    valid_dataset = coco14.COCO14SegmentationDataset(args.data_dir, 'train2014', tv)
 
-  if CUTMIX:
-    log_func('[i] Using cutmix')
+  if 'cutmix' in args.augment:
+    log('[i] Using cutmix')
     train_dataset = CutMix(train_dataset, args.image_size, num_mix=1, beta=1., prob=args.cutmix_prob)
 
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(META['classes']))
-  log_func('[i] train_transform is {}'.format(tt))
-  log_func('[i] test_transform is {}'.format(tv))
-  log_func()
+  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] train_transform is {}'.format(tt))
+  log('[i] test_transform is {}'.format(tv))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
@@ -170,9 +137,9 @@ if __name__ == '__main__':
 
   # val_iteration = log_iteration
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(max_iteration))
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(max_iteration))
 
   ###################################################################################
   # Network
@@ -190,10 +157,10 @@ if __name__ == '__main__':
   model = model.to(DEVICE)
   model.train()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Regularization is {}'.format(args.regularization))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Regularization is {}'.format(args.regularization))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   try:
     use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
@@ -202,7 +169,7 @@ if __name__ == '__main__':
 
   the_number_of_gpu = len(use_gpu.split(','))
   if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
 
   load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
@@ -213,17 +180,33 @@ if __name__ == '__main__':
   ###################################################################################
   class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
-  log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
+  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
+  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
+  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
+  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
   optimizer = PolyOptimizer(
     [
-      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
-      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
-      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
-      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0},
+      {
+        'params': param_groups[0],
+        'lr': args.lr,
+        'weight_decay': args.wd
+      },
+      {
+        'params': param_groups[1],
+        'lr': 2 * args.lr,
+        'weight_decay': 0
+      },
+      {
+        'params': param_groups[2],
+        'lr': 10 * args.lr,
+        'weight_decay': args.wd
+      },
+      {
+        'params': param_groups[3],
+        'lr': 20 * args.lr,
+        'weight_decay': 0
+      },
     ],
     lr=args.lr,
     momentum=0.9,
@@ -245,15 +228,16 @@ if __name__ == '__main__':
   thresholds = list(np.arange(0.1, 0.50, 0.05))
 
   def evaluate(loader):
+    imagenet_mean, imagenet_std = imagenet_stats()
+    
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
 
     outputs = {'labels': [], 'preds': []}
 
     with torch.no_grad():
-      length = len(loader)
       for step, (images, labels, gt_masks) in enumerate(loader):
         logits, features = model(images.to(DEVICE), with_cam=True)
 
@@ -355,7 +339,7 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         'iteration={iteration:,} '
         'learning_rate={learning_rate:.4f} '
         'loss={loss:.4f} '
@@ -376,9 +360,6 @@ if __name__ == '__main__':
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
 
-        save_model_fn()
-        log_func('[i] save model')
-
       data = {
         'iteration': iteration + 1,
         'threshold': threshold,
@@ -389,7 +370,7 @@ if __name__ == '__main__':
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         'iteration={iteration:,} '
         'threshold={threshold:.2f} '
         'train_mIoU={train_mIoU:.2f}% '
@@ -404,4 +385,5 @@ if __name__ == '__main__':
   write_json(data_path, data_dic)
   writer.close()
 
-  print(TAG)
+  log(f'[i] {TAG} saved at {model_path}')
+  save_model_fn()

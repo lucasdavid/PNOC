@@ -31,6 +31,8 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 ###############################################################################
@@ -60,7 +62,7 @@ if __name__ == '__main__':
 
   TAG = args.tag
 
-  META = read_json('./data/voc12/VOC_2012.json')
+  META = read_json('./data/voc12/meta.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 
@@ -76,18 +78,26 @@ if __name__ == '__main__':
   model_path = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
   set_seed(args.seed)
-  log_func = lambda string='': print(string)
+  log = lambda string='': print(string)
 
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
+  META = read_json(f'./data/{args.dataset}/meta.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
+  if args.dataset == 'voc12':
+    from core.datasets import voc12
+    dataset = voc12.VOC12InferenceDataset(args.data_dir, 'train_aug')
+  else:
+    from core.datasets import coco14
+    dataset = coco14.COCO14InferenceDataset(args.data_dir, 'train2014')
 
-  # for mIoU
-  dataset = VOC_Dataset_For_Making_CAM(args.data_dir, args.domain)
+  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log()
+
+  normalize_fn = Normalize(*imagenet_stats())
 
   ###################################################################################
   # Network
@@ -104,9 +114,9 @@ if __name__ == '__main__':
   model = model.cuda()
   model.eval()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   try:
     use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
@@ -115,7 +125,7 @@ if __name__ == '__main__':
 
   the_number_of_gpu = len(use_gpu.split(','))
   if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
 
   load_model(model, model_path, parallel=the_number_of_gpu > 1)

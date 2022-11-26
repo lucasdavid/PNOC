@@ -1,47 +1,42 @@
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
-import os
-import sys
+import argparse
 import copy
 import math
-import shutil
+import os
 import random
-import argparse
-import numpy as np
+import shutil
+import sys
 
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
-
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
 
-from core.puzzle_utils import *
-from core.networks import *
-from core.datasets import *
 from core import occse
-
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
-
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
-
+from core.datasets import *
+from core.networks import *
+from core.puzzle_utils import *
 from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 # Network
@@ -107,11 +102,9 @@ if __name__ == '__main__':
   # Arguments
   args = parser.parse_args()
 
-  CUTMIX = 'cutmix' in args.augment
-
-  META = read_json('./data/voc12/VOC_2012.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
+  TAG = args.tag
+  SEED = args.seed
+  DEVICE = args.device
 
   print('Train Configuration')
   pad = max(map(len, vars(args))) + 1
@@ -122,73 +115,58 @@ if __name__ == '__main__':
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
+  tensorboard_dir = create_directory(f'./experiments/tensorboards/{TAG}/')
 
-  log_path = log_dir + f'{args.tag}.txt'
-  data_path = data_dir + f'{args.tag}.json'
-  model_path = model_dir + f'{args.tag}.pth'
+  log_path = log_dir + f'{TAG}.txt'
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
-  set_seed(args.seed)
-  log_func = lambda string='': log_print(string, log_path)
+  set_seed(SEED)
+  log = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(args.tag))
-  log_func()
+  log('[i] {}'.format(TAG))
+  log()
 
+  ###################################################################################
   # Transform, Dataset, DataLoader
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
+  ###################################################################################
+  META = read_json(f'./data/{args.dataset}/meta.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
-  tt = []
-  tt.append(RandomResize(args.min_image_size, args.max_image_size))
-  tt.append(RandomHorizontalFlip())
+  tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
 
-  if 'colorjitter' in args.augment:
-    tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+  if args.dataset == 'voc12':
+    from core.datasets import voc12
+    train_dataset = voc12.VOC12ClassificationDataset(args.data_dir, 'train_aug', tt)
+    valid_dataset = voc12.VOC12CAMTestingDataset(args.data_dir, 'train', tv)
+  else:
+    from core.datasets import coco14
+    train_dataset = coco14.COCO14ClassificationDataset(args.data_dir, 'train2014', tt)
+    valid_dataset = coco14.COCO14SegmentationDataset(args.data_dir, 'train2014', tv)
 
-  if 'randaugment' in args.augment:
-    tt.append(RandAugmentMC(n=2, m=10))
-
-  tt.append(Normalize(imagenet_mean, imagenet_std))
-
-  if not CUTMIX:
-    tt.append(RandomCrop(args.image_size))
-    tt.append(Transpose())
-
-  tt = transforms.Compose(tt)
-
-  tv = transforms.Compose([
-    Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-    Top_Left_Crop_For_Segmentation(args.image_size),
-    Transpose_For_Segmentation()
-  ])
-
-  train_dataset = VOC_Dataset_For_Classification(args.data_dir, 'train_aug', tt)
-
-  if CUTMIX:
-    log_func('[i] Using cutmix')
+  if 'cutmix' in args.augment:
+    log('[i] Using cutmix')
     train_dataset = CutMix(train_dataset, args.image_size, num_mix=1, beta=1., prob=args.cutmix_prob)
 
-  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', tv)
-
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
-  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(NUM_CLASSES))
-  log_func('[i] train_transform is {}'.format(tt))
-  log_func('[i] test_transform is {}'.format(tv))
-  log_func()
+  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] train_transform is {}'.format(tt))
+  log('[i] test_transform is {}'.format(tv))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   step_init = args.first_epoch * val_iteration
   step_max = args.max_epoch * val_iteration
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(step_max))
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(step_max))
 
   # Network
   model = Classifier(
@@ -206,13 +184,13 @@ if __name__ == '__main__':
 
   gap_fn = model.global_average_pooling_2d
 
-  model = model.cuda()
+  model = model.to(DEVICE)
   model.train()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Regularization is {}'.format(args.regularization))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Regularization is {}'.format(args.regularization))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
@@ -227,7 +205,7 @@ if __name__ == '__main__':
     oc_nn = Classifier(args.oc_architecture, NUM_CLASSES, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
-  oc_nn = oc_nn.cuda()
+  oc_nn = oc_nn.to(DEVICE)
   oc_nn.eval()
   for child in oc_nn.children():
     for param in child.parameters():
@@ -240,7 +218,7 @@ if __name__ == '__main__':
 
   the_number_of_gpu = len(use_gpu.split(','))
   if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
     oc_nn = nn.DataParallel(oc_nn)
 
@@ -248,23 +226,40 @@ if __name__ == '__main__':
   save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
 
   # Loss, Optimizer
-  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
   if args.r_loss == 'L1_Loss':
     r_loss_fn = L1_Loss
   else:
     r_loss_fn = L2_Loss
 
-  log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
+  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
+  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
+  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
+  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
-  optimizer = PolyOptimizer([
-      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
-      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
-      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
-      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0},
+  optimizer = PolyOptimizer(
+    [
+      {
+        'params': param_groups[0],
+        'lr': args.lr,
+        'weight_decay': args.wd
+      },
+      {
+        'params': param_groups[1],
+        'lr': 2 * args.lr,
+        'weight_decay': 0
+      },
+      {
+        'params': param_groups[2],
+        'lr': 10 * args.lr,
+        'weight_decay': args.wd
+      },
+      {
+        'params': param_groups[3],
+        'lr': 20 * args.lr,
+        'weight_decay': 0
+      },
     ],
     lr=args.lr,
     momentum=0.9,
@@ -278,27 +273,27 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter([
-    'loss', 'c_loss', 'p_loss', 'r_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'
-  ])
+  train_meter = Average_Meter(['loss', 'c_loss', 'p_loss', 'r_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(NUM_CLASSES).cuda()
-  focal_factor = torch.ones(NUM_CLASSES).cuda()
+  choices = torch.ones(NUM_CLASSES).to(DEVICE)
+  focal_factor = torch.ones(NUM_CLASSES).to(DEVICE)
 
   def evaluate(loader):
+    imagenet_mean, imagenet_std = imagenet_stats()
+    
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)
       for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.cuda()
-        labels = labels.cuda()
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
 
         _, features = model(images, with_cam=True)
 
@@ -364,7 +359,7 @@ if __name__ == '__main__':
 
   for step in range(step_init, step_max):
     images, labels = train_iterator.get()
-    images, labels = images.cuda(), labels.cuda()
+    images, labels = images.to(DEVICE), labels.to(DEVICE)
 
     ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
@@ -388,50 +383,33 @@ if __name__ == '__main__':
     labels_oc = labels - labels_mask
     o_loss = class_loss_fn(cl_logits, labels_oc).mean()
 
-    loss = (
-      c_loss
-      + p_loss
-      + ap * r_loss
-      + ao * o_loss
-    )
+    loss = (c_loss + p_loss + ap * r_loss + ao * o_loss)
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
     occse.update_focal_factor(
-      labels,
-      labels_oc,
-      cl_logits,
-      focal_factor,
-      momentum=args.oc_focal_momentum,
-      gamma=args.oc_focal_gamma
+      labels, labels_oc, cl_logits, focal_factor, momentum=args.oc_focal_momentum, gamma=args.oc_focal_gamma
     )
 
     # region logging
-    train_meter.add({
-      'loss': loss.item(),
-      'c_loss': c_loss.item(),
-      'p_loss': p_loss.item(),
-      'r_loss': r_loss.item(),
-      'o_loss': o_loss.item(),
-      'alpha': ap,
-      'oc_alpha': ao,
-      'k': k
-    })
+    train_meter.add(
+      {
+        'loss': loss.item(),
+        'c_loss': c_loss.item(),
+        'p_loss': p_loss.item(),
+        'r_loss': r_loss.item(),
+        'o_loss': o_loss.item(),
+        'alpha': ap,
+        'oc_alpha': ao,
+        'k': k
+      }
+    )
 
     if (step + 1) % log_iteration == 0:
-      (
-        loss,
-        c_loss,
-        p_loss,
-        r_loss,
-        o_loss,
-        ap,
-        ao,
-        k
-      ) = train_meter.get(clear=True)
-      
+      (loss, c_loss, p_loss, r_loss, o_loss, ap, ao, k) = train_meter.get(clear=True)
+
       lr = float(get_learning_rate_from_optimizer(optimizer))
       cs = to_numpy(choices).tolist()
       ffs = to_numpy(focal_factor).astype(float).round(2).tolist()
@@ -454,7 +432,7 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         'iteration    = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
@@ -467,8 +445,7 @@ if __name__ == '__main__':
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
         'focal_factor = {focal_factor}\n'
-        'choices      = {choices}\n'
-        .format(**data)
+        'choices      = {choices}\n'.format(**data)
       )
 
       writer.add_scalar('Train/loss', loss, step)
@@ -500,25 +477,22 @@ if __name__ == '__main__':
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         '\niteration       = {iteration:,}\n'
         'time            = {time:.0f} sec'
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
         'best_train_mIoU = {best_train_mIoU:.2f}%\n'
-        'train_iou       = {train_iou}\n'
-        .format(**data)
+        'train_iou       = {train_iou}\n'.format(**data)
       )
 
       writer.add_scalar('Evaluation/threshold', threshold, step)
       writer.add_scalar('Evaluation/train_mIoU', mIoU, step)
       writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, step)
-
-      save_model_fn()
-      log_func('[i] save model')
     # endregion
 
   write_json(data_path, data_dic)
   writer.close()
 
-  print(args.tag)
+  log(f'[i] {TAG} saved at {model_path}')
+  save_model_fn()

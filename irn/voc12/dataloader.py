@@ -271,4 +271,3 @@ class VOC12AffinityDataset(VOC12SegmentationDataset):
         out['aff_bg_pos_label'], out['aff_fg_pos_label'], out['aff_neg_label'] = self.extract_aff_lab_func(reduced_label)
 
         return out
-

@@ -96,7 +96,7 @@ if __name__ == '__main__':
   # Transform, Dataset, DataLoader
   ###################################################################################
 
-  META = read_json('./data/voc12/VOC_2012.json')
+  META = read_json('./data/voc12/meta.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = len(CLASSES)
 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
   )
 
   train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', pred_dir, train_transform)
-  valid_dataset = VOC_Dataset_For_Segmentation(args.data_dir, 'val', test_transform)
+  valid_dataset = VOC12SegmentationDataset(args.data_dir, 'val', test_transform)
 
   train_loader = DataLoader(
     train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
@@ -242,7 +242,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter = Calculator_For_mIoU('./data/voc12/VOC_2012.json')
+    meter = Calculator_For_mIoU(CLASSES)
 
     with torch.no_grad():
       length = len(loader)

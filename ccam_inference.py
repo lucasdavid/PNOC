@@ -88,8 +88,8 @@ if __name__ == '__main__':
   normalize_fn = Normalize(imagenet_mean, imagenet_std)
 
   # for mIoU
-  meta_dic = read_json('./data/voc12/VOC_2012.json')
-  dataset = VOC_Dataset_For_Making_CAM(args.data_dir, args.domain)
+  meta_dic = read_json('./data/voc12/meta.json')
+  dataset = VOC12InferenceDataset(args.data_dir, args.domain)
 
   ###################################################################################
   # Network

@@ -11,7 +11,7 @@ import numpy as np
 from torch import multiprocessing
 from torch.utils.data import DataLoader, Subset
 
-from core.datasets import VOC_Dataset_For_Making_CAM
+from core.datasets import VOC12InferenceDataset
 from tools.ai.demo_utils import *
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import *
@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
   create_directory(f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_iteration}/')
 
-  dataset = VOC_Dataset_For_Making_CAM(args.data_dir, args.domain)
+  dataset = VOC12InferenceDataset(args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)

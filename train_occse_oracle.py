@@ -143,13 +143,13 @@ if __name__ == '__main__':
     Transpose_For_Segmentation()
   ])
 
-  meta_dic = read_json('./data/voc12/VOC_2012.json')
+  meta_dic = read_json('./data/voc12/meta.json')
   class_names = np.asarray(meta_dic['class_names'])
   classes = meta_dic['classes']
 
-  train_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train_aug', train_transform)
-  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
-  # valid_dataset_for_seg = VOC_Dataset_For_Testing_CAM(args.data_dir, 'val', test_transform)
+  train_dataset = VOC12CAMTestingDataset(args.data_dir, 'train_aug', train_transform)
+  valid_dataset = VOC12CAMTestingDataset(args.data_dir, 'train', test_transform)
+  # valid_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'val', test_transform)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU('./data/voc12/VOC_2012.json') for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)

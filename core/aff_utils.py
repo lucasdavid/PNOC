@@ -156,11 +156,12 @@ def propagate_to_edge(x, edge, radius=5, beta=10, exp_times=8):
   return rw
 
 
-class GetAffinityLabelFromIndices():
+class GetAffinityLabelFromIndices:
 
-  def __init__(self, indices_from, indices_to):
+  def __init__(self, indices_from, indices_to, classes=21):
     self.indices_from = indices_from
     self.indices_to = indices_to
+    self.classes = classes
 
   def __call__(self, segm_map):
     segm_map_flat = np.reshape(segm_map, -1)
@@ -168,7 +169,7 @@ class GetAffinityLabelFromIndices():
     segm_label_from = np.expand_dims(segm_map_flat[self.indices_from], axis=0)
     segm_label_to = segm_map_flat[self.indices_to]
 
-    valid_m = (segm_label_from < 21) & (segm_label_to < 21)
+    valid_m = (segm_label_from < self.classes) & (segm_label_to < self.classes)
     equal_m = segm_label_from == segm_label_to
 
     pos_aff_m = equal_m & valid_m

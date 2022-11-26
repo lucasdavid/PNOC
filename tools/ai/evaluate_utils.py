@@ -67,9 +67,8 @@ def calculate_mIoU(pred_mask, gt_mask):
     return miou * 100
 
 class Calculator_For_mIoU:
-    def __init__(self, json_path):
-        data = read_json(json_path)
-        self.class_names = ['background'] + data['class_names']
+    def __init__(self, classes):
+        self.class_names = ['background'] + classes
         self.classes = len(self.class_names)
 
         self.clear()

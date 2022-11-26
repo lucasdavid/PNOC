@@ -1,44 +1,22 @@
-import os
-import cv2
 import glob
-import torch
-
 import math
+import os
+
+import cv2
 import imageio
 import numpy as np
-
+import torch
 from PIL import Image
 
 from core.aff_utils import *
-
 from tools.ai.augment_utils import *
 from tools.ai.torch_utils import one_hot_embedding
-
-from tools.general.xml_utils import read_xml
-from tools.general.json_utils import read_json
 from tools.dataset.voc_utils import get_color_map_dic
+from tools.general.json_utils import read_json
+from tools.general.xml_utils import read_xml
 
 
-class Iterator:
-
-  def __init__(self, loader):
-    self.loader = loader
-    self.init()
-
-  def init(self):
-    self.iterator = iter(self.loader)
-
-  def get(self):
-    try:
-      data = next(self.iterator)
-    except StopIteration:
-      self.init()
-      data = next(self.iterator)
-
-    return data
-
-
-class VOC_Dataset(torch.utils.data.Dataset):
+class VOC12Dataset(torch.utils.data.Dataset):
 
   def __init__(self, root_dir, domain, with_id=False, with_tags=False, with_mask=False):
     self.root_dir = root_dir
@@ -88,13 +66,13 @@ class VOC_Dataset(torch.utils.data.Dataset):
     return data_list
 
 
-class VOC_Dataset_For_Classification(VOC_Dataset):
+class VOC12ClassificationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_tags=True)
     self.transform = transform
 
-    data = read_json('./data/voc12/VOC_2012.json')
+    data = read_json('./data/voc12/meta.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -109,7 +87,7 @@ class VOC_Dataset_For_Classification(VOC_Dataset):
     return image, label
 
 
-class VOC_Dataset_For_Segmentation(VOC_Dataset):
+class VOC12SegmentationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_mask=True)
@@ -131,7 +109,7 @@ class VOC_Dataset_For_Segmentation(VOC_Dataset):
     return image, mask
 
 
-class VOC_Dataset_For_Evaluation(VOC_Dataset):
+class VOC12EvaluationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_id=True, with_mask=True)
@@ -153,7 +131,7 @@ class VOC_Dataset_For_Evaluation(VOC_Dataset):
     return image, image_id, mask
 
 
-class VOC_Dataset_For_WSSS(VOC_Dataset):
+class VOC_Dataset_For_WSSS(VOC12Dataset):
 
   def __init__(self, root_dir, domain, pred_dir, transform=None):
     super().__init__(root_dir, domain, with_id=True)
@@ -177,7 +155,7 @@ class VOC_Dataset_For_WSSS(VOC_Dataset):
     return image, mask
 
 
-class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
+class VOC12CAMTestingDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_tags=True, with_mask=True)
@@ -186,7 +164,7 @@ class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/voc12/VOC_2012.json')
+    data = read_json('./data/voc12/meta.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -212,7 +190,7 @@ class VOC_Dataset_For_Testing_CAM(VOC_Dataset):
     return image, label, mask
 
 
-class VOC_Dataset_For_Making_CAM(VOC_Dataset):
+class VOC12InferenceDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain):
     super().__init__(root_dir, domain, with_id=True, with_tags=True, with_mask=True)
@@ -220,7 +198,7 @@ class VOC_Dataset_For_Making_CAM(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/voc12/VOC_2012.json')
+    data = read_json('./data/voc12/meta.json')
 
     self.class_names = np.asarray(class_names[1:21])
     self.class_dic = data['class_dic']
@@ -233,12 +211,12 @@ class VOC_Dataset_For_Making_CAM(VOC_Dataset):
     return image, image_id, label, mask
 
 
-class VOC_Dataset_For_Affinity(VOC_Dataset):
+class VOC12AffinityDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
     super().__init__(root_dir, domain, with_id=True)
 
-    data = read_json('./data/voc12/VOC_2012.json')
+    data = read_json('./data/voc12/meta.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -248,7 +226,9 @@ class VOC_Dataset_For_Affinity(VOC_Dataset):
     self.label_dir = label_dir
     self.path_index = path_index
 
-    self.extract_aff_lab_func = GetAffinityLabelFromIndices(self.path_index.src_indices, self.path_index.dst_indices)
+    self.extract_aff_lab_func = GetAffinityLabelFromIndices(
+      self.path_index.src_indices, self.path_index.dst_indices, classes=21
+    )
 
   def __getitem__(self, idx):
     image, image_id = super().__getitem__(idx)
@@ -256,7 +236,7 @@ class VOC_Dataset_For_Affinity(VOC_Dataset):
     label = imageio.imread(self.label_dir + image_id + '.png')
     label = Image.fromarray(label)
 
-    output_dic = self.transform({'image': image, 'mask': label})
-    image, label = output_dic['image'], output_dic['mask']
+    entry = self.transform({'image': image, 'mask': label})
+    image, label = entry['image'], entry['mask']
 
     return image, self.extract_aff_lab_func(label)

@@ -75,7 +75,7 @@ GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
 GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 
 
-class VOCDatasetWithCAMs(VOC_Dataset):
+class VOCDatasetWithCAMs(VOC12Dataset):
 
   def __init__(self, root_dir, domain, cams_dir, resize, normalize, aug_transform):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
@@ -87,7 +87,7 @@ class VOCDatasetWithCAMs(VOC_Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/voc12/VOC_2012.json')
+    data = read_json('./data/voc12/meta.json')
 
     self.class_dic = data['class_dic']
     self.classes = data['classes']
@@ -150,7 +150,7 @@ if __name__ == '__main__':
   BATCH_TRAIN = args.batch_size
   BATCH_VALID = 32
 
-  META = read_json('./data/voc12/VOC_2012.json')
+  META = read_json('./data/voc12/meta.json')
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = len(CLASSES)
 
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     normalize=normalize_t,
     aug_transform=aug_transform
   )
-  valid_dataset = VOC_Dataset_For_Testing_CAM(args.data_dir, 'train', test_transform)
+  valid_dataset = VOC12CAMTestingDataset(args.data_dir, 'train', test_transform)
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
   valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers)
 
