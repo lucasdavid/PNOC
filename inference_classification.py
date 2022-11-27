@@ -32,7 +32,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 ###############################################################################
@@ -61,16 +60,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   TAG = args.tag
-
-  META = read_json('./data/voc12/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
-
-  if 'train' in args.domain:
-    TAG += '@train'
-  else:
-    TAG += '@val'
-
+  TAG += '@train' if 'train' in args.domain else '@val'
   TAG += '@scale=%s' % args.scales
 
   pred_dir = create_directory(f'./experiments/predictions/{TAG}/')
@@ -87,13 +77,7 @@ if __name__ == '__main__':
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 
-  if args.dataset == 'voc12':
-    from core.datasets import voc12
-    dataset = voc12.VOC12InferenceDataset(args.data_dir, 'train_aug')
-  else:
-    from core.datasets import coco14
-    dataset = coco14.COCO14InferenceDataset(args.data_dir, 'train2014')
-
+  dataset = get_dataset_inference(args.dataset, args.data_dir)
   log('[i] The number of class is {}'.format(NUM_CLASSES))
   log()
 
@@ -164,7 +148,7 @@ if __name__ == '__main__':
 
   with torch.no_grad():
     length = len(dataset)
-    for step, (ori_image, image_id, label, gt_mask) in enumerate(dataset):
+    for step, (ori_image, image_id, label, _) in enumerate(dataset):
       ori_w, ori_h = ori_image.size
 
       npy_path = pred_dir + image_id + '.npy'
@@ -201,8 +185,3 @@ if __name__ == '__main__':
       )
       sys.stdout.flush()
     print()
-
-  if args.domain == 'train_aug':
-    args.domain = 'train'
-
-  print("python3 evaluate.py --experiment_name {} --domain {}".format(TAG, args.domain))

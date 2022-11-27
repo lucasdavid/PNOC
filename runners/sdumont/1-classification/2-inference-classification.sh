@@ -35,22 +35,32 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
 PY=python3.9
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+
+# DATASET=voc12
+# DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
+DATASET=coco14
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
 DOMAIN=train
 DILATED=false
 
 ARCHITECTURE=resnest269
+MODE=normal
+REG=none
 WEIGHTS=resnest269@puzzlerep
+
 TAG=puzzle/$WEIGHTS
 
-CUDA_VISIBLE_DEVICES=0                    \
-    $PY inference_classification.py       \
-    --architecture $ARCHITECTURE          \
-    --dilated      $DILATED               \
-    --weights      $WEIGHTS               \
-    --tag          $TAG                   \
-    --domain       $DOMAIN                \
-    --data_dir     $DATA_DIR              &
+CUDA_VISIBLE_DEVICES=0                      \
+    $PY inference_classification.py         \
+    --architecture   $ARCHITECTURE          \
+    --dilated        $DILATED               \
+    --regularization $REG                   \
+    --mode           $MODE                  \
+    --weights        $WEIGHTS               \
+    --tag            $TAG                   \
+    --domain         $DOMAIN                \
+    --dataset        $DATASET               \
+    --data_dir       $DATA_DIR              &
 
 wait

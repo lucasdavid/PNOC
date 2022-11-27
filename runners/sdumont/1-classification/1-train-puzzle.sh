@@ -25,7 +25,7 @@
 # task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -36,22 +36,36 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
 PY=python3.9
 SOURCE=train_classification_with_puzzle.py
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest269
+# DATASET=voc12
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+
 BATCH=32
-# AUGMENT=colorjitter
-TAG=$ARCHITECTURE@puzzle-rep#2
 
-CUDA_VISIBLE_DEVICES=0,1,2,3        \
-    $PY $SOURCE                     \
-    --architecture   $ARCHITECTURE  \
-    --batch_size     $BATCH         \
-    --mode           normal         \
-    --re_loss_option masking        \
-    --re_loss        L1_Loss        \
-    --alpha_schedule 0.50           \
-    --alpha          4.00           \
-    --tag            $TAG           \
+ARCH=rs101
+ARCHITECTURE=resnest101
+REGULAR=none
+
+AUGMENT=colorjitter_randaugment_cutmix
+CUTMIX_PROB=0.5
+AUG=ra-cm$CUTMIX_PROB
+
+TAG=$DATASET-$ARCH-p-$AUG
+
+CUDA_VISIBLE_DEVICES=0,1,2,3         \
+    $PY $SOURCE                      \
+    --architecture   $ARCHITECTURE   \
+    --regularization $REGULAR        \
+    --batch_size     $BATCH          \
+    --mode           normal          \
+    --re_loss_option masking         \
+    --re_loss        L1_Loss         \
+    --alpha_schedule 0.50            \
+    --alpha          4.00            \
+    --tag            $TAG            \
+    --augment        $AUGMENT        \
+    --cutmix_prob    $CUTMIX_PROB    \
+    --dataset        $DATASET        \
     --data_dir       $DATA_DIR
-    # --augment        $AUGMENT       \

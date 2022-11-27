@@ -44,8 +44,8 @@ class COCO14Dataset(Dataset):
     return len(self.img_name_list)
 
   def __getitem__(self, idx):
-    filename = decode_int_filename(self.img_name_list[idx])
-    filename = f"COCO_{self.domain}_{filename}.jpg"
+    image_id = decode_int_filename(self.img_name_list[idx])
+    filename = f"COCO_{self.domain}_{image_id}.jpg"
     filepath = os.path.join(self.root_dir, IMG_FOLDER_NAME, filename)
     
     image = Image.open(filepath).convert('RGB')
@@ -53,7 +53,7 @@ class COCO14Dataset(Dataset):
     if self.transform:
       image = self.transform(image)
 
-    return filename, image
+    return image_id, image
 
 
 class COCO14ClassificationDataset(COCO14Dataset):
@@ -69,6 +69,23 @@ class COCO14ClassificationDataset(COCO14Dataset):
     return image, label
 
 
+class COCO14InferenceDataset(COCO14Dataset):
+
+  def __init__(self, root_dir, domain, transform=None):
+    super().__init__(root_dir, domain, transform)
+    self.label_list = load_image_label_list_from_npy(self.img_name_list)
+
+  def __getitem__(self, idx):
+    image_id, image = super().__getitem__(idx)
+
+    label = torch.from_numpy(self.label_list[idx])
+
+    maskpath = os.path.join(self.label_dir, image_id + '.png')
+    mask = Image.open(maskpath) if os.path.isfile(maskpath) else None
+
+    return image, image_id, label, mask
+
+
 class COCO14SegmentationDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, label_dir, transform=None):
@@ -77,16 +94,13 @@ class COCO14SegmentationDataset(COCO14Dataset):
     self.label_dir = label_dir
 
   def __getitem__(self, idx):
-    name = decode_int_filename(self.img_name_list[idx])
-    filename = f"COCO_{self.domain}_{name}.jpg"
+    image_id = decode_int_filename(self.img_name_list[idx])
+    filename = f"COCO_{self.domain}_{image_id}.jpg"
     filepath = os.path.join(self.root_dir, IMG_FOLDER_NAME, filename)
-    maskpath = os.path.join(self.label_dir, name + '.png')
+    maskpath = os.path.join(self.label_dir, image_id + '.png')
 
     image = Image.open(filepath).convert('RGB')
-    if os.path.isfile(maskpath):
-      label = Image.open(maskpath)
-    else:
-      label = None
+    label = Image.open(maskpath) if os.path.isfile(maskpath) else None
 
     if self.transform:
       entry = self.transform({'image': image, 'mask': label})

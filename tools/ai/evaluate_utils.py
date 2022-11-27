@@ -68,6 +68,9 @@ def calculate_mIoU(pred_mask, gt_mask):
 
 class Calculator_For_mIoU:
     def __init__(self, classes):
+        if isinstance(classes, np.ndarray):
+            classes = classes.tolist()
+
         self.class_names = ['background'] + classes
         self.classes = len(self.class_names)
 

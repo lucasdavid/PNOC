@@ -38,13 +38,19 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 PY=python3.9
 SOURCE=train_classification_with_puzzle_oc.py
 LOGS_DIR=$SCRATCH/logs/puzzle
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+
+# DATASET=voc12
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
 
 # Dataset
 BATCH=16
 AUGMENT=none
+CUTMIX_PROB=0.5
 # Arch
 ARCHITECTURE=resnest269
+ARCH=rs269
 REG=none
 DILATED=false
 TRAINABLE_STEM=true
@@ -66,13 +72,14 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=$ARCHITECTURE@poc-rs269-ra-cm-r2-@$OC_STRATEGY@b$BATCH
+TAG=$ARCH-b$BATCH-poc@rs269-ra
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
     --max_epoch         $EPOCHS            \
     --batch_size        $BATCH             \
     --augment           $AUGMENT           \
+    --cutmix_prob       $CUTMIX_PROB       \
     --architecture      $ARCHITECTURE      \
     --regularization    $REG               \
     --dilated           $DILATED           \
@@ -113,5 +120,3 @@ $PY evaluate.py \
   --min_th 0.05 \
   --max_th 0.9 \
   --step_th 0.05
-
-rm "-rf $TAG@train@scale=0.5,1.0,1.5,2.0"

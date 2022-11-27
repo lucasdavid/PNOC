@@ -78,7 +78,7 @@ def get_dataset_classification(
 ):
   print(f'Loading {dataset} dataset')
 
-  if dataset == 'voc12':  
+  if dataset == 'voc12':
     from . import voc12
     train_dataset = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
     valid_dataset = voc12.VOC12CAMTestingDataset(data_dir, 'train', valid_transforms)
@@ -92,3 +92,14 @@ def get_dataset_classification(
     train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
   
   return train_dataset, valid_dataset
+
+
+def get_dataset_inference(dataset, data_dir):
+  if dataset == 'voc12':
+    from . import voc12
+    dataset = voc12.VOC12InferenceDataset(data_dir, 'train_aug')
+  else:
+    from . import coco14
+    dataset = coco14.COCO14InferenceDataset(data_dir, 'train2014')
+  
+  return dataset

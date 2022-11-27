@@ -121,71 +121,44 @@ if __name__ == '__main__':
   model_path = model_dir + f'{args.tag}.pth'
 
   set_seed(args.seed)
-  log_func = lambda string='': log_print(string, log_path)
+  log = lambda string='': log_print(string, log_path)
 
-  log_func('[i] {}'.format(args.tag))
-  log_func()
+  log('[i] {}'.format(args.tag))
+  log()
 
   # Transform, Dataset, DataLoader
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
+  META = read_json(f'./data/{args.dataset}/meta.json')
+  CLASSES = np.asarray(META['class_names'])
+  NUM_CLASSES = META['classes']
 
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
+  tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset, valid_dataset = get_dataset_classification(
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+  )
 
-  train_transforms = [
-    RandomResize(args.min_image_size, args.max_image_size),
-    RandomHorizontalFlip(),
-  ]
-  if 'colorjitter' in args.augment:
-    train_transforms.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  if 'randaugment' in args.augment:
-    train_transforms.append(RandAugmentMC(n=2, m=10))
-
-  train_transform = transforms.Compose(train_transforms + [
-    Normalize(imagenet_mean, imagenet_std),
-    RandomCrop(args.image_size),
-    Transpose()
-  ])
-  test_transform = transforms.Compose([
-    Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-    Top_Left_Crop_For_Segmentation(args.image_size),
-    Transpose_For_Segmentation()
-  ])
-
-  meta_dic = read_json('./data/voc12/meta.json')
-  class_names = np.asarray(meta_dic['class_names'])
-  classes = meta_dic['classes']
-
-  train_dataset = VOC12ClassificationDataset(args.data_dir, 'train_aug', train_transform)
-
-  train_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'train', test_transform)
-  # valid_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'val', test_transform)
-
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
-  train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
-  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=args.batch_size, num_workers=1, drop_last=True)
-
-  log_func('[i] mean values is {}'.format(imagenet_mean))
-  log_func('[i] std values is {}'.format(imagenet_std))
-  log_func('[i] The number of class is {}'.format(classes))
-  log_func('[i] train_transform is {}'.format(train_transform))
-  log_func('[i] test_transform is {}'.format(test_transform))
-  log_func()
+  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] train_transform is {}'.format(tt))
+  log('[i] test_transform is {}'.format(tv))
+  log()
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   step_init = args.first_epoch * val_iteration
   step_max = args.max_epoch * val_iteration
 
-  log_func('[i] log_iteration : {:,}'.format(log_iteration))
-  log_func('[i] val_iteration : {:,}'.format(val_iteration))
-  log_func('[i] max_iteration : {:,}'.format(step_max))
+  log('[i] log_iteration : {:,}'.format(log_iteration))
+  log('[i] val_iteration : {:,}'.format(val_iteration))
+  log('[i] max_iteration : {:,}'.format(step_max))
 
   # Network
   model = Classifier(
     args.architecture,
-    classes,
+    NUM_CLASSES,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -201,10 +174,10 @@ if __name__ == '__main__':
   model = model.cuda()
   model.train()
 
-  log_func('[i] Architecture is {}'.format(args.architecture))
-  log_func('[i] Regularization is {}'.format(args.regularization))
-  log_func('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log_func()
+  log('[i] Architecture is {}'.format(args.architecture))
+  log('[i] Regularization is {}'.format(args.regularization))
+  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  log()
 
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
@@ -212,11 +185,11 @@ if __name__ == '__main__':
     ps = 'avg'
     topN = 4
     threshold = 0.5
-    oc_nn = mcar_resnet101(classes, ps, topN, threshold, inference_mode=True, with_logits=True)
+    oc_nn = mcar_resnet101(NUM_CLASSES, ps, topN, threshold, inference_mode=True, with_logits=True)
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, classes, mode=args.mode, regularization=args.oc_regularization)
+    oc_nn = Classifier(args.oc_architecture, NUM_CLASSES, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.cuda()
@@ -232,7 +205,7 @@ if __name__ == '__main__':
 
   the_number_of_gpu = len(use_gpu.split(','))
   if the_number_of_gpu > 1:
-    log_func('[i] the number of gpu : {}'.format(the_number_of_gpu))
+    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
     model = nn.DataParallel(model)
     oc_nn = nn.DataParallel(oc_nn)
 
@@ -247,22 +220,12 @@ if __name__ == '__main__':
   # else:
   #   r_loss_fn = L2_Loss
 
-  log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
+  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
+  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
+  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
+  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
-  optimizer = PolyOptimizer([
-      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
-      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
-      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
-      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0},
-    ],
-    lr=args.lr,
-    momentum=0.9,
-    weight_decay=args.wd,
-    max_step=step_max,
-  )
+  optimizer = get_optimizer(args.lr, args.wd, step_max, param_groups)
 
   # Train
   data_dic = {'train': [], 'validation': []}
@@ -277,10 +240,12 @@ if __name__ == '__main__':
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(classes).cuda()
-  focal_factor = torch.ones(classes).cuda()
+  choices = torch.ones(NUM_CLASSES).cuda()
+  focal_factor = torch.ones(NUM_CLASSES).cuda()
 
   def evaluate(loader):
+    imagenet_mean, imagenet_std = imagenet_stats()
+    
     model.eval()
     eval_timer.tik()
 
@@ -439,7 +404,7 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         '\niteration  = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
@@ -468,7 +433,7 @@ if __name__ == '__main__':
 
     # region evaluation
     if (step + 1) % val_iteration == 0:
-      threshold, mIoU = evaluate(train_loader_for_seg)
+      threshold, mIoU = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
@@ -483,7 +448,7 @@ if __name__ == '__main__':
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
 
-      log_func(
+      log(
         '\niteration       = {iteration:,}\n'
         'time            = {time:.0f} sec'
         'threshold       = {threshold:.2f}\n'
@@ -495,12 +460,10 @@ if __name__ == '__main__':
       writer.add_scalar('Evaluation/threshold', threshold, step)
       writer.add_scalar('Evaluation/train_mIoU', mIoU, step)
       writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, step)
-
-      save_model_fn()
-      log_func('[i] save model')
     # endregion
 
   write_json(data_path, data_dic)
   writer.close()
 
-  print(args.tag)
+  log(f'[i] {args.tag} saved at {model_path}')
+  save_model_fn()

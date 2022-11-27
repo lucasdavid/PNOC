@@ -25,7 +25,7 @@
 # task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -36,13 +36,21 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
 PY=python3.9
 SOURCE=train_classification.py
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
-ARCHITECTURE=resnest269
-REGULAR=kernel_usage
-AUGMENT=cutmix_colorjitter_randaugment
-CUTMIX_PROB=1.0
-TAG=$ARCHITECTURE@ku-ra-cutmix-rr$CUTMIX_PROB-rep2
+# DATASET=voc12
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+
+ARCH=rs101
+ARCHITECTURE=resnest101
+REGULAR=none
+
+AUGMENT=colorjitter_randaugment_cutmix
+CUTMIX_PROB=0.5
+AUG=ra-cm$CUTMIX_PROB
+
+TAG=$DATASET-$ARCH-$AUG
 
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \
@@ -51,4 +59,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3         \
     --augment        $AUGMENT        \
     --cutmix_prob    $CUTMIX_PROB    \
     --tag            $TAG            \
+    --dataset        $DATASET        \
     --data_dir       $DATA_DIR
