@@ -117,7 +117,7 @@ if __name__ == '__main__':
   log('[i] test_transform is {}'.format(tv))
   log()
 
-  val_iteration = 10  # len(train_loader)
+  val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   max_iteration = args.max_epoch * val_iteration
 
