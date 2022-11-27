@@ -152,7 +152,7 @@ class VOC_Dataset_For_WSSS(VOC12Dataset):
     return image, mask
 
 
-class VOC12CAMTestingDataset(VOC12Dataset):
+class VOC12CAMEvaluationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_tags=True, with_mask=True)
@@ -190,22 +190,7 @@ class VOC12CAMTestingDataset(VOC12Dataset):
 class VOC12InferenceDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain):
-    super().__init__(root_dir, domain, with_id=True, with_tags=True, with_mask=True)
-
-    cmap_dic, _, class_names = get_color_map_dic()
-    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
-
-    data = read_json('./data/voc12/meta.json')
-
-    self.class_names = np.asarray(class_names[1:21])
-    self.class_dic = data['class_dic']
-    self.classes = data['classes']
-
-  def __getitem__(self, index):
-    image, image_id, tags, mask = super().__getitem__(index)
-
-    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
-    return image, image_id, label, mask
+    super().__init__(root_dir, domain, with_id=True, with_tags=True)
 
 
 class VOC12AffinityDataset(VOC12Dataset):

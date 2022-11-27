@@ -12,7 +12,6 @@ import sys
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -113,10 +112,6 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  META = read_json(f'./data/{args.dataset}/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
-
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
@@ -127,7 +122,7 @@ if __name__ == '__main__':
   )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
   log('[i] train_transform is {}'.format(tt))
   log('[i] test_transform is {}'.format(tv))
   log()
@@ -145,7 +140,7 @@ if __name__ == '__main__':
   ###################################################################################
   model = Classifier(
     args.architecture,
-    NUM_CLASSES,
+    train_dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -214,7 +209,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)

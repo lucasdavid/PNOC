@@ -1,7 +1,12 @@
+import os
+
 from torchvision import transforms
 
 from tools.ai.augment_utils import *
 from tools.ai.randaugment import RandAugmentMC
+from tools.general.json_utils import read_json
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
 
 
 class Iterator:
@@ -81,25 +86,46 @@ def get_dataset_classification(
   if dataset == 'voc12':
     from . import voc12
     train_dataset = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
-    valid_dataset = voc12.VOC12CAMTestingDataset(data_dir, 'train', valid_transforms)
+    valid_dataset = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
   else:
     from . import coco14
     train_dataset = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
-    valid_dataset = coco14.COCO14SegmentationDataset(data_dir, 'train2014', valid_transforms)
+    valid_dataset = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
   
   if 'cutmix' in augment:
     print('[i] Using cutmix')
     train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
   
+  info = DatasetInfo.from_metafile(dataset)
+  train_dataset.info = info
+  valid_dataset.info = info
+  
   return train_dataset, valid_dataset
 
 
-def get_dataset_inference(dataset, data_dir):
+def get_dataset_inference(dataset, data_dir, domain=None):
   if dataset == 'voc12':
     from . import voc12
-    dataset = voc12.VOC12InferenceDataset(data_dir, 'train_aug')
+    dataset = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug')
   else:
     from . import coco14
-    dataset = coco14.COCO14InferenceDataset(data_dir, 'train2014')
-  
+    dataset = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014')
+
+  dataset.info = DatasetInfo.from_metafile(dataset)
+
   return dataset
+
+
+class DatasetInfo:
+  def __init__(self, meta, classes, num_classes):
+    self.meta = meta
+    self.classes = classes
+    self.num_classes = num_classes
+  
+  @classmethod
+  def from_metafile(cls, dataset):
+    META = read_json(os.path.join(DATA_DIR, dataset, 'meta.json'))
+    CLASSES = np.asarray(META['class_names'])
+    NUM_CLASSES = META['classes']
+    
+    return cls(META, CLASSES, NUM_CLASSES)

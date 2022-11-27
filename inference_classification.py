@@ -77,7 +77,7 @@ if __name__ == '__main__':
   CLASSES = np.asarray(META['class_names'])
   NUM_CLASSES = META['classes']
 
-  dataset = get_dataset_inference(args.dataset, args.data_dir)
+  dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
   log('[i] The number of class is {}'.format(NUM_CLASSES))
   log()
 
@@ -148,7 +148,7 @@ if __name__ == '__main__':
 
   with torch.no_grad():
     length = len(dataset)
-    for step, (ori_image, image_id, label, _) in enumerate(dataset):
+    for step, (ori_image, image_id, label) in enumerate(dataset):
       ori_w, ori_h = ori_image.size
 
       npy_path = pred_dir + image_id + '.npy'

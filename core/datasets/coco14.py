@@ -1,14 +1,13 @@
-import os.path
-from PIL import Image
+import os
 
 import numpy as np
-import torch
+from PIL import Image
 from torch.utils.data import Dataset
 
 from core.aff_utils import *
 
-IMG_FOLDER_NAME = "JPEGImages"
-ANNOT_FOLDER_NAME = "Annotations"
+IMAGES_DIR = "JPEGImages"
+MASKS_DIR = "coco_seg_anno"
 IGNORE = 255
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'coco14')
@@ -40,73 +39,70 @@ class COCO14Dataset(Dataset):
     self.img_name_list = load_img_name_list(domain)
     self.transform = transform
 
+    self.label_list = load_image_label_list_from_npy(self.img_name_list)
+
   def __len__(self):
     return len(self.img_name_list)
 
   def __getitem__(self, idx):
     image_id = decode_int_filename(self.img_name_list[idx])
     filename = f"COCO_{self.domain}_{image_id}.jpg"
-    filepath = os.path.join(self.root_dir, IMG_FOLDER_NAME, filename)
-    
+    filepath = os.path.join(self.root_dir, IMAGES_DIR, filename)
+
     image = Image.open(filepath).convert('RGB')
+    label = self.label_list[idx]
+    # label = torch.from_numpy(label)
 
-    if self.transform:
-      image = self.transform(image)
-
-    return image_id, image
+    return image_id, image, label
 
 
 class COCO14ClassificationDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, transform)
-    self.label_list = load_image_label_list_from_npy(self.img_name_list)
-
   def __getitem__(self, idx):
-    _, image = super().__getitem__(idx)
-    label = torch.from_numpy(self.label_list[idx])
+    _, image, label = super().__getitem__(idx)
+
+    if self.transform:
+      image = self.transform(image)
 
     return image, label
 
 
 class COCO14InferenceDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, transform)
-    self.label_list = load_image_label_list_from_npy(self.img_name_list)
+  def __getitem__(self, idx):
+    image_id, image, label = super().__getitem__(idx)
+
+    if self.transform:
+      image = self.transform(image)
+
+    return image, image_id, label
+
+
+class COCO14CAMEvaluationDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
-    image_id, image = super().__getitem__(idx)
-
-    label = torch.from_numpy(self.label_list[idx])
+    image, image_id, label = super().__getitem__(idx)
 
     maskpath = os.path.join(self.label_dir, image_id + '.png')
     mask = Image.open(maskpath) if os.path.isfile(maskpath) else None
 
-    return image, image_id, label, mask
+    if self.transform:
+      entry = self.transform({'image': image, 'mask': mask})
+      image, mask = entry['image'], entry['mask']
+
+    return image, label, mask
 
 
 class COCO14SegmentationDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, label_dir, transform=None):
-    super().__init__(root_dir, domain, transform=transform)
-
-    self.label_dir = label_dir
-
   def __getitem__(self, idx):
-    image_id = decode_int_filename(self.img_name_list[idx])
-    filename = f"COCO_{self.domain}_{image_id}.jpg"
-    filepath = os.path.join(self.root_dir, IMG_FOLDER_NAME, filename)
-    maskpath = os.path.join(self.label_dir, image_id + '.png')
-
-    image = Image.open(filepath).convert('RGB')
-    label = Image.open(maskpath) if os.path.isfile(maskpath) else None
+    image, _, _, mask = super().__getitem__(idx)
 
     if self.transform:
-      entry = self.transform({'image': image, 'mask': label})
-      image, label = entry['image'], entry['mask']
+      entry = self.transform({'image': image, 'mask': mask})
+      image, mask = entry['image'], entry['mask']
 
-    return image, label
+    return image, mask
 
 
 class COCO14AffinityDataset(COCO14SegmentationDataset):
@@ -115,15 +111,18 @@ class COCO14AffinityDataset(COCO14SegmentationDataset):
     self,
     root_dir,
     domain,
-    label_dir,
     indices_from,
     indices_to,
     transform=None,
   ):
-    super().__init__(root_dir, domain, label_dir, transform=transform)
+    super().__init__(root_dir, domain, transform=transform)
     self.extract_aff_lab_func = GetAffinityLabelFromIndices(indices_from, indices_to, classes=81)
 
   def __getitem__(self, idx):
-    image, label = super().__getitem__(idx)
+    image, mask = super().__getitem__(idx)
 
-    return image, self.extract_aff_lab_func(label)
+    if self.transform:
+      entry = self.transform({'image': image, 'mask': mask})
+      image, mask = entry['image'], entry['mask']
+
+    return image, self.extract_aff_lab_func(mask)

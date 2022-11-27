@@ -14,7 +14,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
 
 from core import occse
 from core.datasets import *
@@ -130,10 +129,6 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  META = read_json(f'./data/{args.dataset}/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
-
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
@@ -144,7 +139,7 @@ if __name__ == '__main__':
   )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
   log('[i] train_transform is {}'.format(tt))
   log('[i] test_transform is {}'.format(tv))
   log()
@@ -161,7 +156,7 @@ if __name__ == '__main__':
   # Network
   model = Classifier(
     args.architecture,
-    NUM_CLASSES,
+    train_dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -188,11 +183,11 @@ if __name__ == '__main__':
     ps = 'avg'
     topN = 4
     threshold = 0.5
-    oc_nn = mcar_resnet101(NUM_CLASSES, ps, topN, threshold, inference_mode=True, with_logits=True)
+    oc_nn = mcar_resnet101(train_dataset.info.num_classes, ps, topN, threshold, inference_mode=True, with_logits=True)
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, NUM_CLASSES, mode=args.mode, regularization=args.oc_regularization)
+    oc_nn = Classifier(args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.to(DEVICE)
@@ -241,8 +236,8 @@ if __name__ == '__main__':
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(NUM_CLASSES).to(DEVICE)
-  focal_factor = torch.ones(NUM_CLASSES).to(DEVICE)
+  choices = torch.ones(train_dataset.info.num_classes).to(DEVICE)
+  focal_factor = torch.ones(train_dataset.info.num_classes).to(DEVICE)
 
   def evaluate(loader):
     imagenet_mean, imagenet_std = imagenet_stats()
@@ -250,7 +245,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)
@@ -311,7 +306,7 @@ if __name__ == '__main__':
       if best_mIoU < mIoU:
         best_th = th
         best_mIoU = mIoU
-        best_iou = [round(iou[c], 2) for c in CLASSES]
+        best_iou = [round(iou[c], 2) for c in train_dataset.info.classes]
 
     return best_th, best_mIoU, best_iou
 

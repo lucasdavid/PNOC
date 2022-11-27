@@ -83,31 +83,29 @@ if __name__ == '__main__':
     args.tag += '@iteration=%d'%args.iteration
 
     pred_dir = create_directory('./experiments/predictions/{}/'.format(args.tag))
-    
+
     set_seed(args.seed)
     log = lambda string='': print(string)
     
     ###################################################################################
     # Transform, Dataset, DataLoader
     ###################################################################################
-    imagenet_mean = [0.485, 0.456, 0.406]
-    imagenet_std = [0.229, 0.224, 0.225]
+    META = read_json(f'./data/{args.dataset}/meta.json')
+    CLASSES = np.asarray(META['class_names'])
+    NUM_CLASSES = META['classes']
 
-    normalize_fn = Normalize(imagenet_mean, imagenet_std)
-    
-    # for mIoU
-    meta_dic = read_json('./data/voc12/meta.json')
-    dataset = VOC12EvaluationDataset(args.data_dir, args.domain)
+    dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
+    normalize_fn = Normalize(*imagenet_stats())
     
     ###################################################################################
     # Network
     ###################################################################################
     if args.architecture == 'DeepLabv3+':
-        model = DeepLabv3_Plus(args.backbone, num_classes=meta_dic['classes'] + 1, mode=args.mode, use_group_norm=args.use_gn)
+        model = DeepLabv3_Plus(args.backbone, num_classes=NUM_CLASSES + 1, mode=args.mode, use_group_norm=args.use_gn)
     elif args.architecture == 'Seg_Model':
-        model = Seg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
+        model = Seg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
     elif args.architecture == 'CSeg_Model':
-        model = CSeg_Model(args.backbone, num_classes=meta_dic['classes'] + 1)
+        model = CSeg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
     
     model = model.cuda()
     model.eval()
@@ -139,7 +137,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         length = len(dataset)
-        for step, (ori_image, image_id, gt_mask) in enumerate(dataset):
+        for step, (ori_image, image_id, _) in enumerate(dataset):
             ori_w, ori_h = ori_image.size
 
             cams_list = []
@@ -158,7 +156,7 @@ if __name__ == '__main__':
 
                 cams = inference(images, (ori_h, ori_w))
                 cams_list.append(cams)
-            
+
             preds = np.sum(cams_list, axis=0)
             preds = F.softmax(torch.from_numpy(preds), dim=-1).numpy()
             
