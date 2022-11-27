@@ -82,7 +82,7 @@ class COCO14CAMEvaluationDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
     image_id, image, label = super().__getitem__(idx)
-    
+
     maskpath = os.path.join(self.root_dir, MASKS_DIR, image_id + '.png')
     mask = Image.open(maskpath) if os.path.isfile(maskpath) else None
 
@@ -96,7 +96,7 @@ class COCO14CAMEvaluationDataset(COCO14Dataset):
 class COCO14SegmentationDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
-    image, _, _, mask = super().__getitem__(idx)
+    _, image, _, mask = super().__getitem__(idx)
 
     if self.transform:
       entry = self.transform({'image': image, 'mask': mask})
@@ -120,9 +120,5 @@ class COCO14AffinityDataset(COCO14SegmentationDataset):
 
   def __getitem__(self, idx):
     image, mask = super().__getitem__(idx)
-
-    if self.transform:
-      entry = self.transform({'image': image, 'mask': mask})
-      image, mask = entry['image'], entry['mask']
 
     return image, self.extract_aff_lab_func(mask)
