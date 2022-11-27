@@ -117,7 +117,7 @@ if __name__ == '__main__':
   log('[i] test_transform is {}'.format(tv))
   log()
 
-  val_iteration = len(train_loader)
+  val_iteration = 10  # len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
   max_iteration = args.max_epoch * val_iteration
 
@@ -208,6 +208,7 @@ if __name__ == '__main__':
 
         images = to_numpy(images)
         labels = to_numpy(labels)
+        gt_masks = to_numpy(gt_masks)
         preds = to_numpy(torch.sigmoid(logits))
         cams = to_numpy(cams)
 
@@ -234,10 +235,10 @@ if __name__ == '__main__':
 
             writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
 
-        for batch_index in range(images.size()[0]):
+        for b in range(len(images)):
           # c, h, w -> h, w, c
-          cam = cams[batch_index].transpose((1, 2, 0))
-          gt_mask = gt_masks[batch_index]
+          cam = cams[b].transpose((1, 2, 0))
+          gt_mask = gt_masks[b]
 
           h, w, c = cam.shape
           gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
@@ -299,8 +300,8 @@ if __name__ == '__main__':
       write_json(data_path, data_dic)
 
       log(
-        'iteration={iteration:,} '
-        'learning_rate={learning_rate:.4f} '
+        'step={iteration:,} '
+        'lr={learning_rate:.4f} '
         'loss={loss:.4f} '
         'class_loss={class_loss:.4f} '
         'time={time:.0f}sec'.format(**data)

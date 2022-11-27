@@ -81,9 +81,9 @@ class COCO14InferenceDataset(COCO14Dataset):
 class COCO14CAMEvaluationDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
-    image, image_id, label = super().__getitem__(idx)
-
-    maskpath = os.path.join(self.label_dir, image_id + '.png')
+    image_id, image, label = super().__getitem__(idx)
+    
+    maskpath = os.path.join(self.root_dir, MASKS_DIR, image_id + '.png')
     mask = Image.open(maskpath) if os.path.isfile(maskpath) else None
 
     if self.transform:

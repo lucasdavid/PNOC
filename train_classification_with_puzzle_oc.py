@@ -281,10 +281,10 @@ if __name__ == '__main__':
 
             writer.add_image('CAM/{}'.format(b + 1), image, step, dataformats='HWC')
 
-        for batch_index in range(images.size()[0]):
+        for b in range(images.size()[0]):
           # c, h, w -> h, w, c
-          cam = to_numpy(cams[batch_index]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[batch_index])
+          cam = to_numpy(cams[b]).transpose((1, 2, 0))
+          gt_mask = to_numpy(gt_masks[b])
 
           h, w, c = cam.shape
           gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
