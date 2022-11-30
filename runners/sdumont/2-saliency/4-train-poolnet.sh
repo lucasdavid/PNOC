@@ -21,11 +21,10 @@
 # limitations under the License.
 
 #
-# Train ResNeSt269 to perform multilabel classification
-# task over Pascal VOC 2012 using OC-CSE strategy.
+# Train PoolNet over the VOC12 or COCO14 dataset.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/saliency/train-poolnet] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 

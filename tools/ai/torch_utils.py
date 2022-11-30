@@ -168,3 +168,10 @@ def get_cosine_schedule_with_warmup(optimizer, warmup_iteration, max_iteration, 
     return max(0., math.cos(math.pi * cycles * no_progress))
 
   return LambdaLR(optimizer, _lr_lambda, -1)
+
+
+def label_smoothing(labels, alpha):
+  if alpha:
+    return (1 - alpha) * labels + alpha * 0.5
+  
+  return labels

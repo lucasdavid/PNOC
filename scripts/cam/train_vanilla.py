@@ -57,6 +57,7 @@ parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
+parser.add_argument('--label_smoothing', default=0, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -267,12 +268,12 @@ if __name__ == '__main__':
 
   for iteration in range(max_iteration):
     images, labels = train_iterator.get()
-    images, labels = images.to(DEVICE), labels.to(DEVICE)
 
     #################################################################################################
-    logits = model(images)
+    logits = model(images.to(DEVICE))
 
-    class_loss = class_loss_fn(logits, labels).mean()
+    labels = label_smoothing(labels, args.label_smoothing)
+    class_loss = class_loss_fn(logits, labels.to(DEVICE)).mean()
     loss = class_loss
     #################################################################################################
 

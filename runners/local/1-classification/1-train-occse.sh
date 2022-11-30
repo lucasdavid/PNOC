@@ -1,13 +1,13 @@
 
 PY=python
-SOURCE=train_occse_oracle.py
+SOURCE=scripts/cam/train_occse.py
 DEVICE=cpu
 WORKERS=8
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
 
 IMAGE_SIZE=64
 
-ARCHITECTURE=resnet50
+ARCHITECTURE=res2net101_v1b
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal

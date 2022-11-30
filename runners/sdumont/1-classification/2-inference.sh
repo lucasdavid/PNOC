@@ -21,10 +21,12 @@
 # limitations under the License.
 
 #
-# CAMs Inference.
+# Infer CAMs using a multi-label classification model previous
+# trained trained over the VOC12 or COCO14 dataset.
+# TTA is employed to produce higher quality maps.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/classification/inference] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -38,16 +40,17 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
+SOURCE=scripts/cam/inference.py
 
 # DATASET=voc12
 # DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
 DATASET=coco14
 DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
-DOMAIN=train
-DILATED=false
+DOMAIN=train2014
 
 ARCHITECTURE=resnest269
+DILATED=false
 MODE=normal
 REG=none
 WEIGHTS=resnest269@puzzlerep
@@ -55,7 +58,7 @@ WEIGHTS=resnest269@puzzlerep
 TAG=puzzle/$WEIGHTS
 
 CUDA_VISIBLE_DEVICES=0                      \
-    $PY inference_classification.py         \
+    $PY $SOURCE                             \
     --architecture   $ARCHITECTURE          \
     --dilated        $DILATED               \
     --regularization $REG                   \

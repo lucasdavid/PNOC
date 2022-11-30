@@ -24,7 +24,7 @@
 # CAMs Inference.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/classification/train-puzzle] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -37,7 +37,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=train_affinitynet.py
+SOURCE=scripts/rw/train.py
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 # Architecture

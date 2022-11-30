@@ -15,13 +15,17 @@ DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
 IMAGE_SIZE=64
 
-ARCHITECTURE=resnest101
+ARCHITECTURE=resnest50
+ARCH=rs50
+
 DILATED=false
 MODE=normal
 TRAINABLE_STEM=true
-AUGMENT=colorjitter_randaugment
 
-TAG=rs101-rr-$DATASET
+AUGMENT=colorjitter_randaugment
+EPOCHS=1
+
+TAG=$DATASET-$ARCH
 
 $PY $SOURCE                          \
   --tag             $TAG             \
@@ -33,5 +37,6 @@ $PY $SOURCE                          \
   --trainable-stem  $TRAINABLE_STEM  \
   --image_size      $IMAGE_SIZE      \
   --augment         $AUGMENT         \
+  --max_epoch       $EPOCHS          \
   --dataset         $DATASET         \
   --data_dir        $DATA_DIR

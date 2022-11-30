@@ -21,11 +21,12 @@
 # limitations under the License.
 
 #
-# Train ResNeSt269 to perform multilabel classification
-# task over Pascal VOC 2012 using OC-CSE strategy.
+# Train CCAM to perform the unsupervised saliency
+# detection task over the VOC12 or COCO14 dataset.
+# Hints from CAMs are used as additional information.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/saliency/train-ccam-hints] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -39,7 +40,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=ccam_train_with_cam_hints.py
+SOURCE=scripts/ccam/train_with_cam_hints.py
 
 LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/

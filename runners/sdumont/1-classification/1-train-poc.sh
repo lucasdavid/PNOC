@@ -21,11 +21,11 @@
 # limitations under the License.
 
 #
-# Train ResNeSt269 to perform multilabel classification
-# task over Pascal VOC 2012 using OC-CSE strategy.
+# Train ResNeSt269 to perform multilabel classification task over
+# the VOC12 or COCO14 dataset using Puzzle and OC-CSE strategies.
 #
 
-echo "[voc12/puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/classification/train-poc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -39,7 +39,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=train_classification_with_puzzle_oc.py
+SOURCE=scripts/cam/train_poc.py
 LOGS_DIR=$SCRATCH/logs/puzzle
 
 # DATASET=voc12
