@@ -104,7 +104,7 @@ if __name__ == '__main__':
   ###################################################################################
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv,
   )
 
   train_loader = DataLoader(

@@ -1,7 +1,10 @@
 #!/bin/bash
 
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPATH=$(pwd)
+
 PY=python
-SOURCE=train_classification.py
+SOURCE=scripts/cam/train_vanilla.py
 DEVICE=cuda
 WORKERS=8
 
@@ -19,8 +22,6 @@ TRAINABLE_STEM=true
 AUGMENT=colorjitter_randaugment
 
 TAG=rs101-rr-$DATASET
-
-export PYTHONDONTWRITEBYTECODE=1
 
 $PY $SOURCE                          \
   --tag             $TAG             \

@@ -44,7 +44,12 @@ def get_transforms(
   mean, std = imagenet_stats()
 
   tt = []
-  tt.append(RandomResize(min_image_size, max_image_size))
+
+  if min_image_size == max_image_size:
+    tt.append(transforms.Resize((image_size, image_size)))
+  else:
+    tt.append(RandomResize(min_image_size, max_image_size))
+
   tt.append(RandomHorizontalFlip())
 
   if 'colorjitter' in augment:
@@ -58,7 +63,8 @@ def get_transforms(
   if 'cutmix' not in augment:
     # This will happen inside CutMix.
     tt.append(RandomCrop(image_size))
-    tt.append(Transpose())
+
+  tt.append(Transpose())
 
   tt = transforms.Compose(tt)
   tv = transforms.Compose(
@@ -94,12 +100,14 @@ def get_dataset_classification(
   
   if 'cutmix' in augment:
     print('[i] Using cutmix')
-    train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+    train_dataset = CutMix(
+      train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob
+    )
   
   info = DatasetInfo.from_metafile(dataset)
   train_dataset.info = info
   valid_dataset.info = info
-  
+
   return train_dataset, valid_dataset
 
 

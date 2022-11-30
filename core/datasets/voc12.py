@@ -12,6 +12,8 @@ from tools.dataset.voc_utils import get_color_map_dic
 from tools.general.json_utils import read_json
 from tools.general.xml_utils import read_xml
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'voc12')
+
 
 class VOC12Dataset(torch.utils.data.Dataset):
 
@@ -21,7 +23,12 @@ class VOC12Dataset(torch.utils.data.Dataset):
     self.xml_dir = os.path.join(self.root_dir, 'Annotations/')
     self.mask_dir = os.path.join(self.root_dir, 'SegmentationClass/')
 
-    self.image_id_list = [image_id.strip() for image_id in open('./data/voc12/%s.txt' % domain).readlines()]
+    filepath = os.path.join(DATA_DIR, f"{domain}.txt")
+    self.image_id_list = [image_id.strip() for image_id in open(filepath).readlines()]
+
+    data = read_json(os.path.join(DATA_DIR, "meta.json"))
+    self.class_dic = data['class_dic']
+    self.classes = data['classes']
 
     self.with_id = with_id
     self.with_tags = with_tags
@@ -68,11 +75,6 @@ class VOC12ClassificationDataset(VOC12Dataset):
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_tags=True)
     self.transform = transform
-
-    data = read_json('./data/voc12/meta.json')
-
-    self.class_dic = data['class_dic']
-    self.classes = data['classes']
 
   def __getitem__(self, index):
     image, tags = super().__getitem__(index)
@@ -161,11 +163,6 @@ class VOC12CAMEvaluationDataset(VOC12Dataset):
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
 
-    data = read_json('./data/voc12/meta.json')
-
-    self.class_dic = data['class_dic']
-    self.classes = data['classes']
-
   def __getitem__(self, index):
     image, tags, mask = super().__getitem__(index)
 
@@ -192,16 +189,20 @@ class VOC12InferenceDataset(VOC12Dataset):
   def __init__(self, root_dir, domain):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
 
+  def __getitem__(self, index):
+    image, image_id, tags = super().__getitem__(index)
+
+    if self.transform is not None:
+      image = self.transform(image)
+
+    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    return image, image_id, label
+
 
 class VOC12AffinityDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
     super().__init__(root_dir, domain, with_id=True)
-
-    data = read_json('./data/voc12/meta.json')
-
-    self.class_dic = data['class_dic']
-    self.classes = data['classes']
 
     self.transform = transform
 

@@ -125,7 +125,7 @@ def random_horizontal_flip(data):
 class RandomCropForCams(RandomCrop):
 
   def __init__(self, crop_size):
-    super().__init__(crop_size)
+    super().__init__(crop_size, channels_last=False)
     self.crop_shape_for_mask = (self.crop_size, self.crop_size)
 
   def __call__(self, data):

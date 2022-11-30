@@ -73,12 +73,8 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  META = read_json(f'./data/{args.dataset}/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
-
   dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
-  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] The number of class is {}'.format(dataset.info.num_classes))
   log()
 
   normalize_fn = Normalize(*imagenet_stats())
@@ -88,7 +84,7 @@ if __name__ == '__main__':
   ###################################################################################
   model = Classifier(
     args.architecture,
-    NUM_CLASSES,
+    dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,

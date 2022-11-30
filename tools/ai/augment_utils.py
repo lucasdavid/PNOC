@@ -1,8 +1,8 @@
 import random
-import numpy as np
 
-from PIL import Image
+import numpy as np
 import torch
+from PIL import Image
 
 
 def convert_OpenCV_to_PIL(image):
@@ -209,50 +209,57 @@ def random_crop_box(crop_size, h, w):
 
 class RandomCrop:
 
-  def __init__(self, crop_size, channels=3, with_bbox=False):
-    self.bg_value = 0
+  def __init__(self, crop_size, channels=3, channels_last=True, with_bbox=False, bg_value=0):
+    self.bg_value = bg_value
     self.with_bbox = with_bbox
     self.crop_size = crop_size
-    self.crop_shape = (self.crop_size, self.crop_size, channels)
+    self.channels_last = channels_last
+    self.crop_shape = (
+      (self.crop_size, self.crop_size, channels)
+      if channels_last
+      else (channels, self.crop_size, self.crop_size)
+    )
 
-  def __call__(self, image, bbox_dic=None):
-    if bbox_dic is None:
-      dst_bbox, src_bbox = random_crop_box(self.crop_size, *image.shape[:2])
+  def __call__(self, x):
+    sizes = x.shape[:2] if self.channels_last else x.shape[1:]
+    b, a = random_crop_box(self.crop_size, *sizes)
+    
+    y = np.ones(self.crop_shape, x.dtype) * self.bg_value
+
+    if self.channels_last:
+      crop = x[a['ymin']:a['ymax'], a['xmin']:a['xmax']]
+      y[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = crop
     else:
-      dst_bbox, src_bbox = bbox_dic['dst_bbox'], bbox_dic['src_bbox']
-
-    cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
-    cropped_image[dst_bbox['ymin']:dst_bbox['ymax'], dst_bbox['xmin']:dst_bbox['xmax']] = \
-        image[src_bbox['ymin']:src_bbox['ymax'], src_bbox['xmin']:src_bbox['xmax']]
-
+      crop = x[:, a['ymin']:a['ymax'], a['xmin']:a['xmax']]
+      y[:, b['ymin']:b['ymax'], b['xmin']:b['xmax']] = crop
+  
     if self.with_bbox:
-      return cropped_image, {'dst_bbox': dst_bbox, 'src_bbox': src_bbox}
+      return y, (b, a)
     else:
-      return cropped_image
+      return y
 
 
 class RandomCrop_For_Segmentation(RandomCrop):
 
-  def __init__(self, crop_size):
-    super().__init__(crop_size)
+  def __init__(self, crop_size, channels=3, channels_last=True, with_bbox=False, bg_value=0, ignore_value=255):
+    super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
 
-    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
+    self.ignore_value
+    self.mask_crop_shape = (self.crop_size, self.crop_size)
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
-    dst_bbox, src_bbox = random_crop_box(self.crop_size, *image.shape[:2])
+    ci, (b, a) = super()(image)
 
-    cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
-    cropped_image[dst_bbox['ymin']:dst_bbox['ymax'], dst_bbox['xmin']:dst_bbox['xmax']] = \
-        image[src_bbox['ymin']:src_bbox['ymax'], src_bbox['xmin']:src_bbox['xmax']]
+    cm = np.ones(self.mask_crop_shape, mask.dtype) * self.ignore_value
+    cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[
+      a['ymin']:a['ymax'],
+      a['xmin']:a['xmax'],
+    ]
 
-    cropped_mask = np.ones(self.crop_shape_for_mask, mask.dtype) * 255
-    cropped_mask[dst_bbox['ymin']:dst_bbox['ymax'], dst_bbox['xmin']:dst_bbox['xmax']] = \
-        mask[src_bbox['ymin']:src_bbox['ymax'], src_bbox['xmin']:src_bbox['xmax']]
-
-    data['image'] = cropped_image
-    data['mask'] = cropped_mask
+    data['image'] = ci
+    data['mask'] = cm
 
     return data
 
@@ -289,7 +296,7 @@ class Resize_For_Mask:
     return data
 
 
-# CutMix and FMix
+# CutMix
 
 
 def rand_bbox(h, w, lam):
@@ -315,7 +322,7 @@ class CutMix(torch.utils.data.Dataset):
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
-    self.random_crop = RandomCrop(crop)
+    self.random_crop = RandomCrop(crop, channels_last=False)
 
   def __len__(self):
     return len(self.dataset)
@@ -324,7 +331,6 @@ class CutMix(torch.utils.data.Dataset):
     x, y = self.dataset[index]
 
     x = self.random_crop(x)
-    x = x.transpose((2, 0, 1))
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -335,7 +341,6 @@ class CutMix(torch.utils.data.Dataset):
       lam = np.random.beta(self.beta, self.beta)
       r = random.choice(range(len(self)))
       xb, yb = self.dataset[r]
-      xb = xb.transpose((2, 0, 1))
 
       # Cut random bbox.
       bH, bW = xb.shape[1:]
