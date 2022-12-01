@@ -59,7 +59,7 @@ def main(args):
 
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   _, valid_dataset = get_dataset_classification(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
 
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers)

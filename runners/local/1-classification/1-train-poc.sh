@@ -1,12 +1,11 @@
-#!/bin/bash
 
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH=$(pwd)
 export OMP_NUM_THREADS=8
 
 PY=python
-SOURCE=scripts/cam/train_vanilla.py
-DEVICE=cuda
+SOURCE=scripts/cam/train_poc.py
+DEVICE=cpu
 WORKERS=8
 
 DATASET=voc12
@@ -14,7 +13,14 @@ DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
 # DATASET=coco14
 # DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
-IMAGE_SIZE=384
+IMAGE_SIZE=64
+AUGMENT=mixup
+CUTMIX=0.5
+MIXUP=1.
+LABELSMOOTHING=0.1
+
+EPOCHS=15
+BATCH=8
 
 ARCHITECTURE=resnest50
 ARCH=rs50
@@ -23,16 +29,12 @@ DILATED=false
 MODE=normal
 TRAINABLE_STEM=true
 
-AUGMENT=colorjitter_randaugment_cutmix
-CUTMIX=0.5
-MIXUP=1.
-LABELSMOOTHING=0.1
+OC_ARCHITECTURE=resnest50
+OC_PRETRAINED=./experiments/models/voc12-rs50-ra_cm@0.5.pth
+# OC_PRETRAINED=./experiments/models/coco14-rs50.pth
 
-AUG=ra_cm@$CUTMIX
-EPOCHS=1
-BATCH=16
+TAG=$DATASET-$ARCH-poc@rs50
 
-TAG=$DATASET-$ARCH-$AUG
 
 $PY $SOURCE                          \
   --tag             $TAG             \
@@ -43,6 +45,10 @@ $PY $SOURCE                          \
   --dilated         $DILATED         \
   --mode            $MODE            \
   --trainable-stem  $TRAINABLE_STEM  \
+  --alpha_schedule  0.50             \
+  --alpha           4.00             \
+  --oc-architecture $OC_ARCHITECTURE \
+  --oc-pretrained   $OC_PRETRAINED   \
   --image_size      $IMAGE_SIZE      \
   --min_image_size  $IMAGE_SIZE      \
   --max_image_size  $IMAGE_SIZE      \

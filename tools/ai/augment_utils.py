@@ -296,7 +296,42 @@ class Resize_For_Mask:
     return data
 
 
-# CutMix
+# region MixUp
+
+
+class MixUp(torch.utils.data.Dataset):
+  def __init__(self, dataset, num_mix=1, beta=1., prob=1.0):
+    self.dataset = dataset
+    self.num_mix = num_mix
+    self.beta = beta
+    self.prob = prob
+  
+  def __len__(self):
+    return len(self.dataset)
+
+  def __getitem__(self, index):
+    x, y = self.dataset[index]
+
+    for _ in range(self.num_mix):
+      r = np.random.rand(1)
+      if self.beta <= 0 or r > self.prob:
+        continue
+
+      # Draw random sample.
+      r = random.choice(range(len(self)))
+      xb, yb = self.dataset[r]
+
+      alpha = np.random.beta(self.beta, self.beta)
+      x = x * alpha + xb * (1. - alpha)
+      y = y * alpha + yb * (1. - alpha)
+
+    return x, y
+
+
+# endregion
+
+
+# region CutMix
 
 
 def rand_bbox(h, w, lam):
@@ -363,3 +398,5 @@ class CutMix(torch.utils.data.Dataset):
       y = y * lam + yb * (1. - lam)
 
     return x, y
+
+# endregion

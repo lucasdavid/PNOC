@@ -1,17 +1,9 @@
-# Copyright (C) 2020 * Ltd. All rights reserved.
-# author : Sanghyeon Jo <josanghyeokn@gmail.com>
-
 import argparse
-import copy
 import os
-import random
-import shutil
-import sys
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -68,6 +60,7 @@ parser.add_argument('--print_ratio', default=0.5, type=float)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--cutmix_prob', default=1.0, type=float)
+parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 if __name__ == '__main__':
   ###################################################################################
@@ -105,7 +98,7 @@ if __name__ == '__main__':
   ###################################################################################
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv,
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv,
   )
 
   train_loader = DataLoader(

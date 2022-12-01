@@ -57,6 +57,7 @@ parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
+parser.add_argument('--label_smoothing', default=0, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -67,19 +68,12 @@ parser.add_argument('--print_ratio', default=0.25, type=float)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--cutmix_prob', default=1.0, type=float)
+parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 # For Puzzle-CAM
 parser.add_argument('--num_pieces', default=4, type=int)
-
-# 'cl_pcl'
-# 'cl_re'
-# 'cl_conf'
-# 'cl_pcl_re'
-# 'cl_pcl_re_conf'
 parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
-
 parser.add_argument('--level', default='feature', type=str)
-
 parser.add_argument('--re_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
 parser.add_argument('--re_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
 
@@ -114,7 +108,7 @@ if __name__ == '__main__':
   ###################################################################################
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
 
   train_loader = DataLoader(
@@ -286,8 +280,10 @@ if __name__ == '__main__':
   loss_option = args.loss_option.split('_')
 
   for iteration in range(max_iteration):
-    images, labels = train_iterator.get()
-    images, labels = images.cuda(), labels.cuda()
+    images, targets = train_iterator.get()
+    images = images.cuda()
+
+    optimizer.zero_grad()
 
     ###############################################################################
     # Normal
@@ -298,9 +294,7 @@ if __name__ == '__main__':
     # Puzzle Module
     ###############################################################################
     tiled_images = tile_features(images, args.num_pieces)
-
     tiled_logits, tiled_features = model(tiled_images, with_cam=True)
-
     re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
     ###############################################################################
@@ -310,28 +304,29 @@ if __name__ == '__main__':
       features = make_cam(features)
       re_features = make_cam(re_features)
 
-    class_loss = class_loss_fn(logits, labels).mean()
+    labels_sm = label_smoothing(targets, args.label_smoothing).to(logits)
+    class_loss = class_loss_fn(logits, labels_sm).mean()
 
     if 'pcl' in loss_option:
-      p_class_loss = class_loss_fn(gap_fn(re_features), labels).mean()
+      p_class_loss = class_loss_fn(gap_fn(re_features), labels_sm).mean()
     else:
-      p_class_loss = torch.zeros(1).cuda()
+      p_class_loss = torch.zeros(1, dtype=logits.device)
 
     if 're' in loss_option:
       if args.re_loss_option == 'masking':
-        class_mask = labels.unsqueeze(2).unsqueeze(3)
-        re_loss = re_loss_fn(features, re_features) * class_mask
+        class_mask = targets.unsqueeze(2).unsqueeze(3)
+        re_loss = re_loss_fn(features, re_features) * class_mask.to(features)
         re_loss = re_loss.mean()
       elif args.re_loss_option == 'selection':
         re_loss = 0.
-        for b_index in range(labels.size()[0]):
-          class_indices = labels[b_index].nonzero(as_tuple=True)
+        for b_index in range(targets.size()[0]):
+          class_indices = targets[b_index].nonzero(as_tuple=True)
           selected_features = features[b_index][class_indices]
           selected_re_features = re_features[b_index][class_indices]
 
           re_loss_per_feature = re_loss_fn(selected_features, selected_re_features).mean()
           re_loss += re_loss_per_feature
-        re_loss /= labels.size()[0]
+        re_loss /= targets.size()[0]
       else:
         re_loss = re_loss_fn(features, re_features).mean()
     else:
@@ -350,7 +345,6 @@ if __name__ == '__main__':
     loss = class_loss + p_class_loss + alpha * re_loss + conf_loss
     #################################################################################################
 
-    optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 

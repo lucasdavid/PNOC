@@ -65,6 +65,7 @@ parser.add_argument('--print_ratio', default=0.2, type=float)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--cutmix_prob', default=1.0, type=float)
+parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 parser.add_argument('--alpha', type=float, default=0.25)
 

@@ -83,7 +83,8 @@ def get_dataset_classification(
   data_dir,
   augment,
   image_size,
-  cutmix_prob=0.,
+  cutmix_prob=1.,
+  mixup_prob=1.,
   train_transforms=None,
   valid_transforms=None,
 ):
@@ -100,10 +101,12 @@ def get_dataset_classification(
   
   if 'cutmix' in augment:
     print('[i] Using cutmix')
-    train_dataset = CutMix(
-      train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob
-    )
+    train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
   
+  if 'mixup' in augment:
+    print('[i] Using mixup')
+    train_dataset = MixUp(train_dataset, num_mix=1, beta=1., prob=mixup_prob)
+
   info = DatasetInfo.from_metafile(dataset)
   train_dataset.info = info
   valid_dataset.info = info

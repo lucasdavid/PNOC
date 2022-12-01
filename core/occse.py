@@ -8,10 +8,20 @@ def random_label_split(label, k, choices):
   y_mask = torch.zeros_like(label)
   indices = []
 
+  # for i in range(bs):
+  #   label_idx = torch.nonzero(label[i], as_tuple=False)  # [0, 1, 14]
+  #   rand_idx = torch.randperm(len(label_idx))[:k]        # [2]
+  #   target = label_idx[rand_idx]                         # [14]
+  #   y_mask[i, target] = 1
+  #   choices[target] += 1
+  #   indices.append(target)
+  
   for i in range(bs):
-    label_idx = torch.nonzero(label[i], as_tuple=False)  # [0, 1, 14]
-    rand_idx = torch.randperm(len(label_idx))[:k]        # [2]
-    target = label_idx[rand_idx]                         # [14]
+    # Use label vector as multinomial distribution, which supresses non-present classes.
+    # If vanilla training, a class is uniformally sampled. If using cutmix/mixup,
+    # classes are sampled with prob. proportional to their retained areas.
+    p = label[i]
+    target = torch.multinomial(p, k)
     y_mask[i, target] = 1
     choices[target] += 1
 
@@ -109,7 +119,7 @@ def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_ba
     weight = target * alpha + (1 - target) * (1 - alpha)
     factor = weight * factor
 
-  return factor.detach()
+  return factor.detach().float()
 
 
 def update_focal_factor(
@@ -134,4 +144,5 @@ def images_with_masked_objects(images, features, label_mask):
   mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
   mask = F.relu(mask)
   mask = mask / (mask.max() + 1e-5)
+
   return images * (1 - mask)

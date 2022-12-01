@@ -1,47 +1,41 @@
-# Copyright (C) 2020 * Ltd. All rights reserved.
-# author : Sanghyeon Jo <josanghyeokn@gmail.com>
-
-import os
-import sys
+import argparse
 import copy
 import math
-import shutil
+import os
 import random
-import argparse
-import numpy as np
+import shutil
+import sys
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
-
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
 
-from core.puzzle_utils import *
-from core.networks import *
-from core.datasets import *
 from core import occse
-
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
-
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
-
+from core.datasets import *
+from core.networks import *
+from core.puzzle_utils import *
 from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
 # Dataset
+parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=4, type=int)
+parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 # Network
@@ -66,6 +60,7 @@ parser.add_argument('--max_epoch', default=15, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
+parser.add_argument('--label_smoothing', default=0, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -75,24 +70,8 @@ parser.add_argument('--print_ratio', default=0.3, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
-
-# For Puzzle-CAM
-parser.add_argument('--num_pieces', default=4, type=int)
-
-# 'cl_pcl'
-# 'cl_re'
-# 'cl_conf'
-# 'cl_pcl_re'
-# 'cl_pcl_re_conf'
-# parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
-# parser.add_argument('--r_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
-# parser.add_argument('--r_loss_option', default='masking', type=str)  # 'none', 'masking', 'selection'
-
-# parser.add_argument('--branches', default='0,0,0,0,0,1', type=str)
-
-# parser.add_argument('--alpha', default=1.0, type=float)
-# parser.add_argument('--alpha_init', default=0., type=float)
-# parser.add_argument('--alpha_schedule', default=0.50, type=float)
+parser.add_argument('--cutmix_prob', default=1.0, type=float)
+parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
@@ -127,13 +106,9 @@ if __name__ == '__main__':
   log()
 
   # Transform, Dataset, DataLoader
-  META = read_json(f'./data/{args.dataset}/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = META['classes']
-
   tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_dataset_classification(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, tt, tv
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
 
   train_loader = DataLoader(
@@ -141,7 +116,7 @@ if __name__ == '__main__':
   )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
 
-  log('[i] The number of class is {}'.format(NUM_CLASSES))
+  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
   log('[i] train_transform is {}'.format(tt))
   log('[i] test_transform is {}'.format(tv))
   log()
@@ -158,7 +133,7 @@ if __name__ == '__main__':
   # Network
   model = Classifier(
     args.architecture,
-    NUM_CLASSES,
+    train_dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,
@@ -185,11 +160,11 @@ if __name__ == '__main__':
     ps = 'avg'
     topN = 4
     threshold = 0.5
-    oc_nn = mcar_resnet101(NUM_CLASSES, ps, topN, threshold, inference_mode=True, with_logits=True)
+    oc_nn = mcar_resnet101(train_dataset.info.num_classes, ps, topN, threshold, inference_mode=True, with_logits=True)
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, NUM_CLASSES, mode=args.mode, regularization=args.oc_regularization)
+    oc_nn = Classifier(args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization)
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.cuda()
@@ -215,7 +190,7 @@ if __name__ == '__main__':
   # Loss, Optimizer
   class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
 
-  # if args.r_loss == 'L1_Loss':
+  # if args.re_loss == 'L1_Loss':
   #   r_loss_fn = L1_Loss
   # else:
   #   r_loss_fn = L2_Loss
@@ -240,8 +215,8 @@ if __name__ == '__main__':
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
-  choices = torch.ones(NUM_CLASSES).cuda()
-  focal_factor = torch.ones(NUM_CLASSES).cuda()
+  choices = torch.ones(train_dataset.info.num_classes)
+  focal_factor = torch.ones(train_dataset.info.num_classes)
 
   def evaluate(loader):
     imagenet_mean, imagenet_std = imagenet_stats()
@@ -249,7 +224,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(CLASSES) for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
 
     with torch.no_grad():
       length = len(loader)
@@ -316,35 +291,32 @@ if __name__ == '__main__':
   train_iterator = Iterator(train_loader)
 
   for step in range(step_init, step_max):
-    images, labels = train_iterator.get()
-    images, labels = images.cuda(), labels.cuda()
+    images, targets = train_iterator.get()
+
+    images = images.cuda()
+    targets = targets.float()
 
     # ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
     k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
-    # Normal
     logits, features = model(images, with_cam=True)
 
-    # Puzzle Module
-    # tiled_images = tile_features(images, args.num_pieces)
-    # tiled_logits, tiled_features = model(tiled_images, with_cam=True)
-    # re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
-
-    c_loss = class_loss_fn(logits, labels).mean()
-    # p_loss = class_loss_fn(gap_fn(re_features), labels).mean()
-    # r_loss = (r_loss_fn(features, re_features) * labels.unsqueeze(2).unsqueeze(3)).mean()
+    c_loss = class_loss_fn(
+      logits,
+      label_smoothing(targets, args.label_smoothing).to(logits)
+    ).mean()
 
     # OC-CSE
-    labels_mask, _ = occse.split_label(labels, k, choices, focal_factor, args.oc_strategy)
-    labels_oc = labels - labels_mask
-    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
-    o_loss = class_loss_fn(cl_logits, labels_oc).mean()
+    labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
+    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask.cuda()))
+
+    labels_oc = targets - labels_mask
+    labels_oc_sm = label_smoothing(labels_oc, args.label_smoothing)
+    o_loss = class_loss_fn(cl_logits, labels_oc_sm.to(cl_logits)).mean()
 
     loss = (
       c_loss
-      # + p_loss
-      # + ap * r_loss
       + ao * o_loss
     )
 
@@ -353,9 +325,9 @@ if __name__ == '__main__':
     optimizer.step()
 
     occse.update_focal_factor(
-      labels,
+      targets,
       labels_oc,
-      cl_logits,
+      cl_logits.to(targets),
       focal_factor,
       momentum=args.oc_focal_momentum,
       gamma=args.oc_focal_gamma
@@ -366,7 +338,7 @@ if __name__ == '__main__':
       'loss': loss.item(),
       'c_loss': c_loss.item(),
       # 'p_loss': p_loss.item(),
-      # 'r_loss': r_loss.item(),
+      # 're_loss': re_loss.item(),
       'o_loss': o_loss.item(),
       # 'alpha': ap,
       'oc_alpha': ao,
@@ -378,7 +350,7 @@ if __name__ == '__main__':
         loss,
         c_loss,
         # p_loss,
-        # r_loss,
+        # re_loss,
         o_loss,
         # ap,
         ao,
@@ -394,7 +366,7 @@ if __name__ == '__main__':
         'loss': loss,
         'c_loss': c_loss,
         # 'p_loss': p_loss,
-        # 'r_loss': r_loss,
+        # 're_loss': re_loss,
         'o_loss': o_loss,
         'oc_alpha': ao,
         'k': k,
@@ -412,7 +384,7 @@ if __name__ == '__main__':
         'loss         = {loss:.4f}\n'
         'c_loss       = {c_loss:.4f}\n'
         # 'p_loss       = {p_loss:.4f}\n'
-        # 'r_loss       = {r_loss:.4f}\n'
+        # 're_loss       = {re_loss:.4f}\n'
         'o_loss       = {o_loss:.4f}\n'
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
@@ -423,7 +395,7 @@ if __name__ == '__main__':
       writer.add_scalar('Train/loss', loss, step)
       writer.add_scalar('Train/c_loss', c_loss, step)
       # writer.add_scalar('Train/p_loss', p_loss, step)
-      # writer.add_scalar('Train/r_loss', r_loss, step)
+      # writer.add_scalar('Train/re_loss', re_loss, step)
       writer.add_scalar('Train/o_loss', o_loss, step)
       writer.add_scalar('Train/learning_rate', lr, step)
       # writer.add_scalar('Train/alpha', ap, step)
