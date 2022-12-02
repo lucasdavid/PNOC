@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-oc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/occse/tr-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #

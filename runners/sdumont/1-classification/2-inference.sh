@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J inf-rs269-rand
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/inf-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --time=4:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -42,10 +42,10 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/cam/inference.py
 
-# DATASET=voc12
-# DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
-DATASET=coco14
-DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+DATASET=voc12
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
 
 DOMAIN=train2014
 
@@ -53,12 +53,27 @@ ARCHITECTURE=resnest269
 DILATED=false
 MODE=normal
 REG=none
-WEIGHTS=resnest269@puzzlerep
 
-TAG=puzzle/$WEIGHTS
+WEIGHTS=resnest269@normal@puzzleoc@b16-rep3
+TAG=poc/$WEIGHTS
 
 CUDA_VISIBLE_DEVICES=0                      \
     $PY $SOURCE                             \
+    --architecture   $ARCHITECTURE          \
+    --dilated        $DILATED               \
+    --regularization $REG                   \
+    --mode           $MODE                  \
+    --weights        $WEIGHTS               \
+    --tag            $TAG                   \
+    --domain         $DOMAIN                \
+    --dataset        $DATASET               \
+    --data_dir       $DATA_DIR              &
+
+WEIGHTS=resnest269@normal@puzzleoc@randaug@b16@random
+TAG=poc/$WEIGHTS
+
+CUDA_VISIBLE_DEVICES=1                      \
+    $PY inference_classification.py         \
     --architecture   $ARCHITECTURE          \
     --dilated        $DILATED               \
     --regularization $REG                   \

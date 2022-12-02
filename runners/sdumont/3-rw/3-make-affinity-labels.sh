@@ -4,7 +4,7 @@
 #SBATCH -p nvidia_long
 #SBATCH -J mk-aff
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/mk-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #

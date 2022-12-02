@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-puzzle
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/puz-%j.out
+#SBATCH -J tr-vanilla
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/van-%j.out
 #SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -21,11 +21,11 @@
 # limitations under the License.
 
 #
-# Train ResNeSt269 to perform multilabel classification task
-# over the VOC12 or COCO14 dataset using Puzzle-CAM strategy.
+# Train ResNeSt269 to perform multilabel classification
+# task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
-echo "[sdumont/sequana/classification/train-puzzle] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -34,38 +34,26 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
-export PYTHONDONTWRITEBYTECODE=1
-export PYTHONPATH=$(pwd)
-export OMP_NUM_THREADS=48
-
 PY=python3.9
-SOURCE=scripts/cam/train_puzzle.py
+SOURCE=train_classification.py
 
 # DATASET=voc12
 # DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 
-BATCH=16
-
 ARCH=rs269
 ARCHITECTURE=resnest269
 REGULAR=none
 
-AUGMENT=colorjitter
-TAG=$DATASET-$ARCH-p
+AUGMENT="colorjitter"
+TAG=$DATASET-$ARCH
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
     $PY $SOURCE                      \
     --architecture   $ARCHITECTURE   \
     --regularization $REGULAR        \
-    --batch_size     $BATCH          \
-    --mode           normal          \
-    --re_loss_option masking         \
-    --re_loss        L1_Loss         \
-    --alpha_schedule 0.50            \
-    --alpha          4.00            \
-    --tag            $TAG            \
     --augment        $AUGMENT        \
+    --tag            $TAG            \
     --dataset        $DATASET        \
     --data_dir       $DATA_DIR
 
@@ -73,20 +61,28 @@ CUDA_VISIBLE_DEVICES=0,1,2,3         \
 # AUGMENT=colorjitter_randaugment
 # CUTMIX_PROB=0.5
 # AUG=ra
-# TAG=$DATASET-$ARCH-p-$AUG
+# TAG=$DATASET-$ARCH-$AUG
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #     $PY $SOURCE                      \
 #     --architecture   $ARCHITECTURE   \
 #     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
-#     --tag            $TAG            \
 #     --augment        $AUGMENT        \
 #     --cutmix_prob    $CUTMIX_PROB    \
+#     --tag            $TAG            \
+#     --dataset        $DATASET        \
+#     --data_dir       $DATA_DIR
+
+# AUGMENT=colorjitter_randaugment_cutmix
+# CUTMIX_PROB=0.5
+# AUG=ra-cm$CUTMIX_PROB
+# TAG=$DATASET-$ARCH-$AUG
+# CUDA_VISIBLE_DEVICES=0,1,2,3         \
+#     $PY $SOURCE                      \
+#     --architecture   $ARCHITECTURE   \
+#     --regularization $REGULAR        \
+#     --augment        $AUGMENT        \
+#     --cutmix_prob    $CUTMIX_PROB    \
+#     --tag            $TAG            \
 #     --dataset        $DATASET        \
 #     --data_dir       $DATA_DIR
 
@@ -94,40 +90,13 @@ CUDA_VISIBLE_DEVICES=0,1,2,3         \
 # AUGMENT=colorjitter_cutmix
 # CUTMIX_PROB=0.5
 # AUG=cm$CUTMIX_PROB
-# TAG=$DATASET-$ARCH-p-$AUG
+# TAG=$DATASET-$ARCH-$AUG
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #     $PY $SOURCE                      \
 #     --architecture   $ARCHITECTURE   \
 #     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
-#     --tag            $TAG            \
 #     --augment        $AUGMENT        \
 #     --cutmix_prob    $CUTMIX_PROB    \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
-
-
-# AUGMENT=colorjitter_randaugment_cutmix
-# CUTMIX_PROB=0.5
-# AUG=ra-cm$CUTMIX_PROB
-# TAG=$DATASET-$ARCH-p-$AUG
-# CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
 #     --tag            $TAG            \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
 #     --dataset        $DATASET        \
 #     --data_dir       $DATA_DIR

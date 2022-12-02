@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-poc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -64,7 +64,7 @@ MODE=normal
 # OC
 OC_ARCHITECTURE=resnest269
 OC_REG=none
-OC_PRETRAINED=experiments/models/resnest269@ra-cutmix-rr1.0-rep2.pth
+OC_PRETRAINED=experiments/models/coco14-rs269.pth
 OC_STRATEGY=random
 OC_FOCAL_MOMENTUM=0.8
 OC_FOCAL_GAMMA=5.0
@@ -76,7 +76,7 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=$ARCH-b$BATCH-poc@rs269-ra
+TAG=coco14-$ARCH-poc@rs269
 
 CUDA_VISIBLE_DEVICES=0,1,2,3               \
     $PY $SOURCE                            \
@@ -104,23 +104,23 @@ CUDA_VISIBLE_DEVICES=0,1,2,3               \
     --tag               $TAG               \
     --data_dir          $DATA_DIR
 
-DOMAIN=train
+# DOMAIN=train
 
-CUDA_VISIBLE_DEVICES=0                   \
-    $PY inference_classification.py      \
-    --architecture      $ARCHITECTURE    \
-    --regularization    $REG             \
-    --dilated           $DILATED         \
-    --trainable-stem    $TRAINABLE_STEM  \
-    --mode              $MODE            \
-    --tag               $TAG             \
-    --domain            $DOMAIN          \
-    --data_dir          $DATA_DIR
+# CUDA_VISIBLE_DEVICES=0                   \
+#     $PY inference_classification.py      \
+#     --architecture      $ARCHITECTURE    \
+#     --regularization    $REG             \
+#     --dilated           $DILATED         \
+#     --trainable-stem    $TRAINABLE_STEM  \
+#     --mode              $MODE            \
+#     --tag               $TAG             \
+#     --domain            $DOMAIN          \
+#     --data_dir          $DATA_DIR
 
-$PY evaluate.py \
-  --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
-  --domain $DOMAIN \
-  --gt_dir "$DATA_DIR"SegmentationClass \
-  --min_th 0.05 \
-  --max_th 0.9 \
-  --step_th 0.05
+# $PY evaluate.py                                        \
+#   --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
+#   --domain $DOMAIN                                     \
+#   --gt_dir "$DATA_DIR"SegmentationClass                \
+#   --min_th 0.05 \
+#   --max_th 0.9 \
+#   --step_th 0.05

@@ -186,8 +186,18 @@ class VOC12CAMEvaluationDataset(VOC12Dataset):
 
 class VOC12InferenceDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain):
+  def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
+    self.transform = transform
+
+  def __getitem__(self, index):
+    image, image_id, tags = super().__getitem__(index)
+
+    if self.transform is not None:
+      image = self.transform(image)
+
+    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    return image, image_id, label
 
   def __getitem__(self, index):
     image, image_id, tags = super().__getitem__(index)
