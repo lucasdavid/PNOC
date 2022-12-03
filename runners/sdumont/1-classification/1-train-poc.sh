@@ -35,39 +35,39 @@ module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 
-export PYTHONDONTWRITEBYTECODE=1
+
 export PYTHONPATH=$(pwd)
-export OMP_NUM_THREADS=48
+# export OMP_NUM_THREADS=48
 
 PY=python3.9
 SOURCE=scripts/cam/train_poc.py
-LOGS_DIR=$SCRATCH/logs/puzzle
+WORKERS=16
 
 # DATASET=voc12
 # DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 
-# Dataset
-BATCH=16
-AUGMENT=none
-CUTMIX_PROB=0.5
-# Arch
-ARCHITECTURE=resnest269
-ARCH=rs269
-REG=none
-DILATED=false
+
+ARCH=rs101
+ARCHITECTURE=resnest101
 TRAINABLE_STEM=true
-# Training
-EPOCHS=15
+DILATED=false
 MODE=normal
-# OC
-OC_ARCHITECTURE=resnest269
-OC_REG=none
-OC_PRETRAINED=experiments/models/coco14-rs269.pth
+REGULAR=none
+
+IMAGE_SIZE=512
+EPOCHS=15
+BATCH=32
+
+OC_PRETRAINED=experiments/models/coco14-rs101.pth
+OC_ARCHITECTURE=$ARCHITECTURE
+OC_REGULAR=none
+OC_NAME=rs101
+
 OC_STRATEGY=random
-OC_FOCAL_MOMENTUM=0.8
-OC_FOCAL_GAMMA=5.0
+OC_F_MOMENTUM=0.8
+OC_F_GAMMA=5.0
 # Schedule
 P_INIT=0.0
 P_ALPHA=4.0
@@ -76,33 +76,45 @@ OC_INIT=0.3
 OC_ALPHA=1.0
 OC_SCHEDULE=1.0
 
-TAG=coco14-$ARCH-poc@rs269
+AUGMENT=colorjitter
+CUTMIX=0.5
+MIXUP=1.
+LABELSMOOTHING=0  # 0.1
 
-CUDA_VISIBLE_DEVICES=0,1,2,3               \
-    $PY $SOURCE                            \
-    --max_epoch         $EPOCHS            \
-    --batch_size        $BATCH             \
-    --augment           $AUGMENT           \
-    --cutmix_prob       $CUTMIX_PROB       \
-    --architecture      $ARCHITECTURE      \
-    --regularization    $REG               \
-    --dilated           $DILATED           \
-    --trainable-stem    $TRAINABLE_STEM    \
-    --mode              $MODE              \
-    --oc-architecture   $OC_ARCHITECTURE   \
-    --oc-pretrained     $OC_PRETRAINED     \
-    --oc-regularization $OC_REG            \
-    --oc-strategy       $OC_STRATEGY       \
-    --oc-alpha-schedule $OC_SCHEDULE       \
-    --oc-focal-momentum $OC_FOCAL_MOMENTUM \
-    --oc-focal-gamma    $OC_FOCAL_GAMMA    \
-    --alpha             $P_ALPHA           \
-    --alpha_init        $P_INIT            \
-    --alpha_schedule    $P_SCHEDULE        \
-    --oc-alpha          $OC_ALPHA          \
-    --oc-alpha-init     $OC_INIT           \
-    --tag               $TAG               \
+TAG=$DATASET-$ARCH-poc@$OC_NAME
+CUDA_VISIBLE_DEVICES=0,1,2,3             \
+$PY $SOURCE                              \
+    --tag               $TAG             \
+    --num_workers       $WORKERS         \
+    --batch_size        $BATCH           \
+    --architecture      $ARCHITECTURE    \
+    --dilated           $DILATED         \
+    --mode              $MODE            \
+    --trainable-stem    $TRAINABLE_STEM  \
+    --regularization    $REGULAR         \
+    --oc-architecture   $OC_ARCHITECTURE \
+    --oc-pretrained     $OC_PRETRAINED   \
+    --oc-regularization $OC_REGULAR      \
+    --image_size        $IMAGE_SIZE      \
+    --min_image_size    320              \
+    --max_image_size    640              \
+    --augment           $AUGMENT         \
+    --cutmix_prob       $CUTMIX          \
+    --mixup_prob        $MIXUP           \
+    --label_smoothing   $LABELSMOOTHING  \
+    --max_epoch         $EPOCHS          \
+    --alpha             $P_ALPHA         \
+    --alpha_init        $P_INIT          \
+    --alpha_schedule    $P_SCHEDULE      \
+    --oc-alpha          $OC_ALPHA        \
+    --oc-alpha-init     $OC_INIT         \
+    --oc-alpha-schedule $OC_SCHEDULE     \
+    --oc-strategy       $OC_STRATEGY     \
+    --oc-focal-momentum $OC_F_MOMENTUM   \
+    --oc-focal-gamma    $OC_F_GAMMA      \
+    --dataset           $DATASET         \
     --data_dir          $DATA_DIR
+
 
 # DOMAIN=train
 

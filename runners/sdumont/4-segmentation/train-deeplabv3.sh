@@ -33,7 +33,7 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
-export PYTHONDONTWRITEBYTECODE=1
+
 export PYTHONPATH=$(pwd)
 
 PY=python3.9

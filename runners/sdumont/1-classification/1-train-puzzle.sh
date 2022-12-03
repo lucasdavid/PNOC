@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-puzzle
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/puz-%j.out
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -34,100 +34,88 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
-export PYTHONDONTWRITEBYTECODE=1
+export LD_LIBRARY_PATH=$SCRATCH/.local/lib/python3.9/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$(pwd)
-export OMP_NUM_THREADS=48
+# export OMP_NUM_THREADS=48
 
 PY=python3.9
 SOURCE=scripts/cam/train_puzzle.py
+WORKERS=16
 
 # DATASET=voc12
 # DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 
-BATCH=16
 
 ARCH=rs269
 ARCHITECTURE=resnest269
+TRAINABLE_STEM=true
+DILATED=false
+MODE=normal
 REGULAR=none
+
+CUTMIX=0.5
+MIXUP=1.
+LABELSMOOTHING=0  # 0.1
+
+IMAGE_SIZE=512
+EPOCHS=15
+BATCH=16
+
 
 AUGMENT=colorjitter
 TAG=$DATASET-$ARCH-p
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
-    $PY $SOURCE                      \
-    --architecture   $ARCHITECTURE   \
-    --regularization $REGULAR        \
-    --batch_size     $BATCH          \
-    --mode           normal          \
-    --re_loss_option masking         \
-    --re_loss        L1_Loss         \
-    --alpha_schedule 0.50            \
-    --alpha          4.00            \
-    --tag            $TAG            \
-    --augment        $AUGMENT        \
-    --dataset        $DATASET        \
-    --data_dir       $DATA_DIR
+$PY $SOURCE                          \
+  --tag             $TAG             \
+  --num_workers     $WORKERS         \
+  --batch_size      $BATCH           \
+  --architecture    $ARCHITECTURE    \
+  --dilated         $DILATED         \
+  --mode            $MODE            \
+  --trainable-stem  $TRAINABLE_STEM  \
+  --regularization  $REGULAR         \
+  --re_loss_option  masking          \
+  --re_loss         L1_Loss          \
+  --alpha_schedule  0.50             \
+  --alpha           4.00             \
+  --image_size      $IMAGE_SIZE      \
+  --min_image_size  320              \
+  --max_image_size  640              \
+  --augment         $AUGMENT         \
+  --cutmix_prob     $CUTMIX          \
+  --mixup_prob      $MIXUP           \
+  --label_smoothing $LABELSMOOTHING  \
+  --max_epoch       $EPOCHS          \
+  --dataset         $DATASET         \
+  --data_dir        $DATA_DIR
 
-
-# AUGMENT=colorjitter_randaugment
-# CUTMIX_PROB=0.5
-# AUG=ra
-# TAG=$DATASET-$ARCH-p-$AUG
+# LABELSMOOTHING=0.1
+# CUTMIX=1.0
+# AUGMENT=randaugment_cutormixup
+# TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-cutormixup
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
-#     --tag            $TAG            \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
-
-
-# AUGMENT=colorjitter_cutmix
-# CUTMIX_PROB=0.5
-# AUG=cm$CUTMIX_PROB
-# TAG=$DATASET-$ARCH-p-$AUG
-# CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
-#     --tag            $TAG            \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
-
-
-# AUGMENT=colorjitter_randaugment_cutmix
-# CUTMIX_PROB=0.5
-# AUG=ra-cm$CUTMIX_PROB
-# TAG=$DATASET-$ARCH-p-$AUG
-# CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --batch_size     $BATCH          \
-#     --mode           normal          \
-#     --re_loss_option masking         \
-#     --re_loss        L1_Loss         \
-#     --alpha_schedule 0.50            \
-#     --alpha          4.00            \
-#     --tag            $TAG            \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
+# $PY $SOURCE                          \
+#   --tag             $TAG             \
+#   --num_workers     $WORKERS         \
+#   --batch_size      $BATCH           \
+#   --architecture    $ARCHITECTURE    \
+#   --dilated         $DILATED         \
+#   --mode            $MODE            \
+#   --trainable-stem  $TRAINABLE_STEM  \
+#   --regularization  $REGULAR         \
+#   --re_loss_option  masking          \
+#   --re_loss         L1_Loss          \
+#   --alpha_schedule  0.50             \
+#   --alpha           4.00             \
+#   --image_size      $IMAGE_SIZE      \
+#   --min_image_size  $IMAGE_SIZE      \
+#   --max_image_size  $IMAGE_SIZE      \
+#   --augment         $AUGMENT         \
+#   --cutmix_prob     $CUTMIX          \
+#   --mixup_prob      $MIXUP           \
+#   --label_smoothing $LABELSMOOTHING  \
+#   --max_epoch       $EPOCHS          \
+#   --dataset         $DATASET         \
+#   --data_dir        $DATA_DIR

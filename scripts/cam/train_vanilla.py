@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
 from core.datasets import *
 from core.networks import *
@@ -81,7 +80,6 @@ if __name__ == '__main__':
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{TAG}/')
 
   log_path = log_dir + f'{TAG}.txt'
   data_path = data_dir + f'{TAG}.json'
@@ -209,26 +207,6 @@ if __name__ == '__main__':
         outputs['labels'].append(labels)
         outputs['preds'].append(preds)
 
-        # for visualization
-        if step == 0:
-          obj_cams = cams.max(axis=1)
-
-          for b in range(8):
-            image = images[b]
-            cam = obj_cams[b]
-
-            image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
-            h, w, c = image.shape
-
-            cam = (cam * 255).astype(np.uint8)
-            cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
-            cam = colormap(cam)
-
-            image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
-            image = image.astype(np.float32) / 255.
-
-            writer.add_image('CAM/{}'.format(b + 1), image, iteration, dataformats='HWC')
-
         for b in range(len(images)):
           # c, h, w -> h, w, c
           cam = cams[b].transpose((1, 2, 0))
@@ -256,7 +234,6 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU
 
-  writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
 
   for iteration in range(max_iteration):
@@ -301,10 +278,6 @@ if __name__ == '__main__':
         'time={time:.0f}sec'.format(**data)
       )
 
-      writer.add_scalar('Train/loss', loss, iteration)
-      writer.add_scalar('Train/class_loss', class_loss, iteration)
-      writer.add_scalar('Train/learning_rate', learning_rate, iteration)
-
     #################################################################################################
     # Evaluation
     #################################################################################################
@@ -332,12 +305,7 @@ if __name__ == '__main__':
         'time={time:.0f}sec'.format(**data)
       )
 
-      writer.add_scalar('Evaluation/threshold', threshold, iteration)
-      writer.add_scalar('Evaluation/train_mIoU', mIoU, iteration)
-      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, iteration)
-
   write_json(data_path, data_dic)
-  writer.close()
 
   log(f'[i] {TAG} saved at {model_path}')
   save_model_fn()

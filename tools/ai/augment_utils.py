@@ -361,6 +361,29 @@ class CutMix(torch.utils.data.Dataset):
 
   def __len__(self):
     return len(self.dataset)
+  
+  def do_cutmix(self, x, y, xb, yb, lam):
+    # Cut random bbox.
+    bH, bW = xb.shape[1:]
+    bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
+    xb = xb[:, bh1:bh2, bw1:bw2]
+
+    # Central crop if B larger than A.
+    aH, aW = x.shape[1:]
+    bH, bW = xb.shape[1:]
+    bhs = (bH-aH) // 2 if bH > aH else 0
+    bws = (bW-aW) // 2 if bW > aW else 0
+    xb = xb[:, bhs:bhs+aH, bws:bws+aW]
+
+    # Random (x,y) placement if A larger than B.
+    bH, bW = xb.shape[1:]
+    bhs, bws = random.randint(0, aH-bH), random.randint(0, aW-bW)
+    x[:, bhs:bhs+bH, bws:bws+bW] = xb
+
+    lam = 1 - ((bH * bW) / (aH * aW))
+    y = y * lam + yb * (1. - lam)
+
+    return x, y
 
   def __getitem__(self, index):
     x, y = self.dataset[index]
@@ -377,25 +400,32 @@ class CutMix(torch.utils.data.Dataset):
       r = random.choice(range(len(self)))
       xb, yb = self.dataset[r]
 
-      # Cut random bbox.
-      bH, bW = xb.shape[1:]
-      bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
-      xb = xb[:, bh1:bh2, bw1:bw2]
+      x, y = self.do_cutmix(x, y, xb, yb, lam)
 
-      # Central crop if B larger than A.
-      aH, aW = x.shape[1:]
-      bH, bW = xb.shape[1:]
-      bhs = (bH-aH) // 2 if bH > aH else 0
-      bws = (bW-aW) // 2 if bW > aW else 0
-      xb = xb[:, bhs:bhs+aH, bws:bws+aW]
+    return x, y
 
-      # Random (x,y) placement if A larger than B.
-      bH, bW = xb.shape[1:]
-      bhs, bws = random.randint(0, aH-bH), random.randint(0, aW-bW)
-      x[:, bhs:bhs+bH, bws:bws+bW] = xb
 
-      lam = 1 - ((bH * bW) / (aH * aW))
-      y = y * lam + yb * (1. - lam)
+class CutOrMixUp(CutMix):
+  def __getitem__(self, index):
+    x, y = self.dataset[index]
+
+    x = self.random_crop(x)
+
+    for _ in range(self.num_mix):
+      r = np.random.rand(1)
+      if self.beta <= 0 or r > self.prob:
+        continue
+
+      # Draw random sample.
+      alpha = np.random.beta(self.beta, self.beta)
+      r = random.choice(range(len(self)))
+      xb, yb = self.dataset[r]
+
+      if np.random.rand(1) > 0.5:
+        x, y = self.do_cutmix(x, y, xb, yb, alpha)
+      else:
+        x = x * alpha + xb * (1. - alpha)
+        y = y * alpha + yb * (1. - alpha)
 
     return x, y
 

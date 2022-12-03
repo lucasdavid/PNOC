@@ -11,11 +11,8 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from torchvision import transforms
-from torch.utils.tensorboard import SummaryWriter
-
 from torch.utils.data import DataLoader
 
 from core.networks import *
@@ -77,7 +74,6 @@ if __name__ == '__main__':
     log_dir = create_directory(f'./experiments/logs/')
     data_dir = create_directory(f'./experiments/data/')
     model_dir = create_directory('./experiments/models/')
-    tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
     
     log_path = log_dir + f'{args.tag}.txt'
     data_path = data_dir + f'{args.tag}.json'
@@ -178,7 +174,6 @@ if __name__ == '__main__':
         'bg_loss', 'fg_loss', 'neg_loss',
     ])
     
-    writer = SummaryWriter(tensorboard_dir)
     train_iterator = Iterator(train_loader)
 
     torch.autograd.set_detect_anomaly(True)
@@ -255,12 +250,6 @@ if __name__ == '__main__':
               'time={time:.0f}sec'.format(**data)
             )
 
-            writer.add_scalar('Train/loss', loss, iteration)
-            writer.add_scalar('Train/bg_loss', bg_loss, iteration)
-            writer.add_scalar('Train/fg_loss', fg_loss, iteration)
-            writer.add_scalar('Train/neg_loss', neg_loss, iteration)
-            writer.add_scalar('Train/learning_rate', learning_rate, iteration)
-        
         #################################################################################################
         # Evaluation
         #################################################################################################
@@ -270,6 +259,5 @@ if __name__ == '__main__':
     save_model_fn()
 
     write_json(data_path, data_dic)
-    writer.close()
 
     print(args.tag)

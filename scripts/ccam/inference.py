@@ -25,8 +25,6 @@ from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
 
-# from torch.utils.tensorboardX import SummaryWriter
-
 parser = argparse.ArgumentParser()
 
 ###############################################################################

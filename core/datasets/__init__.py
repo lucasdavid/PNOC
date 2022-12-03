@@ -99,13 +99,16 @@ def get_dataset_classification(
     train_dataset = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
     valid_dataset = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
   
-  if 'cutmix' in augment:
-    print('[i] Using cutmix')
-    train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
-  
-  if 'mixup' in augment:
-    print('[i] Using mixup')
-    train_dataset = MixUp(train_dataset, num_mix=1, beta=1., prob=mixup_prob)
+  if 'cutormixup' in augment:
+    print(f'[i] Using cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+    train_dataset = CutOrMixUp(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+  else:
+    if 'cutmix' in augment:
+      print(f'[i] Using cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+      train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+    if 'mixup' in augment:
+      print(f'[i] Using mixup num_mix=1, beta=1., prob={mixup_prob}')
+      train_dataset = MixUp(train_dataset, num_mix=1, beta=1., prob=mixup_prob)
 
   info = DatasetInfo.from_metafile(dataset)
   train_dataset.info = info

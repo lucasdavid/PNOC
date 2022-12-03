@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export PYTHONDONTWRITEBYTECODE=1
+
 export PYTHONPATH=$(pwd)
 export OMP_NUM_THREADS=8
 

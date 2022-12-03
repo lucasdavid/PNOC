@@ -11,9 +11,7 @@ import sys
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 
 from core.datasets import *
@@ -79,7 +77,6 @@ if __name__ == '__main__':
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
   pred_dir = './experiments/predictions/{}/'.format(args.label_name)
 
   log_path = log_dir + f'{args.tag}.txt'
@@ -253,23 +250,6 @@ if __name__ == '__main__':
         logits = model(images)
         predictions = torch.argmax(logits, dim=1)
 
-        # for visualization
-        if step == 0:
-          for b in range(8):
-            image = to_numpy(images[b])
-            pred_mask = to_numpy(predictions[b])
-
-            image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
-            h, w, c = image.shape
-
-            pred_mask = decode_from_colormap(pred_mask, train_dataset.colors)
-            pred_mask = cv2.resize(pred_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-            image = cv2.addWeighted(image, 0.5, pred_mask.astype(image.dtype), 0.5, 0)[..., ::-1]
-            image = image.astype(np.float32) / 255.
-
-            writer.add_image('Mask/{}'.format(b + 1), image, step, dataformats='HWC')
-
         for batch_index in range(images.size()[0]):
           pred_mask = to_numpy(predictions[batch_index])
           gt_mask = to_numpy(labels[batch_index])
@@ -281,7 +261,6 @@ if __name__ == '__main__':
 
     return meter.get(clear=True)
 
-  writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
 
   torch.autograd.set_detect_anomaly(True)
@@ -330,9 +309,6 @@ if __name__ == '__main__':
 
       log('step={iteration:,} lr={learning_rate:.4f} loss={loss:.4f} time={time:.0f} sec'.format(**data))
 
-      writer.add_scalar('Train/loss', loss, step)
-      writer.add_scalar('Train/learning_rate', lr, step)
-
     #################################################################################################
     # Evaluation
     #################################################################################################
@@ -358,9 +334,5 @@ if __name__ == '__main__':
         'step={iteration:,} mIoU={mIoU:.2f}% best_valid_mIoU={best_valid_mIoU:.2f}% time={time:.0f}sec'.format(**data)
       )
 
-      writer.add_scalar('Evaluation/mIoU', mIoU, step)
-      writer.add_scalar('Evaluation/best_valid_mIoU', best_valid_mIoU, step)
-
   write_json(data_path, data_dic)
-  writer.close()
   print(args.tag)

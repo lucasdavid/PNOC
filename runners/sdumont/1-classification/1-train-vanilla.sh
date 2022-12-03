@@ -34,8 +34,13 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
+
+export PYTHONPATH=$(pwd)
+# export OMP_NUM_THREADS=8
+
 PY=python3.9
-SOURCE=train_classification.py
+SOURCE=scripts/cam/train_vanilla.py
+WORKERS=16
 
 # DATASET=voc12
 # DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -44,59 +49,117 @@ DATA_DIR=$SCRATCH/datasets/coco14/
 
 ARCH=rs269
 ARCHITECTURE=resnest269
+TRAINABLE_STEM=true
+DILATED=false
+MODE=normal
 REGULAR=none
 
-AUGMENT="colorjitter"
+CUTMIX=0.5
+MIXUP=1.
+LABELSMOOTHING=0  # 0.1
+
+IMAGE_SIZE=512
+EPOCHS=15
+BATCH=32
+
+
+AUGMENT=colorjitter
 TAG=$DATASET-$ARCH
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
-    $PY $SOURCE                      \
-    --architecture   $ARCHITECTURE   \
-    --regularization $REGULAR        \
-    --augment        $AUGMENT        \
-    --tag            $TAG            \
-    --dataset        $DATASET        \
-    --data_dir       $DATA_DIR
+$PY $SOURCE                          \
+  --tag             $TAG             \
+  --device          $DEVICE          \
+  --num_workers     $WORKERS         \
+  --batch_size      $BATCH           \
+  --architecture    $ARCHITECTURE    \
+  --dilated         $DILATED         \
+  --mode            $MODE            \
+  --trainable-stem  $TRAINABLE_STEM  \
+  --regularization  $REGULAR         \
+  --image_size      $IMAGE_SIZE      \
+  --min_image_size  320              \
+  --max_image_size  640              \
+  --augment         $AUGMENT         \
+  --cutmix_prob     $CUTMIX          \
+  --mixup_prob      $MIXUP           \
+  --label_smoothing $LABELSMOOTHING  \
+  --max_epoch       $EPOCHS          \
+  --dataset         $DATASET         \
+  --data_dir        $DATA_DIR
 
 
 # AUGMENT=colorjitter_randaugment
-# CUTMIX_PROB=0.5
-# AUG=ra
-# TAG=$DATASET-$ARCH-$AUG
+# TAG=$DATASET-$ARCH-ra
+# CUTMIX=0.5
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --tag            $TAG            \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
+#   --tag             $TAG             \
+#   --device          $DEVICE          \
+#   --num_workers     $WORKERS         \
+#   --batch_size      $BATCH           \
+#   --architecture    $ARCHITECTURE    \
+#   --dilated         $DILATED         \
+#   --mode            $MODE            \
+#   --trainable-stem  $TRAINABLE_STEM  \
+#   --regularization  $REGULAR         \
+#   --image_size      $IMAGE_SIZE      \
+#   --min_image_size  $IMAGE_SIZE      \
+#   --max_image_size  $IMAGE_SIZE      \
+#   --augment         $AUGMENT         \
+#   --cutmix_prob     $CUTMIX          \
+#   --mixup_prob      $MIXUP           \
+#   --label_smoothing $LABELSMOOTHING  \
+#   --max_epoch       $EPOCHS          \
+#   --dataset         $DATASET         \
+#   --data_dir        $DATA_DIR
 
 # AUGMENT=colorjitter_randaugment_cutmix
-# CUTMIX_PROB=0.5
-# AUG=ra-cm$CUTMIX_PROB
+# CUTMIX=0.5
+# AUG=ra-cm$CUTMIX
 # TAG=$DATASET-$ARCH-$AUG
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
-#     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --tag            $TAG            \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
+#   --tag             $TAG             \
+#   --device          $DEVICE          \
+#   --num_workers     $WORKERS         \
+#   --batch_size      $BATCH           \
+#   --architecture    $ARCHITECTURE    \
+#   --dilated         $DILATED         \
+#   --mode            $MODE            \
+#   --trainable-stem  $TRAINABLE_STEM  \
+#   --regularization  $REGULAR         \
+#   --image_size      $IMAGE_SIZE      \
+#   --min_image_size  $IMAGE_SIZE      \
+#   --max_image_size  $IMAGE_SIZE      \
+#   --augment         $AUGMENT         \
+#   --cutmix_prob     $CUTMIX          \
+#   --mixup_prob      $MIXUP           \
+#   --label_smoothing $LABELSMOOTHING  \
+#   --max_epoch       $EPOCHS          \
+#   --dataset         $DATASET         \
+#   --data_dir        $DATA_DIR
 
 
 # AUGMENT=colorjitter_cutmix
-# CUTMIX_PROB=0.5
-# AUG=cm$CUTMIX_PROB
+# CUTMIX=0.5
+# AUG=cm$CUTMIX
 # TAG=$DATASET-$ARCH-$AUG
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #     $PY $SOURCE                      \
-#     --architecture   $ARCHITECTURE   \
-#     --regularization $REGULAR        \
-#     --augment        $AUGMENT        \
-#     --cutmix_prob    $CUTMIX_PROB    \
-#     --tag            $TAG            \
-#     --dataset        $DATASET        \
-#     --data_dir       $DATA_DIR
+#   --tag             $TAG             \
+#   --device          $DEVICE          \
+#   --num_workers     $WORKERS         \
+#   --batch_size      $BATCH           \
+#   --architecture    $ARCHITECTURE    \
+#   --dilated         $DILATED         \
+#   --mode            $MODE            \
+#   --trainable-stem  $TRAINABLE_STEM  \
+#   --regularization  $REGULAR         \
+#   --image_size      $IMAGE_SIZE      \
+#   --min_image_size  $IMAGE_SIZE      \
+#   --max_image_size  $IMAGE_SIZE      \
+#   --augment         $AUGMENT         \
+#   --cutmix_prob     $CUTMIX          \
+#   --mixup_prob      $MIXUP           \
+#   --label_smoothing $LABELSMOOTHING  \
+#   --max_epoch       $EPOCHS          \
+#   --dataset         $DATASET         \
+#   --data_dir        $DATA_DIR

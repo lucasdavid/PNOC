@@ -11,8 +11,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
 
 from core import occse
 from core.datasets import *
@@ -93,7 +91,6 @@ if __name__ == '__main__':
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory(f'./experiments/tensorboards/{args.tag}/')
 
   log_path = log_dir + f'{args.tag}.txt'
   data_path = data_dir + f'{args.tag}.json'
@@ -240,26 +237,6 @@ if __name__ == '__main__':
         mask = labels.unsqueeze(2).unsqueeze(3)
         cams = (make_cam(features) * mask)
 
-        # for visualization
-        if step == 0:
-          obj_cams = cams.max(dim=1)[0]
-
-          for b in range(8):
-            image = to_numpy(images[b])
-            cam = to_numpy(obj_cams[b])
-
-            image = denormalize(image, imagenet_mean, imagenet_std)[..., ::-1]
-            h, w, c = image.shape
-
-            cam = (cam * 255).astype(np.uint8)
-            cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
-            cam = colormap(cam)
-
-            image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
-            image = image.astype(np.float32) / 255.
-
-            writer.add_image('CAM/{}'.format(b + 1), image, step, dataformats='HWC')
-
         for batch_index in range(images.size()[0]):
           # c, h, w -> h, w, c
           cam = to_numpy(cams[batch_index]).transpose((1, 2, 0))
@@ -287,7 +264,6 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU
 
-  writer = SummaryWriter(tensorboard_dir)
   train_iterator = Iterator(train_loader)
 
   for step in range(step_init, step_max):
@@ -392,15 +368,6 @@ if __name__ == '__main__':
         .format(**data)
       )
 
-      writer.add_scalar('Train/loss', loss, step)
-      writer.add_scalar('Train/c_loss', c_loss, step)
-      # writer.add_scalar('Train/p_loss', p_loss, step)
-      # writer.add_scalar('Train/re_loss', re_loss, step)
-      writer.add_scalar('Train/o_loss', o_loss, step)
-      writer.add_scalar('Train/learning_rate', lr, step)
-      # writer.add_scalar('Train/alpha', ap, step)
-      writer.add_scalar('Train/oc_alpha', ao, step)
-      writer.add_scalar('Train/k', k, step)
       # endregion
 
     # region evaluation
@@ -429,13 +396,9 @@ if __name__ == '__main__':
         .format(**data)
       )
 
-      writer.add_scalar('Evaluation/threshold', threshold, step)
-      writer.add_scalar('Evaluation/train_mIoU', mIoU, step)
-      writer.add_scalar('Evaluation/best_train_mIoU', best_train_mIoU, step)
     # endregion
 
   write_json(data_path, data_dic)
-  writer.close()
 
   log(f'[i] {args.tag} saved at {model_path}')
   save_model_fn()

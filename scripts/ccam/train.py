@@ -6,7 +6,6 @@ import sys
 
 from torch import nn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 
 from core.ccam import SimMaxLoss, SimMinLoss
@@ -90,7 +89,6 @@ if __name__ == '__main__':
   log_dir = create_directory('./experiments/logs/')
   data_dir = create_directory('./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-  tensorboard_dir = create_directory('./experiments/tensorboards/{}/'.format(args.tag))
 
   log_path = log_dir + '{}.txt'.format(args.tag)
   data_path = data_dir + '{}.json'.format(args.tag)
@@ -271,8 +269,6 @@ if __name__ == '__main__':
 
   train_meter = Average_Meter(['loss', 'positive_loss', 'negative_loss'])
 
-  writer = SummaryWriter(tensorboard_dir)
-
   for epoch in range(args.max_epoch):
     model.train()
 
@@ -331,9 +327,6 @@ if __name__ == '__main__':
           'time={time:.0f}sec'.format(**data)
         )
 
-        writer.add_scalar('Train/loss', loss, step)
-        writer.add_scalar('Train/learning_rate', lr, step)
-
     #################################################################################################
     # Evaluation
     #################################################################################################
@@ -367,9 +360,5 @@ if __name__ == '__main__':
       'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
       'time={time:.0f}sec'.format(**data)
     )
-
-    writer.add_scalar('Evaluation/threshold', threshold, step)
-    writer.add_scalar('Evaluation/train_sal_mIoU', mIoU, step)
-    writer.add_scalar('Evaluation/best_train_sal_mIoU', best_train_mIoU, step)
 
   print(args.tag)
