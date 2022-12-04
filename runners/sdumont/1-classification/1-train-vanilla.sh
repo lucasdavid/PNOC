@@ -34,9 +34,8 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
-
 export PYTHONPATH=$(pwd)
-# export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=16
 
 PY=python3.9
 SOURCE=scripts/cam/train_vanilla.py
@@ -68,7 +67,6 @@ TAG=$DATASET-$ARCH
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
 $PY $SOURCE                          \
   --tag             $TAG             \
-  --device          $DEVICE          \
   --num_workers     $WORKERS         \
   --batch_size      $BATCH           \
   --architecture    $ARCHITECTURE    \
@@ -93,7 +91,6 @@ $PY $SOURCE                          \
 # CUTMIX=0.5
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #   --tag             $TAG             \
-#   --device          $DEVICE          \
 #   --num_workers     $WORKERS         \
 #   --batch_size      $BATCH           \
 #   --architecture    $ARCHITECTURE    \
@@ -118,7 +115,6 @@ $PY $SOURCE                          \
 # TAG=$DATASET-$ARCH-$AUG
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #   --tag             $TAG             \
-#   --device          $DEVICE          \
 #   --num_workers     $WORKERS         \
 #   --batch_size      $BATCH           \
 #   --architecture    $ARCHITECTURE    \
@@ -145,7 +141,6 @@ $PY $SOURCE                          \
 # CUDA_VISIBLE_DEVICES=0,1,2,3         \
 #     $PY $SOURCE                      \
 #   --tag             $TAG             \
-#   --device          $DEVICE          \
 #   --num_workers     $WORKERS         \
 #   --batch_size      $BATCH           \
 #   --architecture    $ARCHITECTURE    \

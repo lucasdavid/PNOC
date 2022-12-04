@@ -317,7 +317,7 @@ if __name__ == '__main__':
     optimizer.step()
 
     occse.update_focal_factor(
-      targets, labels_oc, cl_logits, focal_factor, momentum=args.oc_focal_momentum, gamma=args.oc_focal_gamma
+      targets, labels_oc, cl_logits.to(targets), focal_factor, momentum=args.oc_focal_momentum, gamma=args.oc_focal_gamma
     )
 
     # region logging

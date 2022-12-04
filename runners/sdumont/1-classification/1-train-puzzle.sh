@@ -34,9 +34,8 @@ cd $SCRATCH/PuzzleCAM
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 
-export LD_LIBRARY_PATH=$SCRATCH/.local/lib/python3.9/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$(pwd)
-# export OMP_NUM_THREADS=48
+# export OMP_NUM_THREADS=16
 
 PY=python3.9
 SOURCE=scripts/cam/train_puzzle.py
@@ -63,7 +62,6 @@ IMAGE_SIZE=512
 EPOCHS=15
 BATCH=16
 
-
 AUGMENT=colorjitter
 TAG=$DATASET-$ARCH-p
 CUDA_VISIBLE_DEVICES=0,1,2,3         \
@@ -81,7 +79,7 @@ $PY $SOURCE                          \
   --alpha_schedule  0.50             \
   --alpha           4.00             \
   --image_size      $IMAGE_SIZE      \
-  --min_image_size  320              \
+  --min_image_size  512              \
   --max_image_size  640              \
   --augment         $AUGMENT         \
   --cutmix_prob     $CUTMIX          \
@@ -91,6 +89,9 @@ $PY $SOURCE                          \
   --dataset         $DATASET         \
   --data_dir        $DATA_DIR
 
+# ARCH=rs101
+# ARCHITECTURE=resnest101
+# BATCH=32
 # LABELSMOOTHING=0.1
 # CUTMIX=1.0
 # AUGMENT=randaugment_cutormixup
