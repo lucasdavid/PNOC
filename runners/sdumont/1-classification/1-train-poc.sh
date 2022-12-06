@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-poc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=48:00:00
+#SBATCH --time=56:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #

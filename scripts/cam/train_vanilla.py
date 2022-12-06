@@ -305,7 +305,8 @@ if __name__ == '__main__':
         'time={time:.0f}sec'.format(**data)
       )
 
-  write_json(data_path, data_dic)
+      log(f'saving weights `{model_path}`')
+      save_model_fn()
 
-  log(f'[i] {TAG} saved at {model_path}')
-  save_model_fn()
+  write_json(data_path, data_dic)
+  log(TAG)

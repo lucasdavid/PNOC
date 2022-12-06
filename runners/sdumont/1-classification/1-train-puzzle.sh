@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-puzzle
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/puz-%j.out
-#SBATCH --time=72:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -39,12 +39,13 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/cam/train_puzzle.py
+DEVICES=0,1,2,3
 WORKERS=16
 
-# DATASET=voc12
-# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DATASET=coco14
-DATA_DIR=$SCRATCH/datasets/coco14/
+DATASET=voc12
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
 
 
 ARCH=rs269
@@ -59,35 +60,44 @@ MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
 IMAGE_SIZE=512
+MIN_IMAGE_SIZE=320
+MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=16
 
-AUGMENT=colorjitter
-TAG=$DATASET-$ARCH-p
-CUDA_VISIBLE_DEVICES=0,1,2,3         \
-$PY $SOURCE                          \
-  --tag             $TAG             \
-  --num_workers     $WORKERS         \
-  --batch_size      $BATCH           \
-  --architecture    $ARCHITECTURE    \
-  --dilated         $DILATED         \
-  --mode            $MODE            \
-  --trainable-stem  $TRAINABLE_STEM  \
-  --regularization  $REGULAR         \
-  --re_loss_option  masking          \
-  --re_loss         L1_Loss          \
-  --alpha_schedule  0.50             \
-  --alpha           4.00             \
-  --image_size      $IMAGE_SIZE      \
-  --min_image_size  512              \
-  --max_image_size  640              \
-  --augment         $AUGMENT         \
-  --cutmix_prob     $CUTMIX          \
-  --mixup_prob      $MIXUP           \
-  --label_smoothing $LABELSMOOTHING  \
-  --max_epoch       $EPOCHS          \
-  --dataset         $DATASET         \
-  --data_dir        $DATA_DIR
+run_experiment() {
+  echo "Running $TAG experiment"
+  CUDA_VISIBLE_DEVICES=$DEVICES        \
+  $PY $SOURCE                          \
+    --tag             $TAG             \
+    --num_workers     $WORKERS         \
+    --batch_size      $BATCH           \
+    --architecture    $ARCHITECTURE    \
+    --dilated         $DILATED         \
+    --mode            $MODE            \
+    --trainable-stem  $TRAINABLE_STEM  \
+    --regularization  $REGULAR         \
+    --re_loss_option  masking          \
+    --re_loss         L1_Loss          \
+    --alpha_schedule  0.50             \
+    --alpha           4.00             \
+    --image_size      $IMAGE_SIZE      \
+    --min_image_size  $MIN_IMAGE_SIZE  \
+    --max_image_size  $MAX_IMAGE_SIZE  \
+    --augment         $AUGMENT         \
+    --cutmix_prob     $CUTMIX          \
+    --mixup_prob      $MIXUP           \
+    --label_smoothing $LABELSMOOTHING  \
+    --max_epoch       $EPOCHS          \
+    --dataset         $DATASET         \
+    --data_dir        $DATA_DIR
+}
+
+# AUGMENT=colorjitter
+# TAG=$DATASET-$ARCH-p
+
+# run_experiment
+
 
 # ARCH=rs101
 # ARCHITECTURE=resnest101
@@ -96,27 +106,18 @@ $PY $SOURCE                          \
 # CUTMIX=1.0
 # AUGMENT=randaugment_cutormixup
 # TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-cutormixup
-# CUDA_VISIBLE_DEVICES=0,1,2,3         \
-# $PY $SOURCE                          \
-#   --tag             $TAG             \
-#   --num_workers     $WORKERS         \
-#   --batch_size      $BATCH           \
-#   --architecture    $ARCHITECTURE    \
-#   --dilated         $DILATED         \
-#   --mode            $MODE            \
-#   --trainable-stem  $TRAINABLE_STEM  \
-#   --regularization  $REGULAR         \
-#   --re_loss_option  masking          \
-#   --re_loss         L1_Loss          \
-#   --alpha_schedule  0.50             \
-#   --alpha           4.00             \
-#   --image_size      $IMAGE_SIZE      \
-#   --min_image_size  $IMAGE_SIZE      \
-#   --max_image_size  $IMAGE_SIZE      \
-#   --augment         $AUGMENT         \
-#   --cutmix_prob     $CUTMIX          \
-#   --mixup_prob      $MIXUP           \
-#   --label_smoothing $LABELSMOOTHING  \
-#   --max_epoch       $EPOCHS          \
-#   --dataset         $DATASET         \
-#   --data_dir        $DATA_DIR
+
+# run_experiment
+
+
+ARCH=rs101
+ARCHITECTURE=resnest101
+BATCH=32
+LABELSMOOTHING=0.1
+MIXUP=1.0
+AUGMENT=randaugment_mixup
+MIN_IMAGE_SIZE=512
+MAX_IMAGE_SIZE=512
+TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-mixup
+
+run_experiment

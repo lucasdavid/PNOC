@@ -403,9 +403,10 @@ if __name__ == '__main__':
         'best_train_mIoU = {best_train_mIoU:.2f}%\n'
         'train_iou       = {train_iou}\n'.format(**data)
       )
+
+      log(f'saving weights `{model_path}`')
+      save_model_fn()
     # endregion
 
   write_json(data_path, data_dic)
-
-  log(f'[i] {TAG} saved at {model_path}')
-  save_model_fn()
+  log(TAG)
