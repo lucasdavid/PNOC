@@ -39,8 +39,8 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/cam/train_puzzle.py
-DEVICES=0,1,2,3
 WORKERS=16
+DEVICES=0,1,2,3
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -95,7 +95,6 @@ run_experiment() {
 
 # AUGMENT=colorjitter
 # TAG=$DATASET-$ARCH-p
-
 # run_experiment
 
 
@@ -106,7 +105,6 @@ run_experiment() {
 # CUTMIX=1.0
 # AUGMENT=randaugment_cutormixup
 # TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-cutormixup
-
 # run_experiment
 
 
@@ -119,5 +117,4 @@ AUGMENT=randaugment_mixup
 MIN_IMAGE_SIZE=512
 MAX_IMAGE_SIZE=512
 TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-mixup
-
 run_experiment

@@ -42,6 +42,7 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/cam/train_poc.py
 WORKERS=16
+DEVICES=0,1,2,3
 
 # DATASET=voc12
 # DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -57,6 +58,8 @@ MODE=normal
 REGULAR=none
 
 IMAGE_SIZE=512
+MIN_IMAGE_SIZE=320
+MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=32
 
@@ -81,39 +84,43 @@ CUTMIX=0.5
 MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
+run_experiment () {
+    CUDA_VISIBLE_DEVICES=$DEVICES            \
+    $PY $SOURCE                              \
+        --tag               $TAG             \
+        --num_workers       $WORKERS         \
+        --batch_size        $BATCH           \
+        --architecture      $ARCHITECTURE    \
+        --dilated           $DILATED         \
+        --mode              $MODE            \
+        --trainable-stem    $TRAINABLE_STEM  \
+        --regularization    $REGULAR         \
+        --oc-architecture   $OC_ARCHITECTURE \
+        --oc-pretrained     $OC_PRETRAINED   \
+        --oc-regularization $OC_REGULAR      \
+        --image_size        $IMAGE_SIZE      \
+        --min_image_size    $MIN_IMAGE_SIZE  \
+        --max_image_size    $MAX_IMAGE_SIZE  \
+        --augment           $AUGMENT         \
+        --cutmix_prob       $CUTMIX          \
+        --mixup_prob        $MIXUP           \
+        --label_smoothing   $LABELSMOOTHING  \
+        --max_epoch         $EPOCHS          \
+        --alpha             $P_ALPHA         \
+        --alpha_init        $P_INIT          \
+        --alpha_schedule    $P_SCHEDULE      \
+        --oc-alpha          $OC_ALPHA        \
+        --oc-alpha-init     $OC_INIT         \
+        --oc-alpha-schedule $OC_SCHEDULE     \
+        --oc-strategy       $OC_STRATEGY     \
+        --oc-focal-momentum $OC_F_MOMENTUM   \
+        --oc-focal-gamma    $OC_F_GAMMA      \
+        --dataset           $DATASET         \
+        --data_dir          $DATA_DIR
+}
+
 TAG=$DATASET-$ARCH-poc@$OC_NAME
-CUDA_VISIBLE_DEVICES=0,1,2,3             \
-$PY $SOURCE                              \
-    --tag               $TAG             \
-    --num_workers       $WORKERS         \
-    --batch_size        $BATCH           \
-    --architecture      $ARCHITECTURE    \
-    --dilated           $DILATED         \
-    --mode              $MODE            \
-    --trainable-stem    $TRAINABLE_STEM  \
-    --regularization    $REGULAR         \
-    --oc-architecture   $OC_ARCHITECTURE \
-    --oc-pretrained     $OC_PRETRAINED   \
-    --oc-regularization $OC_REGULAR      \
-    --image_size        $IMAGE_SIZE      \
-    --min_image_size    320              \
-    --max_image_size    640              \
-    --augment           $AUGMENT         \
-    --cutmix_prob       $CUTMIX          \
-    --mixup_prob        $MIXUP           \
-    --label_smoothing   $LABELSMOOTHING  \
-    --max_epoch         $EPOCHS          \
-    --alpha             $P_ALPHA         \
-    --alpha_init        $P_INIT          \
-    --alpha_schedule    $P_SCHEDULE      \
-    --oc-alpha          $OC_ALPHA        \
-    --oc-alpha-init     $OC_INIT         \
-    --oc-alpha-schedule $OC_SCHEDULE     \
-    --oc-strategy       $OC_STRATEGY     \
-    --oc-focal-momentum $OC_F_MOMENTUM   \
-    --oc-focal-gamma    $OC_F_GAMMA      \
-    --dataset           $DATASET         \
-    --data_dir          $DATA_DIR
+run_experiment
 
 
 # DOMAIN=train

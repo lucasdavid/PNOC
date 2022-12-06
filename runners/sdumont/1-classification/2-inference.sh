@@ -44,20 +44,18 @@ SOURCE=scripts/cam/inference.py
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train
 # DATASET=coco14
 # DATA_DIR=$SCRATCH/datasets/coco14/
-
-DOMAIN=train2014
+# DOMAIN=train2014
 
 ARCHITECTURE=resnest269
 DILATED=false
 MODE=normal
 REG=none
 
-WEIGHTS=resnest269@normal@puzzleoc@b16-rep3
-TAG=poc/$WEIGHTS
-
-CUDA_VISIBLE_DEVICES=0                      \
+run_experiment () {
+    CUDA_VISIBLE_DEVICES=$DEVICES           \
     $PY $SOURCE                             \
     --architecture   $ARCHITECTURE          \
     --dilated        $DILATED               \
@@ -68,20 +66,16 @@ CUDA_VISIBLE_DEVICES=0                      \
     --domain         $DOMAIN                \
     --dataset        $DATASET               \
     --data_dir       $DATA_DIR              &
+}
+
+WEIGHTS=resnest269@normal@puzzleoc@b16-rep3
+TAG=poc/$WEIGHTS
+DEVICES=0
+run_experiment
 
 WEIGHTS=resnest269@normal@puzzleoc@randaug@b16@random
 TAG=poc/$WEIGHTS
-
-CUDA_VISIBLE_DEVICES=1                      \
-    $PY inference_classification.py         \
-    --architecture   $ARCHITECTURE          \
-    --dilated        $DILATED               \
-    --regularization $REG                   \
-    --mode           $MODE                  \
-    --weights        $WEIGHTS               \
-    --tag            $TAG                   \
-    --domain         $DOMAIN                \
-    --dataset        $DATASET               \
-    --data_dir       $DATA_DIR              &
+DEVICES=1
+run_experiment
 
 wait
