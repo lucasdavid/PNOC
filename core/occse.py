@@ -15,7 +15,7 @@ def random_label_split(label, k, choices):
   #   y_mask[i, target] = 1
   #   choices[target] += 1
   #   indices.append(target)
-  
+
   for i in range(bs):
     # Use label vector as multinomial distribution, which supresses non-present classes.
     # If vanilla training, a class is uniformally sampled. If using cutmix/mixup,
@@ -69,6 +69,7 @@ def least_chosen_label_split(label, k, choices, gamma=1.0):
 
   return y_mask, indices
 
+
 def focal_label_split(label, k, choices, focal_factor):
   bs = label.shape[0]
   y_mask = torch.zeros_like(label)
@@ -85,6 +86,7 @@ def focal_label_split(label, k, choices, focal_factor):
     indices.append(target)
 
   return y_mask, indices
+
 
 STRATEGIES = ['random', 'balanced', 'focal', 'least_chosen']
 
@@ -123,18 +125,18 @@ def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_ba
 
 
 def update_focal_factor(
-    labels,
-    labels_oc,
-    cl_logits,
-    focal_factor,
-    momentum=0.9,
-    gamma=2.0,
+  labels,
+  labels_oc,
+  cl_logits,
+  focal_factor,
+  momentum=0.9,
+  gamma=2.0,
 ):
-  samples  = labels.sum(axis=0)
-  valid    = labels.any(axis=0)
+  samples = labels.sum(axis=0)
+  valid = labels.any(axis=0)
 
   cf = calculate_focal_factor(labels_oc, cl_logits, gamma).sum(axis=0) / samples
-  focal_factor[valid] = (momentum * focal_factor + (1-momentum)*cf)[valid]
+  focal_factor[valid] = (momentum * focal_factor + (1 - momentum) * cf)[valid]
 
   return focal_factor
 

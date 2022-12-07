@@ -52,5 +52,5 @@ class ABC_Model(ABC):
 
     if with_names:
       return groups, names
-    
+
     return groups

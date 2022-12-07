@@ -20,7 +20,9 @@ def feats_pooling(x, method='avg', sh=8, sw=8):
 
 class MCARResnet(nn.Module):
 
-  def __init__(self, model, num_classes, ps, topN, threshold, vis=False, inference_mode=False, with_cams=False, with_logits=False):
+  def __init__(
+    self, model, num_classes, ps, topN, threshold, vis=False, inference_mode=False, with_cams=False, with_logits=False
+  ):
     super(MCARResnet, self).__init__()
     self.features = nn.Sequential(
       model.conv1,
@@ -43,7 +45,7 @@ class MCARResnet(nn.Module):
     # image normalization
     self.image_normalization_mean = [0.485, 0.456, 0.406]
     self.image_normalization_std = [0.229, 0.224, 0.225]
-    
+
     self.inference_mode = inference_mode
     self.with_logits = with_logits
     self.with_cams = with_cams
@@ -52,7 +54,7 @@ class MCARResnet(nn.Module):
     # global stream
     b, c, h, w = inputs.size()
     ga = self.features(inputs)
-    
+
     if self.with_cams:
       cs = self.convclass(ga)  #bchw
       gs = gf = feats_pooling(cs, method=self.ps, sh=int(h / 32), sw=int(w / 32))  #bc11
@@ -67,7 +69,7 @@ class MCARResnet(nn.Module):
       gs = gs.view(gs.size(0), -1)  #bc
 
     if self.inference_mode:
-        return gs
+      return gs
 
     # from global to local
     camscore = self.convclass(ga.detach())
@@ -104,12 +106,8 @@ class MCARResnet(nn.Module):
           ys = (ys - ys.min()) / (ys.max() - ys.min())
         x1, x2 = obj_loc(xs, self.threshold)
         y1, y2 = obj_loc(ys, self.threshold)
-        linputs[i:i + 1, j] = F.interpolate(
-            inputs[i:i + 1, :, y1:y2, x1:x2],
-            size=(h, w),
-            mode='bilinear',
-            align_corners=True
-        )
+        linputs[i:i + 1,
+                j] = F.interpolate(inputs[i:i + 1, :, y1:y2, x1:x2], size=(h, w), mode='bilinear', align_corners=True)
         if self.vis:
           region_bboxs[i, j] = torch.Tensor([x1, x2, y1, y2, gs_ind[j].item(), gs[i, gs_ind[j]].item()])
 
@@ -129,22 +127,42 @@ class MCARResnet(nn.Module):
 
   def get_config_optim(self, lr, lrp):
     return [
-      {'params': self.features.parameters(), 'lr': lr * lrp},
-      {'params': self.convclass.parameters(), 'lr': lr},
+      {
+        'params': self.features.parameters(),
+        'lr': lr * lrp
+      },
+      {
+        'params': self.convclass.parameters(),
+        'lr': lr
+      },
     ]
 
 
 def mcar_resnet50(
-    num_classes, ps, topN, threshold, pretrained=True, vis=False,
-    inference_mode=False, with_cams=False, with_logits=False
+  num_classes,
+  ps,
+  topN,
+  threshold,
+  pretrained=True,
+  vis=False,
+  inference_mode=False,
+  with_cams=False,
+  with_logits=False
 ):
   model = models.resnet50(pretrained=pretrained)
   return MCARResnet(model, num_classes, ps, topN, threshold, vis, inference_mode, with_cams, with_logits)
 
 
 def mcar_resnet101(
-    num_classes, ps, topN, threshold, pretrained=True,
-    vis=False, inference_mode=False, with_cams=False, with_logits=False
+  num_classes,
+  ps,
+  topN,
+  threshold,
+  pretrained=True,
+  vis=False,
+  inference_mode=False,
+  with_cams=False,
+  with_logits=False
 ):
   model = models.resnet101(pretrained=pretrained)
   return MCARResnet(model, num_classes, ps, topN, threshold, vis, inference_mode, with_cams, with_logits)

@@ -33,9 +33,9 @@ def _load_images_list(domain):
 
 def load_sample_with_labels(root_dir, domain, images, labels, idx):
   label = labels[idx]
-  
+
   if label.sum() == 0:
-    return load_sample_with_labels(root_dir, domain, images, labels, idx+1)
+    return load_sample_with_labels(root_dir, domain, images, labels, idx + 1)
 
   image_id = _decode_id(images[idx])
   filename = f"COCO_{domain}_{image_id}.jpg"
@@ -60,13 +60,7 @@ class COCO14Dataset(Dataset):
     return len(self.img_name_list)
 
   def __getitem__(self, idx):
-    return load_sample_with_labels(
-      self.root_dir,
-      self.domain,
-      self.img_name_list,
-      self.label_list,
-      idx
-    )
+    return load_sample_with_labels(self.root_dir, self.domain, self.img_name_list, self.label_list, idx)
 
 
 class COCO14ClassificationDataset(COCO14Dataset):

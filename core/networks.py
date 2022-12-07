@@ -62,9 +62,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
 
     if 'resnet' in name:
       from .arch_resnet import resnet
-      model = resnet.ResNet(
-        resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn
-      )
+      model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn)
 
       if weights == 'imagenet':
         print(f'loading weights from {resnet.urls_dic[name]}')
@@ -107,19 +105,19 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
 class Backbone(nn.Module, ABC_Model):
 
   def __init__(
-      self,
-      model_name,
-      weights='imagenet',
-      mode='fix',
-      dilated=False,
-      strides=None,
-      trainable_stem=True,
+    self,
+    model_name,
+    weights='imagenet',
+    mode='fix',
+    dilated=False,
+    strides=None,
+    trainable_stem=True,
   ):
     super().__init__()
 
     self.mode = mode
     self.trainable_stem = trainable_stem
-    
+
     if mode == 'normal':
       self.norm_fn = nn.BatchNorm2d
     elif mode == 'fix':
@@ -127,13 +125,8 @@ class Backbone(nn.Module, ABC_Model):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    (out_features, model, stages) = build_backbone(
-      name=model_name,
-      dilated=dilated,
-      strides=strides,
-      norm_fn=self.norm_fn,
-      weights=weights
-    )
+    (out_features, model,
+     stages) = build_backbone(name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights)
 
     self.model = model
     self.out_features = out_features
@@ -158,13 +151,7 @@ class Classifier(Backbone):
     regularization=None,
     trainable_stem=True
   ):
-    super().__init__(
-      model_name,
-      mode=mode,
-      dilated=dilated,
-      strides=strides,
-      trainable_stem=trainable_stem
-    )
+    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides, trainable_stem=trainable_stem)
 
     self.num_classes = num_classes
     self.regularization = regularization
@@ -219,12 +206,7 @@ class CCAM(Backbone):
     stage4_out_features=1024
   ):
     super().__init__(
-      model_name,
-      weights=weights,
-      mode=mode,
-      dilated=dilated,
-      strides=strides,
-      trainable_stem=trainable_stem
+      model_name, weights=weights, mode=mode, dilated=dilated, strides=strides, trainable_stem=trainable_stem
     )
 
     self.ac_head = ccam.Disentangler(stage4_out_features + self.out_features)
@@ -240,7 +222,7 @@ class CCAM(Backbone):
     feats = torch.cat([x2, x1], dim=1)
 
     return self.ac_head(feats)
-  
+
   def get_parameter_groups(self):
     groups = ([], [], [], [])
     for m in self.modules():

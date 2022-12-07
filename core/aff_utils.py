@@ -178,8 +178,4 @@ class GetAffinityLabelFromIndices:
     bg_pos_aff = (pos_aff_m & (segm_label_from == 0)).astype(np.float32)
     fg_pos_aff = (pos_aff_m & (segm_label_from > 0)).astype(np.float32)
 
-    return (
-      torch.from_numpy(bg_pos_aff),
-      torch.from_numpy(fg_pos_aff),
-      torch.from_numpy(neg_aff_m)
-    )
+    return (torch.from_numpy(bg_pos_aff), torch.from_numpy(fg_pos_aff), torch.from_numpy(neg_aff_m))

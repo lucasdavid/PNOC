@@ -26,7 +26,7 @@ class Iterator:
       data = next(self.iterator)
 
     return data
-  
+
 
 def imagenet_stats():
   return (
@@ -68,11 +68,9 @@ def get_transforms(
 
   tt = transforms.Compose(tt)
   tv = transforms.Compose(
-    [
-      Normalize_For_Segmentation(mean, std),
-      Top_Left_Crop_For_Segmentation(image_size),
-      Transpose_For_Segmentation()
-    ]
+    [Normalize_For_Segmentation(mean, std),
+     Top_Left_Crop_For_Segmentation(image_size),
+     Transpose_For_Segmentation()]
   )
 
   return tt, tv
@@ -98,7 +96,7 @@ def get_dataset_classification(
     from . import coco14
     train_dataset = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
     valid_dataset = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
-  
+
   if 'cutormixup' in augment:
     print(f'[i] Using cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
     train_dataset = CutOrMixUp(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
@@ -131,15 +129,16 @@ def get_dataset_inference(dataset, data_dir, domain=None):
 
 
 class DatasetInfo:
+
   def __init__(self, meta, classes, num_classes):
     self.meta = meta
     self.classes = classes
     self.num_classes = num_classes
-  
+
   @classmethod
   def from_metafile(cls, dataset):
     META = read_json(os.path.join(DATA_DIR, dataset, 'meta.json'))
     CLASSES = np.asarray(META['class_names'])
     NUM_CLASSES = META['classes']
-    
+
     return cls(META, CLASSES, NUM_CLASSES)
