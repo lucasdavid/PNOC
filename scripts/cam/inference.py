@@ -54,9 +54,6 @@ parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 
 if __name__ == '__main__':
-  ###################################################################################
-  # Arguments
-  ###################################################################################
   args = parser.parse_args()
 
   TAG = args.tag
@@ -64,7 +61,6 @@ if __name__ == '__main__':
   TAG += '@scale=%s' % args.scales
 
   pred_dir = create_directory(f'./experiments/predictions/{TAG}/')
-
   model_path = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
   set_seed(args.seed)
@@ -74,8 +70,7 @@ if __name__ == '__main__':
   # Transform, Dataset, DataLoader
   ###################################################################################
   dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
-  log('[i] The number of class is {}'.format(dataset.info.num_classes))
-  log()
+  log(f'NUM_CLASSES={dataset.info.num_classes}')
 
   normalize_fn = Normalize(*imagenet_stats())
 

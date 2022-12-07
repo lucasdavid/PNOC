@@ -10,7 +10,7 @@ def convert_OpenCV_to_PIL(image):
 
 
 def convert_PIL_to_OpenCV(image):
-  return np.asarray(image)[..., ::-1]
+  return np.array(image)[..., ::-1]
 
 
 class RandomResize:
@@ -99,12 +99,14 @@ class Normalize:
     self.std = std
 
   def __call__(self, image):
-    image = np.asarray(image)
-    norm_image = np.empty_like(image, np.float32)
+    x = np.array(image, dtype=np.float32)
+    if isinstance(image, Image.Image): image.close()
 
-    norm_image[..., 0] = (image[..., 0] / 255. - self.mean[0]) / self.std[0]
-    norm_image[..., 1] = (image[..., 1] / 255. - self.mean[1]) / self.std[1]
-    norm_image[..., 2] = (image[..., 2] / 255. - self.mean[2]) / self.std[2]
+    norm_image = np.empty_like(x, np.float32)
+
+    norm_image[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
+    norm_image[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
+    norm_image[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
 
     return norm_image
 
@@ -118,17 +120,20 @@ class Normalize_For_Segmentation:
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
-    image = np.asarray(image, dtype=np.float32)
-    mask = np.asarray(mask, dtype=np.int64)
+    x = np.array(image, dtype=np.float32)
+    y = np.array(mask, dtype=np.int64)
 
-    norm_image = np.empty_like(image, np.float32)
+    if isinstance(image, Image.Image): image.close()
+    if isinstance(mask, Image.Image): mask.close()
 
-    norm_image[..., 0] = (image[..., 0] / 255. - self.mean[0]) / self.std[0]
-    norm_image[..., 1] = (image[..., 1] / 255. - self.mean[1]) / self.std[1]
-    norm_image[..., 2] = (image[..., 2] / 255. - self.mean[2]) / self.std[2]
+    z = np.empty_like(x, np.float32)
 
-    data['image'] = norm_image
-    data['mask'] = mask
+    z[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
+    z[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
+    z[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
+
+    data['image'] = z
+    data['mask'] = y
 
     return data
 
@@ -292,7 +297,7 @@ class Resize_For_Mask:
   def __call__(self, data):
     mask = Image.fromarray(data['mask'].astype(np.uint8))
     mask = mask.resize(self.size, Image.NEAREST)
-    data['mask'] = np.asarray(mask, dtype=np.uint64)
+    data['mask'] = np.array(mask, dtype=np.uint64)
     return data
 
 

@@ -115,13 +115,13 @@ def get_dataset_classification(
   return train_dataset, valid_dataset
 
 
-def get_dataset_inference(dataset, data_dir, domain=None):
+def get_dataset_inference(dataset, data_dir, domain=None, transform=None):
   if dataset == 'voc12':
     from . import voc12
-    infer_dataset = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug')
+    infer_dataset = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
   else:
     from . import coco14
-    infer_dataset = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014')
+    infer_dataset = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
 
   infer_dataset.info = DatasetInfo.from_metafile(dataset)
 

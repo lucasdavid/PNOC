@@ -24,7 +24,10 @@ class VOC12Dataset(torch.utils.data.Dataset):
     self.mask_dir = os.path.join(self.root_dir, 'SegmentationClass/')
 
     filepath = os.path.join(DATA_DIR, f"{domain}.txt")
-    self.image_id_list = [image_id.strip() for image_id in open(filepath).readlines()]
+    
+    with open(filepath) as f:
+      image_ids = f.readlines()
+    self.image_id_list = [image_id.strip() for image_id in image_ids]
 
     data = read_json(os.path.join(DATA_DIR, "meta.json"))
     self.class_dic = data['class_dic']
@@ -189,15 +192,6 @@ class VOC12InferenceDataset(VOC12Dataset):
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.transform = transform
-
-  def __getitem__(self, index):
-    image, image_id, tags = super().__getitem__(index)
-
-    if self.transform is not None:
-      image = self.transform(image)
-
-    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
-    return image, image_id, label
 
   def __getitem__(self, index):
     image, image_id, tags = super().__getitem__(index)
