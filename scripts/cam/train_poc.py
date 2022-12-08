@@ -303,7 +303,7 @@ if __name__ == '__main__':
 
     # OC-CSE
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-    labels_oc = targets - labels_mask
+    labels_oc = (targets - labels_mask).clip(min=0)
 
     cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
     o_loss = class_loss_fn(
