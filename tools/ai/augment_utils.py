@@ -367,28 +367,28 @@ class CutMix(torch.utils.data.Dataset):
   def __len__(self):
     return len(self.dataset)
   
-  def do_cutmix(self, x, y, xb, yb, lam):
+  def do_cutmix(self, image_a, target_a, image_b, target_b, alpha):
     # Cut random bbox.
-    bH, bW = xb.shape[1:]
-    bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, lam)
-    xb = xb[:, bh1:bh2, bw1:bw2]
+    bH, bW = image_b.shape[1:]
+    bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, alpha)
+    image_b = image_b[:, bh1:bh2, bw1:bw2]
 
     # Central crop if B larger than A.
-    aH, aW = x.shape[1:]
-    bH, bW = xb.shape[1:]
+    aH, aW = image_a.shape[1:]
+    bH, bW = image_b.shape[1:]
     bhs = (bH-aH) // 2 if bH > aH else 0
     bws = (bW-aW) // 2 if bW > aW else 0
-    xb = xb[:, bhs:bhs+aH, bws:bws+aW]
+    image_b = image_b[:, bhs:bhs+aH, bws:bws+aW]
 
     # Random (x,y) placement if A larger than B.
-    bH, bW = xb.shape[1:]
+    bH, bW = image_b.shape[1:]
     bhs, bws = random.randint(0, aH-bH), random.randint(0, aW-bW)
-    x[:, bhs:bhs+bH, bws:bws+bW] = xb
+    image_a[:, bhs:bhs+bH, bws:bws+bW] = image_b
 
-    lam = 1 - ((bH * bW) / (aH * aW))
-    y = y * lam + yb * (1. - lam)
+    alpha = 1 - ((bH * bW) / (aH * aW))
+    target_a = target_a * alpha + target_b * (1. - alpha)
 
-    return x, y
+    return image_a, target_a
 
   def __getitem__(self, index):
     x, y = self.dataset[index]
@@ -401,11 +401,11 @@ class CutMix(torch.utils.data.Dataset):
         continue
 
       # Draw random sample.
-      lam = np.random.beta(self.beta, self.beta)
+      l = np.random.beta(self.beta, self.beta)
       r = random.choice(range(len(self)))
       xb, yb = self.dataset[r]
 
-      x, y = self.do_cutmix(x, y, xb, yb, lam)
+      x, y = self.do_cutmix(x, y, xb, yb, l)
 
     return x, y
 

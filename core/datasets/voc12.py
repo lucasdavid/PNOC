@@ -17,14 +17,14 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'voc12')
 
 class VOC12Dataset(torch.utils.data.Dataset):
 
-  def __init__(self, root_dir, domain, with_id=False, with_tags=False, with_mask=False):
+  def __init__(self, root_dir, domain, masks_dir=None, with_id=False, with_tags=False, with_mask=False):
     self.root_dir = root_dir
     self.image_dir = os.path.join(self.root_dir, 'JPEGImages/')
     self.xml_dir = os.path.join(self.root_dir, 'Annotations/')
-    self.mask_dir = os.path.join(self.root_dir, 'SegmentationClass/')
+    self.mask_dir = masks_dir or os.path.join(self.root_dir, 'SegmentationClass/')
 
     filepath = os.path.join(DATA_DIR, f"{domain}.txt")
-    
+
     with open(filepath) as f:
       image_ids = f.readlines()
     self.image_id_list = [image_id.strip() for image_id in image_ids]
@@ -45,7 +45,7 @@ class VOC12Dataset(torch.utils.data.Dataset):
     return image
 
   def get_mask(self, image_id):
-    mask_path = self.mask_dir + image_id + '.png'
+    mask_path = os.path.join(self.mask_dir, image_id + '.png')
     if os.path.isfile(mask_path):
       mask = Image.open(mask_path)
     else:
@@ -89,90 +89,25 @@ class VOC12ClassificationDataset(VOC12Dataset):
     return image, label
 
 
-class VOC12SegmentationDataset(VOC12Dataset):
-
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, with_mask=True)
-    self.transform = transform
-
-    cmap_dic, _, class_names = get_color_map_dic()
-    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
-
-  def __getitem__(self, index):
-    image, mask = super().__getitem__(index)
-
-    if self.transform is not None:
-      input_dic = {'image': image, 'mask': mask}
-      output_dic = self.transform(input_dic)
-
-      image = output_dic['image']
-      mask = output_dic['mask']
-
-    return image, mask
-
-
-class VOC12EvaluationDataset(VOC12Dataset):
-
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, with_id=True, with_mask=True)
-    self.transform = transform
-
-    cmap_dic, _, class_names = get_color_map_dic()
-    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
-
-  def __getitem__(self, index):
-    image, image_id, mask = super().__getitem__(index)
-
-    if self.transform is not None:
-      input_dic = {'image': image, 'mask': mask}
-      output_dic = self.transform(input_dic)
-
-      image = output_dic['image']
-      mask = output_dic['mask']
-
-    return image, image_id, mask
-
-
-class VOC_Dataset_For_WSSS(VOC12Dataset):
-
-  def __init__(self, root_dir, domain, pred_dir, transform=None):
-    super().__init__(root_dir, domain, with_id=True)
-    self.pred_dir = pred_dir
-    self.transform = transform
-
-    cmap_dic, _, class_names = get_color_map_dic()
-    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
-
-  def __getitem__(self, index):
-    image, image_id = super().__getitem__(index)
-    mask = Image.open(self.pred_dir + image_id + '.png')
-
-    if self.transform is not None:
-      input_dic = {'image': image, 'mask': mask}
-      output_dic = self.transform(input_dic)
-
-      image = output_dic['image']
-      mask = output_dic['mask']
-
-    return image, mask
-
-
 class VOC12CAMEvaluationDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, with_tags=True, with_mask=True)
+  def __init__(self, root_dir, domain, transform=None, masks_dir=None):
+    super().__init__(root_dir, domain, masks_dir=masks_dir, with_tags=True, with_mask=True)
     self.transform = transform
 
     cmap_dic, _, class_names = get_color_map_dic()
     self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
+    # Reversed, because it was stored as BGR:
+    self.color_ids = self.colors[:, 2] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 0]
 
   def __getitem__(self, index):
     image, tags, mask = super().__getitem__(index)
 
     if mask.mode == "RGB":
       # Correction for SBD dataset.
-      mask = np.asarray(mask)
-      mask = (mask[..., np.newaxis] == self.colors[:, ::-1].T).all(axis=-2).argmax(-1)
+      mask = np.array(mask)
+      mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
+      mask = np.argmax(mask[..., np.newaxis] == self.color_ids, axis=-1)
       mask[mask == 21] = 255
       mask = Image.fromarray(mask.astype('uint8'))
 
@@ -185,6 +120,13 @@ class VOC12CAMEvaluationDataset(VOC12Dataset):
 
     label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
     return image, label, mask
+
+
+class VOC12SegmentationDataset(VOC12CAMEvaluationDataset):
+
+  def __getitem__(self, index):
+    image, _, mask = super().__getitem__(index)
+    return image, mask
 
 
 class VOC12InferenceDataset(VOC12Dataset):

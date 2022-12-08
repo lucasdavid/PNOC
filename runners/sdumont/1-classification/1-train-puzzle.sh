@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-puzzle
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/puz-%j.out
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -93,9 +93,9 @@ run_experiment() {
     --data_dir        $DATA_DIR
 }
 
-# AUGMENT=colorjitter
-# TAG=$DATASET-$ARCH-p
-# run_experiment
+AUGMENT=colorjitter
+TAG=$DATASET-$ARCH-p
+run_experiment
 
 
 # ARCH=rs101
@@ -108,13 +108,13 @@ run_experiment() {
 # run_experiment
 
 
-ARCH=rs101
-ARCHITECTURE=resnest101
-BATCH=32
-LABELSMOOTHING=0.1
-MIXUP=1.0
-AUGMENT=randaugment_mixup
-MIN_IMAGE_SIZE=512
-MAX_IMAGE_SIZE=512
-TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-mixup
-run_experiment
+# ARCH=rs101
+# ARCHITECTURE=resnest101
+# BATCH=32
+# LABELSMOOTHING=0.1
+# MIXUP=1.0
+# AUGMENT=randaugment_mixup
+# MIN_IMAGE_SIZE=512
+# MAX_IMAGE_SIZE=512
+# TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-mixup
+# run_experiment

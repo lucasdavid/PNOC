@@ -39,7 +39,6 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 ###############################################################################
 # Network
 ###############################################################################
-parser.add_argument('--architecture', default='DeepLabv3+', type=str)
 parser.add_argument('--backbone', default='resnest269', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--dilated', default=False, type=str2bool)
@@ -93,45 +92,21 @@ if __name__ == '__main__':
   # Transform, Dataset, DataLoader
   ###################################################################################
 
-  META = read_json('./data/voc12/meta.json')
-  CLASSES = np.asarray(META['class_names'])
-  NUM_CLASSES = len(CLASSES)
-
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
-
-  normalize_fn = Normalize(imagenet_mean, imagenet_std)
-
-  train_transform = transforms.Compose(
-    [
-      RandomResize_For_Segmentation(args.min_image_size, args.max_image_size),
-      RandomHorizontalFlip_For_Segmentation(),
-      Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-      RandomCrop_For_Segmentation(args.image_size),
-      Transpose_For_Segmentation()
-    ]
+  tt, tv = get_segmentation_transforms(
+    args.min_image_size, args.max_image_size, args.image_size, args.augment
   )
 
-  test_transform = transforms.Compose(
-    [
-      Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-      Top_Left_Crop_For_Segmentation(args.image_size),
-      Transpose_For_Segmentation()
-    ]
+  train_dataset, valid_dataset = get_segmentation_datasets(
+    args.dataset, args.data_dir, args.augment, args.image_size, args.masks_dir,
+    train_transforms=tt,
+    valid_transforms=tv
   )
 
-  train_dataset = VOC_Dataset_For_WSSS(args.data_dir, 'train_aug', pred_dir, train_transform)
-  valid_dataset = VOC12SegmentationDataset(args.data_dir, 'val', test_transform)
-
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
 
-  log('[i] mean values is {}'.format(imagenet_mean))
-  log('[i] std values is {}'.format(imagenet_std))
-  log('[i] The number of class is {}'.format(NUM_CLASSES))
-  log('[i] train_transform is {}'.format(train_transform))
+  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
+  log('[i] train_transform is {}'.format(tt))
   log()
 
   val_iteration = len(train_loader)
@@ -145,47 +120,17 @@ if __name__ == '__main__':
   ###################################################################################
   # Network
   ###################################################################################
-  if args.architecture == 'DeepLabv3+':
-    model = DeepLabv3_Plus(
-      args.backbone,
-      num_classes=NUM_CLASSES + 1,
-      mode=args.mode,
-      dilated=args.dilated,
-      use_group_norm=args.use_gn
-    )
-  elif args.architecture == 'Seg_Model':
-    model = Seg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
-  elif args.architecture == 'CSeg_Model':
-    model = CSeg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
-
+  model = DeepLabV3Plus(
+    model_name=args.backbone,
+    num_classes=train_dataset.info.num_classes + 1,
+    mode=args.mode,
+    dilated=args.dilated,
+    use_group_norm=args.use_gn
+  )
   param_groups = model.get_parameter_groups()
-  params = [
-    {
-      'params': param_groups[0],
-      'lr': args.lr,
-      'weight_decay': args.wd
-    },
-    {
-      'params': param_groups[1],
-      'lr': 2 * args.lr,
-      'weight_decay': 0
-    },
-    {
-      'params': param_groups[2],
-      'lr': 10 * args.lr,
-      'weight_decay': args.wd
-    },
-    {
-      'params': param_groups[3],
-      'lr': 20 * args.lr,
-      'weight_decay': 0
-    },
-  ]
-
   model = model.cuda()
   model.train()
 
-  log('[i] Architecture is {}'.format(args.architecture))
   log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
   log()
 
@@ -213,12 +158,7 @@ if __name__ == '__main__':
   ###################################################################################
   class_loss_fn = nn.CrossEntropyLoss(ignore_index=255).cuda()
 
-  # log_func('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  # log_func('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  # log_func('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  # log_func('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
-
-  optimizer = PolyOptimizer(params, lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
+  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
 
   #################################################################################################
   # Train
@@ -239,7 +179,7 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter = Calculator_For_mIoU(CLASSES)
+    meter = Calculator_For_mIoU(train_dataset.info.classes)
 
     with torch.no_grad():
       length = len(loader)

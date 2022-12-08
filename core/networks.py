@@ -11,7 +11,6 @@ from tools.ai.torch_utils import freeze_and_eval, resize_for_tensors
 from torchvision import models
 
 from . import ccam, regularizers
-from .abc_modules import ABC_Model
 from .aff_utils import PathIndex
 from .deeplab_utils import ASPP, Decoder
 from .mcar import mcar_resnet50, mcar_resnet101
@@ -102,7 +101,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
   return out_features, model, (stage1, stage2, stage3, stage4, stage5)
 
 
-class Backbone(nn.Module, ABC_Model):
+class Backbone(nn.Module):
 
   def __init__(
     self,
@@ -125,8 +124,9 @@ class Backbone(nn.Module, ABC_Model):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    (out_features, model,
-     stages) = build_backbone(name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights)
+    out_features, model, stages = build_backbone(
+      name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights
+    )
 
     self.model = model
     self.out_features = out_features
@@ -137,6 +137,55 @@ class Backbone(nn.Module, ABC_Model):
 
     if not self.trainable_stem:
       self.not_training.extend([self.stage1])
+
+  def gap2d(self, x, keepdims=False):
+    x = torch.mean(x.view(x.size(0), x.size(1), -1), -1)
+    if keepdims:
+      x = x.view(x.size(0), x.size(1), 1, 1)
+    return x
+
+  def initialize(self, modules):
+    for m in modules:
+      if isinstance(m, nn.Conv2d):
+        # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        # m.weight.data.normal_(0, math.sqrt(2. / n))
+        torch.nn.init.kaiming_normal_(m.weight)
+
+      elif isinstance(m, nn.BatchNorm2d):
+        m.weight.data.fill_(1)
+        m.bias.data.zero_()
+
+  def get_parameter_groups(self, exclude_partial_names=(), with_names=False):
+    names = ([], [], [], [])
+    groups = ([], [], [], [])
+
+    for name, param in self.named_parameters():
+      if param.requires_grad:
+        for p in exclude_partial_names:
+          if p in name:
+            continue
+
+        if 'model' in name:
+          if 'weight' in name:
+            names[0].append(name)
+            groups[0].append(param)
+          else:
+            names[1].append(name)
+            groups[1].append(param)
+
+        # scracthed weights
+        else:
+          if 'weight' in name:
+            names[2].append(name)
+            groups[2].append(param)
+          else:
+            names[3].append(name)
+            groups[3].append(param)
+
+    if with_names:
+      return groups, names
+
+    return groups
 
 
 class Classifier(Backbone):
@@ -185,10 +234,10 @@ class Classifier(Backbone):
 
     if with_cam:
       features = self.classifier(x)
-      logits = self.global_average_pooling_2d(features)
+      logits = self.gap2d(features)
       return logits, features
     else:
-      x = self.global_average_pooling_2d(x, keepdims=True)
+      x = self.gap2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
 
@@ -349,7 +398,7 @@ class AffinityNet(Backbone):
     return aff_cat
 
 
-class DeepLabv3_Plus(Backbone):
+class DeepLabV3Plus(Backbone):
 
   def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=None, use_group_norm=False):
     # model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization

@@ -94,23 +94,23 @@ TAG=$DATASET-$ARCH
 run_experiment
 
 
-AUGMENT=randaugment
-TAG=$DATASET-$ARCH-ra
-CUTMIX=0.5
-run_experiment
+# AUGMENT=randaugment
+# TAG=$DATASET-$ARCH-ra
+# CUTMIX=0.5
+# run_experiment
 
 
-AUGMENT=randaugment_cutmix
-CUTMIX=0.5
-MIN_IMAGE_SIZE=512
-MAX_IMAGE_SIZE=512
-AUG=ra-cm$CUTMIX
-TAG=$DATASET-$ARCH-$AUG
-run_experiment
+# AUGMENT=randaugment_cutmix
+# CUTMIX=0.5
+# MIN_IMAGE_SIZE=512
+# MAX_IMAGE_SIZE=512
+# AUG=ra-cm$CUTMIX
+# TAG=$DATASET-$ARCH-$AUG
+# run_experiment
 
 
-AUGMENT=colorjitter_cutmix
-CUTMIX=0.5
-AUG=cm$CUTMIX
-TAG=$DATASET-$ARCH-$AUG
-run_experiment
+# AUGMENT=colorjitter_cutmix
+# CUTMIX=0.5
+# AUG=cm$CUTMIX
+# TAG=$DATASET-$ARCH-$AUG
+# run_experiment

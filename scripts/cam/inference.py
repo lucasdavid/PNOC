@@ -69,7 +69,7 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   log(f'NUM_CLASSES={dataset.info.num_classes}')
 
   normalize_fn = Normalize(*imagenet_stats())

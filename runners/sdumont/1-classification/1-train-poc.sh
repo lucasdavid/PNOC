@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-poc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=36:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -63,12 +63,12 @@ IMAGE_SIZE=512
 MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
-BATCH=32
+BATCH=16
 
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_NAME=rs269poc
+OC_PRETRAINED=experiments/models/ResNeSt269@PuzzleOc.pth
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_REGULAR=none
-OC_NAME=rs269
 
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.8
@@ -121,26 +121,33 @@ run_experiment () {
         --data_dir          $DATA_DIR
 }
 
-TAG=$DATASET-$ARCH-poc@$OC_NAME
+# TAG=$DATASET-$ARCH-poc@$OC_NAME
+# run_experiment
+
+OC_NAME=rs269ra
+OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_ARCHITECTURE=resnest269
+LABELSMOOTHING=0.1
+TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
 run_experiment
 
 
-CUDA_VISIBLE_DEVICES=0                   \
-    $PY scripts/cam/inference.py         \
-    --architecture      $ARCHITECTURE    \
-    --regularization    $REG             \
-    --dilated           $DILATED         \
-    --trainable-stem    $TRAINABLE_STEM  \
-    --mode              $MODE            \
-    --tag               $TAG             \
-    --domain            $DOMAIN          \
-    --data_dir          $DATA_DIR
+# CUDA_VISIBLE_DEVICES=0                   \
+#     $PY scripts/cam/inference.py         \
+#     --architecture      $ARCHITECTURE    \
+#     --regularization    $REG             \
+#     --dilated           $DILATED         \
+#     --trainable-stem    $TRAINABLE_STEM  \
+#     --mode              $MODE            \
+#     --tag               $TAG             \
+#     --domain            $DOMAIN          \
+#     --data_dir          $DATA_DIR
 
-CUDA_VISIBLE_DEVICES=""                                \
-$PY evaluate.py                                        \
-  --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
-  --domain $DOMAIN                                     \
-  --gt_dir "$DATA_DIR"SegmentationClass                \
-  --min_th 0.05 \
-  --max_th 0.9  \
-  --step_th 0.05
+# CUDA_VISIBLE_DEVICES=""                                \
+# $PY evaluate.py                                        \
+#   --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
+#   --domain $DOMAIN                                     \
+#   --gt_dir "$DATA_DIR"SegmentationClass                \
+#   --min_th 0.05 \
+#   --max_th 0.9  \
+#   --step_th 0.05

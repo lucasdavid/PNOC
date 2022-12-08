@@ -35,7 +35,7 @@ def imagenet_stats():
   )
 
 
-def get_transforms(
+def get_classification_transforms(
   min_image_size,
   max_image_size,
   image_size,
@@ -67,16 +67,56 @@ def get_transforms(
   tt.append(Transpose())
 
   tt = transforms.Compose(tt)
-  tv = transforms.Compose(
-    [Normalize_For_Segmentation(mean, std),
-     Top_Left_Crop_For_Segmentation(image_size),
-     Transpose_For_Segmentation()]
-  )
+  tv = transforms.Compose([
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(image_size),
+    Transpose_For_Segmentation()
+  ])
 
   return tt, tv
 
 
-def get_dataset_classification(
+def get_segmentation_transforms(
+  min_image_size,
+  max_image_size,
+  image_size,
+  augment,
+):
+  mean, std = imagenet_stats()
+
+  tt = transforms.Compose([
+    RandomResize_For_Segmentation(min_image_size, max_image_size),
+    RandomHorizontalFlip_For_Segmentation(),
+    Normalize_For_Segmentation(mean, std),
+    RandomCrop_For_Segmentation(image_size),
+    Transpose_For_Segmentation()
+  ])
+
+  tv = transforms.Compose([
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(image_size),
+    Transpose_For_Segmentation()
+  ])
+
+  return tt, tv
+
+
+def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
+  if 'cutormixup' in augment:
+    print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+  else:
+    if 'cutmix' in augment:
+      print(f'Applying cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+    if 'mixup' in augment:
+      print(f'Applying mixup num_mix=1, beta=1., prob={mixup_prob}')
+      dataset = MixUp(dataset, num_mix=1, beta=1., prob=mixup_prob)
+
+  return dataset
+
+
+def get_classification_datasets(
   dataset,
   data_dir,
   augment,
@@ -90,42 +130,64 @@ def get_dataset_classification(
 
   if dataset == 'voc12':
     from . import voc12
-    train_dataset = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
-    valid_dataset = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
+    train = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
+    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
   else:
     from . import coco14
-    train_dataset = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
-    valid_dataset = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
+    train = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
+    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
 
-  if 'cutormixup' in augment:
-    print(f'[i] Using cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-    train_dataset = CutOrMixUp(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
-  else:
-    if 'cutmix' in augment:
-      print(f'[i] Using cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-      train_dataset = CutMix(train_dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
-    if 'mixup' in augment:
-      print(f'[i] Using mixup num_mix=1, beta=1., prob={mixup_prob}')
-      train_dataset = MixUp(train_dataset, num_mix=1, beta=1., prob=mixup_prob)
+  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
 
   info = DatasetInfo.from_metafile(dataset)
-  train_dataset.info = info
-  valid_dataset.info = info
+  train.info = info
+  valid.info = info
 
-  return train_dataset, valid_dataset
+  return train, valid
 
 
-def get_dataset_inference(dataset, data_dir, domain=None, transform=None):
+def get_segmentation_datasets(
+  dataset,
+  data_dir,
+  augment,
+  image_size,
+  pseudo_masks_dir=None,
+  cutmix_prob=1.,
+  mixup_prob=1.,
+  train_transforms=None,
+  valid_transforms=None,
+):
+  print(f'Loading {dataset} dataset')
+
   if dataset == 'voc12':
     from . import voc12
-    infer_dataset = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
+    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms)
+    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms)
   else:
     from . import coco14
-    infer_dataset = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
+    train = coco14.COCO14SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
+    valid = coco14.COCO14SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
 
-  infer_dataset.info = DatasetInfo.from_metafile(dataset)
+  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
 
-  return infer_dataset
+  info = DatasetInfo.from_metafile(dataset)
+  train.info = info
+  valid.info = info
+
+  return train, valid
+
+
+def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
+  if dataset == 'voc12':
+    from . import voc12
+    infer = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
+  else:
+    from . import coco14
+    infer = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
+
+  infer.info = DatasetInfo.from_metafile(dataset)
+
+  return infer
 
 
 class DatasetInfo:

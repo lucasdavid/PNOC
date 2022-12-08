@@ -87,10 +87,15 @@ class COCO14InferenceDataset(COCO14Dataset):
 
 class COCO14CAMEvaluationDataset(COCO14Dataset):
 
+  def __init__(self, root_dir, domain, transform=None, masks_dir=None):
+    super().__init__(root_dir, domain, transform)
+
+    self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
+
   def __getitem__(self, idx):
     image_id, image, label = super().__getitem__(idx)
 
-    maskpath = os.path.join(self.root_dir, MASKS_DIR, image_id + '.png')
+    maskpath = os.path.join(self.masks_dir, image_id + '.png')
     mask = Image.open(maskpath) if os.path.isfile(maskpath) else None
 
     if self.transform:
@@ -100,14 +105,10 @@ class COCO14CAMEvaluationDataset(COCO14Dataset):
     return image, label, mask
 
 
-class COCO14SegmentationDataset(COCO14Dataset):
+class COCO14SegmentationDataset(COCO14CAMEvaluationDataset):
 
   def __getitem__(self, idx):
-    _, image, _, mask = super().__getitem__(idx)
-
-    if self.transform:
-      entry = self.transform({'image': image, 'mask': mask})
-      image, mask = entry['image'], entry['mask']
+    image, _, mask = super().__getitem__(idx)
 
     return image, mask
 

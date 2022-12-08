@@ -69,7 +69,7 @@ def main(args):
     Transpose(),
   ])
 
-  dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain, transform)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, transform)
   loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=args.num_workers)
   total_steps = args.max_steps or len(loader)
   logg_steps = max(1, int(total_steps * 0.1))

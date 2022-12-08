@@ -94,8 +94,8 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  tt, tv = get_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_dataset_classification(
+  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset, valid_dataset = get_classification_datasets(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv,
   )
 

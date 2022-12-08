@@ -4,8 +4,8 @@ from .torch_utils import *
 
 class PolyOptimizer(torch.optim.SGD):
 
-  def __init__(self, params, lr, weight_decay, max_step, momentum=0.9):
-    super().__init__(params, lr, weight_decay=weight_decay)
+  def __init__(self, params, lr, max_step, momentum=0.9):
+    super().__init__(params, lr)
 
     self.global_step = 0
     self.max_step = max_step
@@ -35,7 +35,6 @@ def get_optimizer(lr, wd, max_step, param_groups):
     ],
     lr=lr,
     momentum=0.9,
-    weight_decay=wd,
     max_step=max_step,
   )
 

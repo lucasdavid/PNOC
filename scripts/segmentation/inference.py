@@ -88,19 +88,13 @@ if __name__ == '__main__':
     CLASSES = np.asarray(META['class_names'])
     NUM_CLASSES = META['classes']
 
-    dataset = get_dataset_inference(args.dataset, args.data_dir, args.domain)
+    dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
     normalize_fn = Normalize(*imagenet_stats())
     
     ###################################################################################
     # Network
     ###################################################################################
-    if args.architecture == 'DeepLabv3+':
-        model = DeepLabv3_Plus(args.backbone, num_classes=NUM_CLASSES + 1, mode=args.mode, use_group_norm=args.use_gn)
-    elif args.architecture == 'Seg_Model':
-        model = Seg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
-    elif args.architecture == 'CSeg_Model':
-        model = CSeg_Model(args.backbone, num_classes=NUM_CLASSES + 1)
-    
+    model = DeepLabV3Plus(args.backbone, num_classes=NUM_CLASSES + 1, mode=args.mode, use_group_norm=args.use_gn)
     model = model.cuda()
     model.eval()
 
@@ -163,7 +157,7 @@ if __name__ == '__main__':
 
             if args.domain == 'test':
                 pred_mask = decode_from_colormap(pred_mask, dataset.colors)[..., ::-1]
-            
+
             imageio.imwrite(pred_dir + image_id + '.png', pred_mask.astype(np.uint8))
             
             sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
