@@ -8,23 +8,12 @@ def random_label_split(label, k, choices):
   y_mask = torch.zeros_like(label)
   indices = []
 
-  # for i in range(bs):
-  #   label_idx = torch.nonzero(label[i], as_tuple=False)  # [0, 1, 14]
-  #   rand_idx = torch.randperm(len(label_idx))[:k]        # [2]
-  #   target = label_idx[rand_idx]                         # [14]
-  #   y_mask[i, target] = 1
-  #   choices[target] += 1
-  #   indices.append(target)
-
   for i in range(bs):
-    # Use label vector as multinomial distribution, which supresses non-present classes.
-    # If vanilla training, a class is uniformally sampled. If using cutmix/mixup,
-    # classes are sampled with prob. proportional to their retained areas.
-    p = label[i]
-    target = torch.multinomial(p, k)
+    label_idx = torch.nonzero(label[i] > 0.5)      # [0, 1, 14]
+    rand_idx = torch.randperm(len(label_idx))[:k]  # [2]
+    target = label_idx[rand_idx]                   # [14]
     y_mask[i, target] = 1
     choices[target] += 1
-
     indices.append(target)
 
   return y_mask, indices
@@ -58,7 +47,7 @@ def least_chosen_label_split(label, k, choices, gamma=1.0):
   indices = []
 
   for i in range(bs):
-    label_i = torch.nonzero(label[i]).ravel()
+    label_i = torch.nonzero(label[i] > 0.5).ravel()
     min_i = choices[label_i].argsort()[:k]
     target = label_i[min_i]
 

@@ -28,6 +28,109 @@ class Iterator:
     return data
 
 
+class DatasetInfo:
+
+  def __init__(self, meta, classes, num_classes):
+    self.meta = meta
+    self.classes = classes
+    self.num_classes = num_classes
+
+  @classmethod
+  def from_metafile(cls, dataset):
+    META = read_json(os.path.join(DATA_DIR, dataset, 'meta.json'))
+    CLASSES = np.asarray(META['class_names'])
+    NUM_CLASSES = META['classes']
+
+    return cls(META, CLASSES, NUM_CLASSES)
+
+
+def get_classification_datasets(
+  dataset,
+  data_dir,
+  augment,
+  image_size,
+  cutmix_prob=1.,
+  mixup_prob=1.,
+  train_transforms=None,
+  valid_transforms=None,
+):
+  print(f'Loading {dataset} dataset')
+
+  if dataset == 'voc12':
+    from . import voc12
+    train = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
+    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
+  else:
+    from . import coco14
+    train = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
+    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
+
+  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
+
+  info = DatasetInfo.from_metafile(dataset)
+  train.info = info
+  valid.info = info
+
+  return train, valid
+
+
+def get_segmentation_datasets(
+  dataset,
+  data_dir,
+  augment,
+  image_size,
+  pseudo_masks_dir=None,
+  cutmix_prob=1.,
+  mixup_prob=1.,
+  train_transforms=None,
+  valid_transforms=None,
+):
+  print(f'Loading {dataset} dataset')
+
+  if dataset == 'voc12':
+    from . import voc12
+    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms)
+    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms)
+  else:
+    from . import coco14
+    train = coco14.COCO14SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
+    valid = coco14.COCO14SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
+
+  info = DatasetInfo.from_metafile(dataset)
+  train.info = info
+  valid.info = info
+
+  return train, valid
+
+
+def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
+  if dataset == 'voc12':
+    from . import voc12
+    infer = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
+  else:
+    from . import coco14
+    infer = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
+
+  infer.info = DatasetInfo.from_metafile(dataset)
+
+  return infer
+
+
+def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
+  if 'cutormixup' in augment:
+    print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+  else:
+    if 'cutmix' in augment:
+      print(f'Applying cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
+      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+    if 'mixup' in augment:
+      print(f'Applying mixup num_mix=1, beta=1., prob={mixup_prob}')
+      dataset = MixUp(dataset, num_mix=1, beta=1., prob=mixup_prob)
+
+  return dataset
+
+
 def imagenet_stats():
   return (
     [0.485, 0.456, 0.406],
@@ -99,108 +202,3 @@ def get_segmentation_transforms(
   ])
 
   return tt, tv
-
-
-def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
-  if 'cutormixup' in augment:
-    print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
-  else:
-    if 'cutmix' in augment:
-      print(f'Applying cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
-    if 'mixup' in augment:
-      print(f'Applying mixup num_mix=1, beta=1., prob={mixup_prob}')
-      dataset = MixUp(dataset, num_mix=1, beta=1., prob=mixup_prob)
-
-  return dataset
-
-
-def get_classification_datasets(
-  dataset,
-  data_dir,
-  augment,
-  image_size,
-  cutmix_prob=1.,
-  mixup_prob=1.,
-  train_transforms=None,
-  valid_transforms=None,
-):
-  print(f'Loading {dataset} dataset')
-
-  if dataset == 'voc12':
-    from . import voc12
-    train = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
-    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
-  else:
-    from . import coco14
-    train = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
-    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
-
-  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
-
-  info = DatasetInfo.from_metafile(dataset)
-  train.info = info
-  valid.info = info
-
-  return train, valid
-
-
-def get_segmentation_datasets(
-  dataset,
-  data_dir,
-  augment,
-  image_size,
-  pseudo_masks_dir=None,
-  cutmix_prob=1.,
-  mixup_prob=1.,
-  train_transforms=None,
-  valid_transforms=None,
-):
-  print(f'Loading {dataset} dataset')
-
-  if dataset == 'voc12':
-    from . import voc12
-    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms)
-    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms)
-  else:
-    from . import coco14
-    train = coco14.COCO14SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
-    valid = coco14.COCO14SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
-
-  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
-
-  info = DatasetInfo.from_metafile(dataset)
-  train.info = info
-  valid.info = info
-
-  return train, valid
-
-
-def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
-  if dataset == 'voc12':
-    from . import voc12
-    infer = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
-  else:
-    from . import coco14
-    infer = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
-
-  infer.info = DatasetInfo.from_metafile(dataset)
-
-  return infer
-
-
-class DatasetInfo:
-
-  def __init__(self, meta, classes, num_classes):
-    self.meta = meta
-    self.classes = classes
-    self.num_classes = num_classes
-
-  @classmethod
-  def from_metafile(cls, dataset):
-    META = read_json(os.path.join(DATA_DIR, dataset, 'meta.json'))
-    CLASSES = np.asarray(META['class_names'])
-    NUM_CLASSES = META['classes']
-
-    return cls(META, CLASSES, NUM_CLASSES)
