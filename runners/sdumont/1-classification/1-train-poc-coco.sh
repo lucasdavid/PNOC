@@ -121,7 +121,11 @@ run_training () {
         --data_dir          $DATA_DIR
 }
 
-TAG=$DATASET-$ARCH-poc@$OC_NAME
+# TAG=$DATASET-$ARCH-poc@$OC_NAME
+# run_training
+
+LABELSMOOTHING=0.1
+TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
 run_training
 
 # OC_NAME=rs269ra

@@ -238,6 +238,8 @@ if __name__ == '__main__':
 
   for iteration in range(max_iteration):
     images, labels = train_iterator.get()
+    
+    optimizer.zero_grad()
 
     #################################################################################################
     logits = model(images.to(DEVICE))
@@ -247,7 +249,6 @@ if __name__ == '__main__':
     loss = class_loss
     #################################################################################################
 
-    optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
