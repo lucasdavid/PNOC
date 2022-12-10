@@ -81,8 +81,8 @@ parser.add_argument("--oc-k", default=1.0, type=float)
 parser.add_argument("--oc-k-init", default=1.0, type=float)
 parser.add_argument("--oc-k-schedule", default=0, type=float)
 
-parser.add_argument("--ow", default=.0, type=float)
-parser.add_argument("--ow-init", default=1.0, type=float)
+parser.add_argument("--ow", default=1.0, type=float)
+parser.add_argument("--ow-init", default=0, type=float)
 parser.add_argument("--ow-schedule", default=0.5, type=float)
 
 if __name__ == "__main__":

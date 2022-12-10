@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-poc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=14:00:00
+#SBATCH -J tr-apoc
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/apoc-%j.out
+#SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -40,7 +40,7 @@ export PYTHONPATH=$(pwd)
 # export OMP_NUM_THREADS=16
 
 PY=python3.9
-SOURCE=scripts/cam/train_poc.py
+SOURCE=scripts/cam/train_apoc.py
 WORKERS=16
 DEVICES=0,1,2,3
 
@@ -117,6 +117,9 @@ run_training () {
         --oc-strategy       $OC_STRATEGY     \
         --oc-focal-momentum $OC_F_MOMENTUM   \
         --oc-focal-gamma    $OC_F_GAMMA      \
+        --ow                $OW              \
+        --ow-init           $OW_INIT         \
+        --ow-schedule       $OW_SCHEDULE     \
         --dataset           $DATASET         \
         --data_dir          $DATA_DIR
 }
@@ -134,68 +137,17 @@ run_inference () {
     --data_dir          $DATA_DIR        &
 }
 
-# TAG=$DATASET-$ARCH-poc@$OC_NAME
-# run_training
 
 OC_NAME=rs269ra
 OC_PRETRAINED=experiments/models/resnest269@randaug.pth
 OC_ARCHITECTURE=resnest269
 LABELSMOOTHING=0.1
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r2
+OW=1.0
+OW_INIT=1.0
+OW_SCHEDULE=0
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r1
 run_training
-
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r3
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r2
 run_training
-
-DEVICES=0
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
-run_inference
-
-DEVICES=1
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r2
-run_inference
-
-DEVICES=2
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r3
-run_inference
-
-wait
-
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
-echo $TAG
-
-CUDA_VISIBLE_DEVICES=""                                \
-$PY scripts/evaluate.py                                \
-  --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
-  --domain $DOMAIN                                     \
-  --gt_dir "$DATA_DIR"SegmentationClass                \
-  --min_th 0.05 \
-  --max_th 0.9  \
-  --step_th 0.05
-echo "=============================="
-
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r1
-echo $TAG
-
-CUDA_VISIBLE_DEVICES=""                                \
-$PY scripts/evaluate.py                                \
-  --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
-  --domain $DOMAIN                                     \
-  --gt_dir "$DATA_DIR"SegmentationClass                \
-  --min_th 0.05 \
-  --max_th 0.9  \
-  --step_th 0.05
-echo "=============================="
-
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME-r2
-echo $TAG
-
-CUDA_VISIBLE_DEVICES=""                                \
-$PY scripts/evaluate.py                                \
-  --experiment_name "$TAG@train@scale=0.5,1.0,1.5,2.0" \
-  --domain $DOMAIN                                     \
-  --gt_dir "$DATA_DIR"SegmentationClass                \
-  --min_th 0.05 \
-  --max_th 0.9  \
-  --step_th 0.05
-echo "=============================="
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r3
+run_training

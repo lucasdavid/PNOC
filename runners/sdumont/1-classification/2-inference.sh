@@ -68,14 +68,19 @@ run_experiment () {
     --data_dir       $DATA_DIR              &
 }
 
-WEIGHTS=resnest269@normal@puzzleoc@b16-rep3
+WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra
 TAG=poc/$WEIGHTS
 DEVICES=0
 run_experiment
 
-WEIGHTS=resnest269@normal@puzzleoc@randaug@b16@random
+WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r2
 TAG=poc/$WEIGHTS
 DEVICES=1
+run_experiment
+
+WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r3
+TAG=poc/$WEIGHTS
+DEVICES=2
 run_experiment
 
 wait
