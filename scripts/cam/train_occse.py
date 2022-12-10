@@ -141,8 +141,6 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   param_groups = model.get_parameter_groups()
 
-  gap_fn = model.gap2d
-
   model = model.cuda()
   model.train()
 
@@ -205,7 +203,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter([
+  train_meter = MetricsContainer([
     'loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'
   ])
 
@@ -300,7 +298,7 @@ if __name__ == '__main__':
     loss.backward()
     optimizer.step()
 
-    occse.update_focal_factor(
+    occse.update_focal(
       targets,
       labels_oc,
       cl_logits.to(targets),
@@ -310,7 +308,7 @@ if __name__ == '__main__':
     )
 
     # region logging
-    train_meter.add({
+    train_meter.update({
       'loss': loss.item(),
       'c_loss': c_loss.item(),
       # 'p_loss': p_loss.item(),

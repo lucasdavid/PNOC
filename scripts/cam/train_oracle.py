@@ -147,8 +147,6 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   param_groups = model.get_parameter_groups()  # (exclude_partial_names=['bn'])
 
-  gap_fn = model.gap2d
-
   model = model.to(DEVICE)
   model.train()
 
@@ -192,7 +190,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
+  train_meter = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
@@ -276,7 +274,7 @@ if __name__ == '__main__':
 
     labels_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
     c_loss = class_loss_fn(logits, labels_sm).mean()
-    p_loss = class_loss_fn(gap_fn(re_features), labels_sm).mean()
+    p_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
 
     re_mask = targets.unsqueeze(2).unsqueeze(3)
     re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
@@ -292,7 +290,7 @@ if __name__ == '__main__':
     optimizer.step()
 
     # region logging
-    train_meter.add(
+    train_meter.update(
       {
         'loss': loss.item(),
         'c_loss': c_loss.item(),

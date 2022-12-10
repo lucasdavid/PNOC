@@ -36,6 +36,13 @@ def resize_for_tensors(tensors, size, mode='bilinear', align_corners=None):
   return F.interpolate(tensors, size, mode=mode, align_corners=align_corners)
 
 
+def gap2d(x, keepdims=False):
+    x = torch.mean(x.view(x.size(0), x.size(1), -1), -1)
+    if keepdims:
+      x = x.view(x.size(0), x.size(1), 1, 1)
+    return x
+
+
 # Losses
 
 def L1_Loss(A_tensors, B_tensors):

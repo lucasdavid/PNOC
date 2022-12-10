@@ -7,8 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from tools.ai.torch_utils import freeze_and_eval, resize_for_tensors
 from torchvision import models
+
+from tools.ai.torch_utils import freeze_and_eval, gap2d, resize_for_tensors
 
 from . import ccam, regularizers
 from .aff_utils import PathIndex
@@ -138,12 +139,6 @@ class Backbone(nn.Module):
     if not self.trainable_stem:
       self.not_training.extend([self.stage1])
 
-  def gap2d(self, x, keepdims=False):
-    x = torch.mean(x.view(x.size(0), x.size(1), -1), -1)
-    if keepdims:
-      x = x.view(x.size(0), x.size(1), 1, 1)
-    return x
-
   def initialize(self, modules):
     for m in modules:
       if isinstance(m, nn.Conv2d):
@@ -234,10 +229,10 @@ class Classifier(Backbone):
 
     if with_cam:
       features = self.classifier(x)
-      logits = self.gap2d(features)
+      logits = gap2d(features)
       return logits, features
     else:
-      x = self.gap2d(x, keepdims=True)
+      x = gap2d(x, keepdims=True)
       logits = self.classifier(x).view(-1, self.num_classes)
       return logits
 

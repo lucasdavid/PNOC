@@ -169,7 +169,7 @@ if __name__ == '__main__':
     }
 
     train_timer = Timer()
-    train_meter = Average_Meter([
+    train_meter = MetricsContainer([
         'loss', 
         'bg_loss', 'fg_loss', 'neg_loss',
     ])
@@ -211,7 +211,7 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
 
-        train_meter.add({
+        train_meter.update({
             'loss' : loss.item(), 
 
             'bg_loss' : bg_pos_aff_loss.item(),

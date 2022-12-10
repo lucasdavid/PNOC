@@ -173,7 +173,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss'])
+  train_meter = MetricsContainer(['loss', 'class_loss'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.1, 0.50, 0.05))
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     loss.backward()
     optimizer.step()
 
-    train_meter.add({'loss': loss.item(), 'class_loss': class_loss.item()})
+    train_meter.update({'loss': loss.item(), 'class_loss': class_loss.item()})
 
     #################################################################################################
     # For Log

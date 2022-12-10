@@ -339,7 +339,7 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU, best_iou
 
-  train_meter = Average_Meter(['loss', 'positive_loss', 'negative_loss', 'hint_loss'])
+  train_meter = MetricsContainer(['loss', 'positive_loss', 'negative_loss', 'hint_loss'])
 
   for epoch in range(args.max_epoch):
     model.train()
@@ -382,7 +382,7 @@ if __name__ == '__main__':
 
       ccam = torch.sigmoid(output)
 
-      train_meter.add(
+      train_meter.update(
         {
           'loss': loss.item(),
           'hint_loss': loss_h.item(),

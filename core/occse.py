@@ -113,7 +113,7 @@ def calculate_focal_factor(target, output, gamma=2.0, alpha=0.25, apply_class_ba
   return factor.detach().float()
 
 
-def update_focal_factor(
+def update_focal(
   labels,
   labels_oc,
   cl_logits,

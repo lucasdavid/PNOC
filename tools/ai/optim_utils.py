@@ -39,10 +39,10 @@ def get_optimizer(lr, wd, max_step, param_groups):
   )
 
 
-def linear_schedule(step, max_step, a_0=0., a_n=1.0, rate=1.0, contraint=min):
-  if rate == 0:
+def linear_schedule(step, max_step, a_0=0., a_n=1.0, schedule=1.0, contraint=min):
+  if schedule == 0:
     return a_n
 
-  rate = a_0 + (a_n - a_0) * step / (max_step * rate)
+  rate = a_0 + (a_n - a_0) * step / (max_step * schedule)
   rate = contraint(rate, a_n)
   return rate

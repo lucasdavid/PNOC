@@ -38,28 +38,28 @@ class Logger:
     def __init__(self):
         pass
 
-class Average_Meter:
-    def __init__(self, keys):
-        self.keys = keys
+class MetricsContainer:
+    def __init__(self, metric_names):
+        self.metric_names = metric_names
         self.clear()
     
-    def add(self, dic):
-        for key, value in dic.items():
-            self.data_dic[key].append(value)
+    def update(self, data):
+        for n, v in data.items():
+            self._metrics_history[n].append(v)
 
-    def get(self, keys=None, clear=False):
-        if keys is None:
-            keys = self.keys
-        
-        dataset = [float(np.mean(self.data_dic[key])) for key in keys]
+    def get(self, metrics=None, clear=False):
+        if metrics is None:
+            metrics = self.metric_names
+
+        metric_values = [float(np.mean(self._metrics_history[k])) for k in metrics]
+
         if clear:
             self.clear()
 
-        if len(dataset) == 1:
-            dataset = dataset[0]
-            
-        return dataset
+        if len(metric_values) == 1:
+            metric_values = metric_values[0]
+
+        return metric_values
     
     def clear(self):
-        self.data_dic = {key : [] for key in self.keys}
-
+        self._metrics_history = {n: [] for n in self.metric_names}

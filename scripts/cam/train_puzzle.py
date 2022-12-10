@@ -140,8 +140,6 @@ if __name__ == '__main__':
   )
   param_groups = model.get_parameter_groups()
 
-  gap_fn = model.gap2d
-
   model = model.cuda()
   model.train()
 
@@ -190,7 +188,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha'])
+  train_meter = MetricsContainer(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
@@ -278,7 +276,7 @@ if __name__ == '__main__':
     class_loss = class_loss_fn(logits, labels_sm).mean()
 
     if 'pcl' in loss_option:
-      p_class_loss = class_loss_fn(gap_fn(re_features), labels_sm).mean()
+      p_class_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
     else:
       p_class_loss = torch.zeros(1, dtype=logits.device)
 
@@ -318,7 +316,7 @@ if __name__ == '__main__':
     loss.backward()
     optimizer.step()
 
-    train_meter.add(
+    train_meter.update(
       {
         'loss': loss.item(),
         'class_loss': class_loss.item(),

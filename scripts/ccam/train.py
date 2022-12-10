@@ -213,7 +213,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = Average_Meter(['loss', 'class_loss'])
+  train_meter = MetricsContainer(['loss', 'class_loss'])
 
   best_train_mIoU = -1
   thresholds = np.arange(0., 0.50, 0.05).astype(float).tolist()
@@ -267,7 +267,7 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU, best_iou
 
-  train_meter = Average_Meter(['loss', 'positive_loss', 'negative_loss'])
+  train_meter = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
 
   for epoch in range(args.max_epoch):
     model.train()
@@ -292,7 +292,7 @@ if __name__ == '__main__':
       if IS_POSITIVE:
         ccams = 1 - ccams
 
-      train_meter.add(
+      train_meter.update(
         {
           'loss': loss.item(),
           'positive_loss': loss1.item() + loss3.item(),
