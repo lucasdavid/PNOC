@@ -1,8 +1,8 @@
 import argparse
-from heapq import nlargest
 import multiprocessing
 import os
 import sys
+from core.datasets import DatasetInfo
 
 import numpy as np
 import pandas as pd
@@ -18,10 +18,11 @@ parser.add_argument('--experiment_name', type=str, required=True)
 parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument("--threshold", default=None, type=float)
 
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument("--domain", default='train', type=str)
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
-parser.add_argument("--predict_dir", default='', type=str)
+parser.add_argument("--pred_dir", default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
 parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODES)
 parser.add_argument("--sal_threshold", default=None, type=float)
@@ -36,18 +37,17 @@ parser.add_argument('--step_th', default=0.05, type=float)
 
 args = parser.parse_args()
 
-predict_folder = './experiments/predictions/{}/'.format(args.experiment_name)
-gt_dir = args.gt_dir
-sal_dir = args.sal_dir
+GT_DIR = args.gt_dir
+SAL_DIR = args.sal_dir
+PRED_DIR = (
+  args.pred_dir
+  or f'./experiments/predictions/{args.experiment_name}/'
+)
 
-args.list = './data/voc12/' + args.domain + '.txt'
-args.predict_dir = predict_folder
+args.list = f'./data/voc12/{args.domain}.txt'
 
-CLASSES = [
-  'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-  'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
-]
-NUM_CLASSES = len(CLASSES)
+INFO = DatasetInfo.from_metafile(args.dataset)
+CLASSES = ['background'] + INFO.classes.tolist()
 
 
 def compare(start, step, TP, P, T, name_list):
@@ -55,13 +55,13 @@ def compare(start, step, TP, P, T, name_list):
     name = name_list[idx]
 
     img_file = os.path.join(args.data_dir, 'JPEGImages', name + '.jpg')
-    npy_file = os.path.join(predict_folder, name + '.npy')
-    png_file = os.path.join(predict_folder, name + '.png')
-    label_file = os.path.join(gt_dir, name + '.png')
-    sal_file = os.path.join(sal_dir, name + '.png') if sal_dir else None
+    npy_file = os.path.join(PRED_DIR, name + '.npy')
+    png_file = os.path.join(PRED_DIR, name + '.png')
+    label_file = os.path.join(GT_DIR, name + '.png')
+    sal_file = os.path.join(SAL_DIR, name + '.png') if SAL_DIR else None
 
     if os.path.exists(png_file):
-      y_pred = np.array(Image.open(predict_folder + name + '.png'))
+      y_pred = np.array(Image.open(PRED_DIR + name + '.png'))
 
       keys, cam = np.unique(y_pred, return_inverse=True)
       cam = cam.reshape(y_pred.shape)
@@ -70,7 +70,7 @@ def compare(start, step, TP, P, T, name_list):
       try:
         data = np.load(npy_file, allow_pickle=True).item()
       except:
-        print(f'File {npy_file} is corrupted', file=sys.stderr)
+        print(f'  {name}.npy is corrupted', file=sys.stderr)
         continue
 
       keys = data['keys']
@@ -107,7 +107,7 @@ def compare(start, step, TP, P, T, name_list):
     valid_mask = y_true < 255
     mask = (y_pred == y_true) * valid_mask
 
-    for i in range(NUM_CLASSES):
+    for i in range(len(CLASSES)):
       P[i].acquire()
       P[i].value += np.sum((y_pred == i) * valid_mask)
       P[i].release()
@@ -123,7 +123,7 @@ def do_python_eval(name_list, num_workers=8):
   TP = []
   P = []
   T = []
-  for i in range(NUM_CLASSES):
+  for i in range(len(CLASSES)):
     TP.append(multiprocessing.Value('i', 0, lock=True))
     P.append(multiprocessing.Value('i', 0, lock=True))
     T.append(multiprocessing.Value('i', 0, lock=True))
@@ -141,7 +141,7 @@ def do_python_eval(name_list, num_workers=8):
   P_TP = []
   FP_ALL = []
   FN_ALL = []
-  for i in range(NUM_CLASSES):
+  for i in range(len(CLASSES)):
     IoU.append(TP[i].value / (T[i].value + P[i].value - TP[i].value + 1e-10))
     T_TP.append(T[i].value / (TP[i].value + 1e-10))
     P_TP.append(P[i].value / (TP[i].value + 1e-10))
@@ -149,7 +149,7 @@ def do_python_eval(name_list, num_workers=8):
     FN_ALL.append((T[i].value - TP[i].value) / (T[i].value + P[i].value - TP[i].value + 1e-10))
 
   loglist = {}
-  for i in range(NUM_CLASSES):
+  for i in range(len(CLASSES)):
     loglist[CLASSES[i]] = IoU[i] * 100
 
   miou = np.mean(np.array(IoU))
@@ -177,7 +177,7 @@ def run():
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and sal_dir is None and args.mode != 'png' else [args.threshold]
+    if args.threshold is None and SAL_DIR is None and args.mode != 'png' else [args.threshold]
   )
 
   for t in thresholds:

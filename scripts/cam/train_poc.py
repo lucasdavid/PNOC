@@ -42,6 +42,7 @@ parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
+parser.add_argument('--oc-mask-globalnorm', default=True, type=str2bool)
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
 parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 
@@ -303,7 +304,7 @@ if __name__ == '__main__':
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
     labels_oc = (targets - labels_mask).clip(min=0)
 
-    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask))
+    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
     o_loss = class_loss_fn(
       cl_logits,
       label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)

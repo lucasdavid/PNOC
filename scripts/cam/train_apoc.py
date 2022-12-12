@@ -4,7 +4,9 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from sklearn import metrics as skmetrics
 
 from core import occse
 from core.datasets import *
@@ -84,6 +86,9 @@ parser.add_argument("--oc-k-schedule", default=0, type=float)
 parser.add_argument("--ow", default=1.0, type=float)
 parser.add_argument("--ow-init", default=0, type=float)
 parser.add_argument("--ow-schedule", default=0.5, type=float)
+parser.add_argument("--oc-train-interval-steps", default=1, type=int)
+parser.add_argument("--oc-train-masks", default="features", choices=["features", "cams"], type=str)
+parser.add_argument("--oc_train_mask_threshold", default=0.2, type=float)
 
 if __name__ == "__main__":
   # Arguments
@@ -259,12 +264,18 @@ if __name__ == "__main__":
 
     meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
 
+    preds = []
+    targets = []
+
     with torch.no_grad():
       for step, (images, labels, gt_masks) in enumerate(loader):
         images = images.to(DEVICE)
         labels = labels.to(DEVICE)
 
         _, features = cgnet(images, with_cam=True)
+
+        preds += [to_numpy(torch.sigmoid(ocnet(images)))]
+        targets += [to_numpy(labels)]
 
         # features = resize_for_tensors(features, images.size()[-2:])
         # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
@@ -285,6 +296,14 @@ if __name__ == "__main__":
             pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
 
             meter_dic[th].add(pred_mask, gt_mask)
+    
+    preds, targets = (np.concatenate(preds, axis=0),
+                      np.concatenate(targets, axis=0))
+    
+    r = skmetrics.precision_recall_fscore_support(targets, preds, average='macro')
+    log(f"oc predictions (macro):    precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
+    r = skmetrics.precision_recall_fscore_support(targets, preds, average='weighted')
+    log(f"oc predictions (weighted): precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
 
     best_th = 0.0
     best_mIoU = 0.0
@@ -360,15 +379,30 @@ if __name__ == "__main__":
     ##############################
     # Ordinary Classifier Training
     ##############################
-    ocnet.train()
-    ocopt.zero_grad()
-    
-    cl_logits = ocnet(images_mask.detach())
+    if (step + 1) % args.oc_train_interval_steps != 0:
+      # Skip OC-CSE training this step.
+      ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
+    else:
+      ocnet.train()
+      ocopt.zero_grad()
 
-    ot_loss = class_loss_fn(cl_logits, targets_sm).mean()
-    ot_loss.backward()
-    ocopt.step()
-    
+      if args.oc_train_masks == "cams":
+        features = features.cpu()
+        mask = features[labels_mask == 1, :, :].unsqueeze(1)
+        mask = F.relu(mask)
+        mask = resize_for_tensors(mask, images.size()[2:])
+        mask /= F.adaptive_max_pool2d(mask, (1, 1)) + 1e-5
+        mask = mask > args.oc_train_mask_threshold
+        images_mask = (images * (1 - mask.to(images)))
+
+      images_mask = images_mask.detach()
+
+      cl_logits = ocnet(images_mask.detach())
+
+      ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
+      ot_loss.backward()
+      ocopt.step()
+
     # region logging
     train_metrics.update(
       {
@@ -451,15 +485,15 @@ if __name__ == "__main__":
       write_json(data_path, data_dic)
 
       log(
-        "\niteration       = {iteration:,}\n"
-        "time            = {time:.0f} sec"
+        "iteration       = {iteration:,}\n"
+        "time            = {time:.0f} sec\n"
         "threshold       = {threshold:.2f}\n"
         "train_mIoU      = {train_mIoU:.2f}%\n"
         "best_train_mIoU = {best_train_mIoU:.2f}%\n"
-        "train_iou       = {train_iou}\n".format(**data)
+        "train_iou       = {train_iou}".format(**data)
       )
 
-      log(f"saving weights `{model_path}`")
+      log(f"saving weights `{model_path}`\n")
       save_model_fn()
     # endregion
 
