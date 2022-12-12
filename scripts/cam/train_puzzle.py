@@ -269,8 +269,8 @@ if __name__ == '__main__':
     # Losses
     ###############################################################################
     if args.level == 'cam':
-      features = make_cam(features)
-      re_features = make_cam(re_features)
+      features = make_cam(features, inplace=False)
+      re_features = make_cam(re_features, inplace=False)
 
     labels_sm = label_smoothing(targets, args.label_smoothing).to(logits)
     class_loss = class_loss_fn(logits, labels_sm).mean()

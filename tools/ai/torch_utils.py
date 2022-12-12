@@ -64,23 +64,26 @@ def shannon_entropy_loss(logits, activation=torch.sigmoid, epsilon=1e-5):
   return -torch.sum(v * torch.log(v + epsilon), dim=1).mean()
 
 
-def make_cam(x, epsilon=1e-5, shift_min=False, global_norm=False):
+def make_cam(x, eps=1e-5, shift_min=False, global_norm=False, inplace=True):
   x = F.relu(x)
 
-  b, c, h, w = x.size()
-
   if global_norm:
-    x_max = x.max()
+    x_min = x.min() if shift_min else 0
+    x_max = x.max() - x_min
   else:
-    flat_x = x.view(b, c, (h * w))
-    x_max = flat_x.max(axis=-1)[0].view((b, c, 1, 1))
+    b, c, h, w = x.size()
+    flat_x = x.view(b, c, -1)
+    x_min = flat_x.min(axis=-1)[0].view((b, c, 1, 1)) if shift_min else 0
+    x_max = flat_x.max(axis=-1)[0].view((b, c, 1, 1)) - x_min
   
-  if shift_min:
-    x_min = flat_x.min(axis=-1)[0].view((b, c, 1, 1))
-    x -= x_min
-    x_max -= x_min
+  if inplace:
+    if shift_min:
+      x -= x_min
+    x /= x_max + eps
+  else:
+    x = (x - x_min) / (x_max + eps)
 
-  return F.relu(x - epsilon) / (x_max + epsilon)
+  return x
 
 
 def one_hot_embedding(label, classes):
