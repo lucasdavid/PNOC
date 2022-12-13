@@ -300,9 +300,9 @@ if __name__ == "__main__":
     preds, targets = (np.concatenate(preds, axis=0),
                       np.concatenate(targets, axis=0))
     
-    r = skmetrics.precision_recall_fscore_support(targets, preds, average='macro')
+    r = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='macro')
     log(f"oc predictions (macro):    precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
-    r = skmetrics.precision_recall_fscore_support(targets, preds, average='weighted')
+    r = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='weighted')
     log(f"oc predictions (weighted): precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
 
     best_th = 0.0
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     # CAM Generator Training
     ##############################
     cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
-    
+
     # Normal
     logits, features = cgnet(images, with_cam=True)
     
@@ -366,7 +366,7 @@ if __name__ == "__main__":
     cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
     cg_loss.backward()
     cgopt.step()
-    
+
     occse.update_focal(
       targets,
       labels_oc,
