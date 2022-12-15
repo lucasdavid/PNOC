@@ -366,7 +366,7 @@ if __name__ == '__main__':
 
       log(
         '\niteration       = {iteration:,}\n'
-        'time            = {time:.0f} sec'
+        'time            = {time:.0f} sec\n'
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
         'best_train_mIoU = {best_train_mIoU:.2f}%\n'

@@ -184,6 +184,7 @@ def get_classification_transforms(
 
   tt = transforms.Compose(tt)
   tv = transforms.Compose([
+    # RandomResize_For_Segmentation(image_size, image_size),
     Normalize_For_Segmentation(mean, std),
     Top_Left_Crop_For_Segmentation(image_size),
     Transpose_For_Segmentation()
