@@ -40,10 +40,10 @@ class SimMinLoss(nn.Module):
 
   def forward(self, embedded_bg, embedded_fg):
     """
-        :param embedded_fg: [N, C]
-        :param embedded_bg: [N, C]
-        :return:
-        """
+    :param embedded_fg: [N, C]
+    :param embedded_bg: [N, C]
+    :return:
+    """
     if self.metric == 'l2':
       raise NotImplementedError
     elif self.metric == 'cos':

@@ -197,13 +197,7 @@ if __name__ == '__main__':
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
   ]
 
-  optimizer = PolyOptimizer([
-      {'params': param_groups[0],'lr': args.lr,'weight_decay': args.wd},
-      {'params': param_groups[1],'lr': 2 * args.lr,'weight_decay': 0},
-      {'params': param_groups[2],'lr': 10 * args.lr,'weight_decay': args.wd},
-      {'params': param_groups[3],'lr': 20 * args.lr,'weight_decay': 0}
-    ],
-    lr=args.lr, momentum=0.9, weight_decay=args.wd, max_step=max_iteration)
+  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
 
   #################################################################################################
   # Train
@@ -226,7 +220,8 @@ if __name__ == '__main__':
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: MIoUCalcFromNames(['background', 'foreground']) for th in thresholds}
+    classes = ['background', 'foreground']
+    meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
 
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
@@ -234,12 +229,11 @@ if __name__ == '__main__':
         _, _, ccams = model(images.to(DEVICE))
 
         ccams = resize_for_tensors(ccams.cpu(), (H, W))
-        ccams = make_cam(ccams)
-        ccams = ccams.squeeze()
-        ccams = to_numpy(ccams)
+        ccams = to_numpy(make_cam(ccams).squeeze())
+        masks = to_numpy(masks)
 
         for i in range(B):
-          y_i = to_numpy(masks[i])
+          y_i = masks[i]
           valid_mask = y_i < 255
           bg_mask = y_i == 0
 
@@ -250,22 +244,11 @@ if __name__ == '__main__':
 
           ccam_i = ccams[i]
 
-          for t in thresholds:
+          for t, meter in meters.items():
             ccam_b = (ccam_i <= t).astype(y_i.dtype)
-            meter_dic[t].add(ccam_b, y_i)
+            meter.add(ccam_b, y_i)
 
-    best_th = 0.0
-    best_mIoU = 0.0
-    best_iou = {}
-
-    for t in thresholds:
-      mIoU, _, iou, *_ = meter_dic[t].get(clear=True, detail=True)
-      if best_mIoU < mIoU:
-        best_th = t
-        best_mIoU = mIoU
-        best_iou = iou  # .astype(float).round(2).float()
-
-    return best_th, best_mIoU, best_iou
+    return result_miou_from_thresholds(meters, classes)
 
   train_meter = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
 

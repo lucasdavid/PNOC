@@ -42,11 +42,11 @@ def main(args):
   DEVICE = args.device
   SIZE = args.image_size
 
-  print('Train Configuration')
+  print('Evaluation Configuration')
   pad = max(map(len, vars(args))) + 1
   for k, v in vars(args).items():
     print(f'{k.ljust(pad)}: {v}')
-  print('===================')
+  print('========================')
 
   log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
@@ -58,11 +58,6 @@ def main(args):
   set_seed(SEED)
   log = lambda string='': log_print(string, log_path)
 
-  # transform = transforms.Compose([
-  #   transforms.Resize(size=(SIZE, SIZE)),
-  #   transforms.ToTensor(),
-  #   transforms.Normalize(*imagenet_stats())
-  # ])
   transform = transforms.Compose([
     transforms.Resize(size=(SIZE, SIZE)),
     Normalize(*imagenet_stats()),
