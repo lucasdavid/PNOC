@@ -1,31 +1,48 @@
+export PYTHONPATH=$(pwd)
+export OMP_NUM_THREADS=8
 
 PY=python
-SOURCE=ccam_train_with_cam_hints.py
-DEVICE=cpu
+SOURCE=scripts/ccam/train.py
+DEVICE=cuda
+DEVICES=0
 WORKERS=8
+
+DATASET=voc12
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
+# DATASET=coco14
+# DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+
 IMAGE_SIZE=64
 BATCH_SIZE=8
+EPOCHS=5
+ACCUMULATE_STEPS=1
 
-ARCHITECTURE=resnet38d
+ARCHITECTURE=resnet50
+ARCH=rn50
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
+S4_OUT_FEATURES=1024
+WEIGHTS=./experiments/models/moco_r50_v2-e3b0c442.pth  # imagenet
 
-TAG=ccam@$ARCHITECTURE
+ALPHA=0.25
+LR=0.0001
 
-CAMS_DIR=experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
+TAG=ccam-$ARCH-moco-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
-
-$PY $SOURCE                          \
-  --tag             $TAG             \
-  --device          $DEVICE          \
-  --batch_size      $BATCH_SIZE      \
-  --num_workers     $WORKERS         \
-  --architecture    $ARCHITECTURE    \
-  --dilated         $DILATED         \
-  --mode            $MODE            \
-  --trainable-stem  $TRAINABLE_STEM  \
-  --image_size      $IMAGE_SIZE      \
-  --cams_dir        $CAMS_DIR        \
+CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
+  --tag             $TAG                  \
+  --alpha           $ALPHA                \
+  --max_epoch       $EPOCHS               \
+  --batch_size      $BATCH_SIZE           \
+  --lr              $LR                   \
+  --accumule_steps  $ACCUMULATE_STEPS     \
+  --num_workers     $WORKERS              \
+  --architecture    $ARCHITECTURE         \
+  --stage4_out_features $S4_OUT_FEATURES  \
+  --dilated         $DILATED              \
+  --mode            $MODE                 \
+  --weights         $WEIGHTS              \
+  --trainable-stem  $TRAINABLE_STEM       \
+  --image_size      $IMAGE_SIZE           \
   --data_dir        $DATA_DIR

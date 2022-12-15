@@ -131,7 +131,7 @@ class Solver(object):
                     cv2.imwrite(os.path.join(self.config.test_fold, image_id + '_sal' + '.png'), multi_fuse)
 
                     grid = make_grid(sal_image, nrow=1, padding=0, pad_value=0,
-                         normalize=True, range=None)
+                         normalize=True, value_range=None)
                     # Add 0.5 after unnormalizing to [0, 255] to round to nearest integer
                     image = grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
                     cv2.imwrite(os.path.join(self.config.test_fold, image_id + '.png'), image)
@@ -162,4 +162,3 @@ def bce2d(input, target, reduction=None):
     weights = alpha * pos + beta * neg
 
     return F.binary_cross_entropy_with_logits(input, target, weights, reduction=reduction)
-

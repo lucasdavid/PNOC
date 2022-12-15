@@ -19,8 +19,6 @@ class RandomResize:
     self.min_image_size = min_image_size
     self.max_image_size = max_image_size
 
-    self.modes = [Image.BICUBIC, Image.NEAREST]
-
   def __call__(self, image, mode=Image.BICUBIC):
     rand_image_size = random.randint(self.min_image_size, self.max_image_size)
 
@@ -39,27 +37,20 @@ class RandomResize:
 
 class RandomResize_For_Segmentation:
 
-  def __init__(self, min_image_size, max_image_size):
+  def __init__(self, min_image_size, max_image_size, scale_largest_dim=True):
     self.min_image_size = min_image_size
     self.max_image_size = max_image_size
-
-    self.modes = [Image.BICUBIC, Image.NEAREST]
+    self.scale_largest_dim = scale_largest_dim
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']
+    W, H = image.size
 
-    rand_image_size = random.randint(self.min_image_size, self.max_image_size)
+    alpha = random.randint(self.min_image_size, self.max_image_size)
+    alpha /= max(W, H) if self.scale_largest_dim else min(W, H)
 
-    w, h = image.size
-    if w < h:
-      scale = rand_image_size / h
-    else:
-      scale = rand_image_size / w
-
-    size = (int(round(w * scale)), int(round(h * scale)))
-    if size[0] == w and size[1] == h:
-      pass
-    else:
+    size = (int(round(W * alpha)), int(round(H * alpha)))
+    if size[0] != W or size[1] == H:
       data['image'] = image.resize(size, Image.BICUBIC)
       data['mask'] = mask.resize(size, Image.NEAREST)
 

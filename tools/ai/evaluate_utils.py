@@ -71,8 +71,7 @@ def calculate_mIoU(pred_mask, gt_mask):
 
 
 def accumulate_batch_iou_lowres(masks, cams, meters):
-    for b in range(len(cams)):
-        # c, h, w -> h, w, c
+    for b in range(len(masks)):
         cam = cams[b]
         gt_mask = masks[b]
 
@@ -83,6 +82,23 @@ def accumulate_batch_iou_lowres(masks, cams, meters):
             bg = np.ones_like(cam[:, :, 0]) * th
             pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
             meter.add(pred_mask, gt_mask)
+
+
+def accumulate_batch_iou_saliency(masks, ccams, meters):
+    for i in range(len(masks)):
+        y_i = masks[i]
+        valid_mask = y_i < 255
+        bg_mask = y_i == 0
+
+        y_i = np.zeros_like(y_i)
+        y_i[~bg_mask] = 1
+        y_i[~valid_mask] = 255
+
+        ccam_i = ccams[i]
+
+        for t, meter in meters.items():
+            ccam_b = (ccam_i <= t).astype(y_i.dtype)
+            meter.add(ccam_b, y_i)
 
 
 def result_miou_from_thresholds(iou_meters, classes):

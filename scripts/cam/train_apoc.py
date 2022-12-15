@@ -106,7 +106,7 @@ if __name__ == "__main__":
   SEED = args.seed
   DEVICE = args.device
 
-  wandb_run = wandb.init(
+  wb_run = wandb.init(
     name=TAG,
     job_type="train",
     entity="lerdl",
@@ -169,7 +169,7 @@ if __name__ == "__main__":
   ocnet = ocnet.to(DEVICE)
   cgnet.train()
   ocnet.train()
-  wandb.watch(cgnet, log_freq=100)
+  wandb.watch(cgnet, log_freq=3)
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
@@ -443,7 +443,5 @@ if __name__ == "__main__":
       save_model_fn()
     # endregion
 
-  write_json(data_path, data_dic)
   print(TAG)
-
-  wandb_run.finish()
+  wb_run.finish()

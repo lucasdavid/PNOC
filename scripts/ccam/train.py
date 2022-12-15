@@ -2,9 +2,8 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 # modified by Sierkinhane <sierkinhane@163.com>
 
-import sys
-
-from torch import nn
+import torch
+import wandb
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
@@ -32,7 +31,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 ###############################################################################
 # Network
@@ -40,14 +40,18 @@ parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--stage4_out_features', default=1024, type=int)
+parser.add_argument('--restore', default=None, type=str)
 
 ###############################################################################
 # Hyperparameter
 ###############################################################################
 parser.add_argument('--batch_size', default=32, type=int)
+parser.add_argument('--batch_size_val', default=32, type=int)
+parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=10, type=int)
 parser.add_argument('--depth', default=50, type=int)
 parser.add_argument('--accumule_steps', default=1, type=int)
@@ -56,9 +60,6 @@ parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
 
 parser.add_argument('--image_size', default=448, type=int)
-parser.add_argument('--min_image_size', default=320, type=int)
-parser.add_argument('--max_image_size', default=640, type=int)
-
 parser.add_argument('--print_ratio', default=0.2, type=float)
 
 parser.add_argument('--tag', default='', type=str)
@@ -68,104 +69,64 @@ parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 parser.add_argument('--alpha', type=float, default=0.25)
 
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
+
 IS_POSITIVE = True
 
-GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
-GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 
 if __name__ == '__main__':
-  # global flag
-  ###################################################################################
   # Arguments
-  ###################################################################################
   args = parser.parse_args()
-  
+
+  TAG = args.tag
+  SEED = args.seed
   DEVICE = args.device
   SIZE = args.image_size
-  BATCH_TRAIN = args.batch_size
-  BATCH_VALID = 32
-  CUTMIX = 'cutmix' in args.augment
 
-  log_dir = create_directory('./experiments/logs/')
+  wb_run = wandb.init(
+    name=TAG,
+    job_type="train",
+    entity="lerdl",
+    project="research-wsss",
+    config=args,
+    tags=[args.dataset, args.architecture, "ccam"],
+  )
+
+  log_config(vars(args), TAG)
+
   data_dir = create_directory('./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-
-  log_path = log_dir + '{}.txt'.format(args.tag)
-  data_path = data_dir + '{}.json'.format(args.tag)
-  model_path = model_dir + '{}.pth'.format(args.tag)
-  cam_path = './experiments/images/{}'.format(args.tag)
-  create_directory(cam_path)
+  cam_path = create_directory(f'./experiments/images/{TAG}')
   create_directory(cam_path + '/train')
   create_directory(cam_path + '/test')
   create_directory(cam_path + '/train/colormaps')
   create_directory(cam_path + '/test/colormaps')
 
-  set_seed(args.seed)
-  log = lambda string='': log_print(string, log_path)
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
-  log('[i] {}'.format(args.tag))
-  log()
+  set_seed(SEED)
 
-  ###################################################################################
-  # Transform, Dataset, DataLoader
-  ###################################################################################
-  imagenet_mean = [0.485, 0.456, 0.406]
-  imagenet_std = [0.229, 0.224, 0.225]
-
-  train_transform = transforms.Compose(
-    [
-      transforms.Resize(size=(512, 512)),
-      transforms.RandomHorizontalFlip(),
-      transforms.RandomCrop(size=(SIZE, SIZE)),
-      transforms.ToTensor(),
-      transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
-    ]
+  tt, tv = get_classification_transforms(512, 512, args.image_size, args.augment)
+  train_dataset, valid_dataset = get_classification_datasets(
+    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size_val, num_workers=args.num_workers, drop_last=True)
+  log_dataset(args.dataset, train_dataset, tt, tv)
 
-  test_transform = transforms.Compose(
-    [
-      Normalize_For_Segmentation(imagenet_mean, imagenet_std),
-      Top_Left_Crop_For_Segmentation(SIZE),
-      Transpose_For_Segmentation(),
-    ]
-  )
+  step_valid = len(train_loader)
+  step_log = int(step_valid * args.print_ratio)
+  step_init = args.first_epoch * step_valid
+  step_max = args.max_epoch * step_valid
+  print(f"Iterations: first={step_init} logging={step_log} validation={step_valid} max={step_max}")
 
-  meta_dic = read_json('./data/voc12/meta.json')
-  class_names = np.asarray(meta_dic['class_names'])
-  classes = len(class_names)
-
-  train_dataset = VOC12ClassificationDataset(args.data_dir, 'train_aug', train_transform)
-  if CUTMIX:
-    log('[i] Using cutmix')
-    train_dataset = CutMix(train_dataset, num_mix=1, beta=1., prob=args.cutmix_prob)
-
-  train_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'train', test_transform)
-  valid_dataset_for_seg = VOC12CAMTestingDataset(args.data_dir, 'val', test_transform)
-
-  train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
-  train_loader_for_seg = DataLoader(train_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
-  # valid_loader_for_seg = DataLoader(valid_dataset_for_seg, batch_size=BATCH_VALID, num_workers=args.num_workers)
-
-  log('[i] mean values is {}'.format(imagenet_mean))
-  log('[i] std values is {}'.format(imagenet_std))
-  log('[i] The number of class is {}'.format(classes))
-  log('[i] train_transform is {}'.format(train_transform))
-  log('[i] test_transform is {}'.format(test_transform))
-  log('[i] #train data'.format(len(train_dataset)))
-  log('[i] #valid data'.format(len(valid_dataset_for_seg)))
-  log()
-
-  val_iteration = len(train_loader)
-  log_iteration = int(val_iteration * args.print_ratio)
-  max_iteration = args.max_epoch * val_iteration
-
-  log('[i] log_iteration : {:,}'.format(log_iteration))
-  log('[i] val_iteration : {:,}'.format(val_iteration))
-  log('[i] max_iteration : {:,}'.format(max_iteration))
-
-  ###################################################################################
   # Network
-  ###################################################################################
   model = CCAM(
     args.architecture,
     weights=args.weights,
@@ -173,41 +134,41 @@ if __name__ == '__main__':
     dilated=args.dilated,
     stage4_out_features=args.stage4_out_features,
   )
-  param_groups = model.get_parameter_groups()
+  if args.restore:
+    print(f'Restoring weights from {args.restore}')
+    model.load_state_dict(torch.load(args.restore), strict=True)
+  log_model("CCAM", model, args)
 
-  log('[i] Architecture is {}'.format(args.architecture))
-  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log()
-
-  if GPUS_COUNT > 1:
-    log('[i] the number of gpu : {}'.format(GPUS_COUNT))
-    model = nn.DataParallel(model)
+  ccam_param_groups = model.get_parameter_groups()
 
   model = model.to(DEVICE)
+  model.train()
+  wandb.watch(model, log_freq=3)
+
+  if GPUS_COUNT > 1:
+    print(f"GPUs={GPUS_COUNT}")
+    model = torch.nn.DataParallel(model)
 
   load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
   save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
-  ###################################################################################
   # Loss, Optimizer
-  ###################################################################################
   criterion = [
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE),
     SimMinLoss(metric='cos').to(DEVICE),
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
   ]
 
-  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, step_max, ccam_param_groups)
+  log_opt_params("CCAM", ccam_param_groups)
 
-  #################################################################################################
   # Train
-  #################################################################################################
   data_dic = {'train': [], 'validation': []}
 
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = MetricsContainer(['loss', 'class_loss'])
+  train_metrics = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
 
   best_train_mIoU = -1
   thresholds = np.arange(0., 0.50, 0.05).astype(float).tolist()
@@ -221,7 +182,7 @@ if __name__ == '__main__':
     eval_timer.tik()
 
     classes = ['background', 'foreground']
-    meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
+    iou_meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
 
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
@@ -232,25 +193,9 @@ if __name__ == '__main__':
         ccams = to_numpy(make_cam(ccams).squeeze())
         masks = to_numpy(masks)
 
-        for i in range(B):
-          y_i = masks[i]
-          valid_mask = y_i < 255
-          bg_mask = y_i == 0
+        accumulate_batch_iou_saliency(masks, ccams, iou_meters)
 
-          # to saliency
-          y_i = np.zeros_like(y_i)
-          y_i[~bg_mask] = 1
-          y_i[~valid_mask] = 255
-
-          ccam_i = ccams[i]
-
-          for t, meter in meters.items():
-            ccam_b = (ccam_i <= t).astype(y_i.dtype)
-            meter.add(ccam_b, y_i)
-
-    return result_miou_from_thresholds(meters, classes)
-
-  train_meter = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
+    return result_miou_from_thresholds(iou_meters, classes)
 
   for epoch in range(args.max_epoch):
     model.train()
@@ -275,7 +220,11 @@ if __name__ == '__main__':
       if IS_POSITIVE:
         ccams = 1 - ccams
 
-      train_meter.update(
+      # region logging
+      do_logging = (step + 1) % step_log == 0
+      do_validation = (step + 1) % step_valid == 0
+
+      train_metrics.update(
         {
           'loss': loss.item(),
           'positive_loss': loss1.item() + loss3.item(),
@@ -283,18 +232,13 @@ if __name__ == '__main__':
         }
       )
 
-      #################################################################################################
-      # For Log
-      #################################################################################################
-
-      if (step + 1) % 100 == 0:
-        visualize_heatmap(args.tag, images.clone().detach(), ccams, 0, step)
-        loss, positive_loss, negative_loss = train_meter.get(clear=True)
+      if do_logging:
+        visualize_heatmap(TAG, images.clone().detach(), ccams, 0, step)
+        loss, positive_loss, negative_loss = train_metrics.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
 
         data = {
           'epoch': epoch,
-          'max_epoch': args.max_epoch,
           'iteration': step + 1,
           'learning_rate': lr,
           'loss': loss,
@@ -304,25 +248,27 @@ if __name__ == '__main__':
         }
         data_dic['train'].append(data)
 
-        log(
-          'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
-          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} '
-          'time={time:.0f}sec'.format(**data)
+        wandb.log(
+          {f"train/{k}": v for k, v in data.items()},
+          commit=not do_validation
         )
 
-    #################################################################################################
-    # Evaluation
-    #################################################################################################
-    save_model_fn()
-    log('[i] save model')
+        print(
+          'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
+          'loss={loss:.4f} loss_p={positive_loss:.4f} loss_n={negative_loss:.4f} '
+          'time={time:.0f}sec'.format(max_epoch=args.max_epoch, **data)
+        )
 
-    threshold, mIoU, iou = evaluate(train_loader_for_seg)
+      # endregion
+
+    # region evaluation
+    threshold, mIoU, iou = evaluate(valid_loader)
 
     if best_train_mIoU == -1 or best_train_mIoU < mIoU:
       best_train_mIoU = mIoU
-
-      save_model_fn()
-      log('[i] save model')
+      wandb.run.summary["train/best_t"] = threshold
+      wandb.run.summary["train/best_miou"] = mIoU
+      wandb.run.summary["train/best_iou"] = iou
 
     data = {
       'iteration': step + 1,
@@ -334,8 +280,9 @@ if __name__ == '__main__':
     }
     data_dic['validation'].append(data)
     write_json(data_path, data_dic)
+    wandb.log({f"val/{k}": v for k, v in data.items()})
 
-    log(
+    print(
       'iteration={iteration:,}\n'
       'threshold={threshold:.2f}\n'
       'train_sal_mIoU={train_sal_mIoU:.2f}%\n'
@@ -343,5 +290,10 @@ if __name__ == '__main__':
       'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
       'time={time:.0f}sec'.format(**data)
     )
+    
+    print(f'saving weights `{model_path}`')
+    save_model_fn()
+    # endregion
 
-  print(args.tag)
+  print(TAG)
+  wb_run.finish()

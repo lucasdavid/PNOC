@@ -152,41 +152,34 @@ def imagenet_stats():
 
 
 def get_classification_transforms(
-  min_image_size,
-  max_image_size,
-  image_size,
+  min_size,
+  max_size,
+  crop_sizes,
   augment,
 ):
   mean, std = imagenet_stats()
 
   tt = []
-
-  if min_image_size == max_image_size:
-    tt.append(transforms.Resize((image_size, image_size)))
+  if min_size == max_size:
+    tt += [transforms.Resize((min_size, min_size))]
   else:
-    tt.append(RandomResize(min_image_size, max_image_size))
-
-  tt.append(RandomHorizontalFlip())
-
+    tt += [RandomResize(min_size, max_size)]
+  tt += [RandomHorizontalFlip()]
   if 'colorjitter' in augment:
-    tt.append(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))
-
+    tt += [transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)]
   if 'randaugment' in augment:
-    tt.append(RandAugmentMC(n=2, m=10))
-
-  tt.append(Normalize(mean, std))
-
+    tt += [RandAugmentMC(n=2, m=10)]
+  tt += [Normalize(mean, std)]
   if 'cutmix' not in augment:
     # This will happen inside CutMix.
-    tt.append(RandomCrop(image_size))
-
-  tt.append(Transpose())
+    tt += [RandomCrop(crop_sizes)]
+  tt += [Transpose()]
 
   tt = transforms.Compose(tt)
   tv = transforms.Compose([
     # RandomResize_For_Segmentation(image_size, image_size),
     Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(image_size),
+    Top_Left_Crop_For_Segmentation(crop_sizes),
     Transpose_For_Segmentation()
   ])
 
