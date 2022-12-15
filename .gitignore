@@ -21,3 +21,4 @@ experiments
 notebooks/
 
 CCAM/
+wandb/

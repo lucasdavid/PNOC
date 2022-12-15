@@ -40,11 +40,15 @@ def log_cams(
   columns = ("Image", "CAM", "Labels", "CG Predictions", "OC Predictions")
   entries = (wb_images, wb_cams, wb_targets, wb_predics, wb_oc_pred)
 
-  table = wandb.Table()
-  for c, d in zip(columns, entries):
-    if d is not None:
-      table.add_column(c, d)
+  columns_v, entries_v = [], []
 
+  for c, e in zip(columns, entries):
+    if e is not None:
+      columns_v += [c]
+      entries_v += [e]
+
+  data = list(zip(*entries_v))
+  table = wandb.Table(columns=columns_v, data=data)
   wandb.log({"val/predictions": table}, commit=commit)
 
 

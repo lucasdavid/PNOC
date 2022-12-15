@@ -128,8 +128,8 @@ if __name__ == '__main__':
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
-  step_valid = len(train_loader)
-  step_log = int(step_valid * args.print_ratio)
+  step_valid = 10 # len(train_loader)
+  step_log = 10 # int(step_valid * args.print_ratio)
   step_init = args.first_epoch * step_valid
   step_max = args.max_epoch * step_valid
   print(f"Iterations: first={step_init} logging={step_log} validation={step_valid} max={step_max}")
