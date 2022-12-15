@@ -50,6 +50,7 @@ parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -222,41 +223,26 @@ if __name__ == '__main__':
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
   def evaluate(loader):
-    imagenet_mean, imagenet_std = imagenet_stats()
-    
+    classes = train_dataset.info.classes
+
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(classes) for th in thresholds}
 
     with torch.no_grad():
-      for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.to(DEVICE)
-        labels = labels.to(DEVICE)
+      for step, (images_batch, targets_batch, gt_masks) in enumerate(loader):
+        images_batch = images_batch.to(DEVICE)
+        targets_batch = to_numpy(targets_batch)
+        masks_batch = to_numpy(masks_batch)
 
-        _, features = model(images, with_cam=True)
+        _, features = model(images_batch, with_cam=True)
 
-        # features = resize_for_tensors(features, images.size()[-2:])
-        # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
+        labels_mask = targets_batch[..., np.newaxis, np.newaxis]
+        cams_batch = to_numpy(make_cam(features.cpu())) * labels_mask
+        cams_batch = cams_batch.transpose(0, 2, 3, 1)
 
-        mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = (make_cam(features) * mask)
-
-        for b in range(images.size()[0]):
-          # c, h, w -> h, w, c
-          cam = to_numpy(cams[b]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[b])
-
-          h, w, c = cam.shape
-          gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-          for th in thresholds:
-            bg = np.ones_like(cam[:, :, 0]) * th
-            pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
-
-            meter_dic[th].add(pred_mask, gt_mask)
-
-    model.train()
+        accumulate_batch_iou_lowres(masks_batch, cams_batch, meter_dic)
 
     best_th = 0.0
     best_mIoU = 0.0
@@ -276,14 +262,14 @@ if __name__ == '__main__':
   for step in range(step_init, step_max):
     images, targets = train_iterator.get()
 
+    model.train()
+    
     images = images.to(DEVICE)
     targets = targets.float()
-
+    
     ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
     k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
-
-    optimizer.zero_grad()
 
     # Normal
     logits, features = model(images, with_cam=True)
@@ -304,7 +290,7 @@ if __name__ == '__main__':
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
     labels_oc = (targets - labels_mask).clip(min=0)
 
-    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
+    cl_logits = oc_nn(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
     o_loss = class_loss_fn(
       cl_logits,
       label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)
@@ -313,7 +299,10 @@ if __name__ == '__main__':
     loss = (c_loss + p_loss + ap * re_loss + ao * o_loss)
 
     loss.backward()
-    optimizer.step()
+
+    if (step + 1) % args.accumulate_steps == 0:
+      optimizer.step()
+      optimizer.zero_grad()
 
     occse.update_focal(
       targets, labels_oc, cl_logits.to(targets), focal_factor, momentum=args.oc_focal_momentum, gamma=args.oc_focal_gamma
@@ -337,7 +326,7 @@ if __name__ == '__main__':
       (loss, c_loss, p_loss, re_loss, o_loss, ap, ao, k) = train_meter.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(optimizer))
-      cs = to_numpy(choices).tolist()
+      cs = to_numpy(choices.int()).tolist()
       ffs = to_numpy(focal_factor).astype(float).round(2).tolist()
 
       data = {
@@ -351,9 +340,9 @@ if __name__ == '__main__':
         'o_loss': o_loss,
         'oc_alpha': ao,
         'k': k,
-        'time': train_timer.tok(clear=True),
         'choices': cs,
         'focal_factor': ffs,
+        'time': train_timer.tok(clear=True),
       }
       data_dic['train'].append(data)
       write_json(data_path, data_dic)

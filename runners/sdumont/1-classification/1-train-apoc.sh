@@ -87,6 +87,9 @@ MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
 run_training () {
+    echo "============================================================"
+    echo "Experiment $TAG"
+    echo "============================================================"
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     $PY $SOURCE                              \
         --tag               $TAG             \
@@ -120,6 +123,8 @@ run_training () {
         --ow                $OW              \
         --ow-init           $OW_INIT         \
         --ow-schedule       $OW_SCHEDULE     \
+        --oc-train-masks    $OC_TRAIN_MASKS  \
+        --oc_train_mask_threshold $OC_TRAIN_MASK_T \
         --dataset           $DATASET         \
         --data_dir          $DATA_DIR
 }
@@ -145,9 +150,15 @@ LABELSMOOTHING=0.1
 OW=0.5
 OW_INIT=0.0
 OW_SCHEDULE=1.0
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r1
+OC_TRAIN_MASKS=cams
+OC_TRAIN_MASK_T=0.2
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T@$OC_NAME-r1
 run_training
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r2
+
+OC_TRAIN_MASK_T=0.3
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T@$OC_NAME-r1
 run_training
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE@$OC_NAME-r3
+
+OC_TRAIN_MASK_T=0.4
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T@$OC_NAME-r1
 run_training

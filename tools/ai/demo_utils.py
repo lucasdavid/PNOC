@@ -32,8 +32,7 @@ def denormalize(image, mean=None, std=None, dtype=np.uint8, tp=True):
         image = (image * std) + mean
     
     if dtype == np.uint8:
-        image *= 255.
-        return image.astype(np.uint8)
+        return (image.clip(0, 1) * 255).astype(np.uint8)
     else:
         return image
 

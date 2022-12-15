@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
+
 from torch.utils.data import DataLoader
 from sklearn import metrics as skmetrics
 
@@ -22,6 +24,7 @@ from tools.ai.torch_utils import *
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
+from tools.general import wandb_utils
 
 parser = argparse.ArgumentParser()
 
@@ -51,6 +54,7 @@ parser.add_argument("--oc-focal-gamma", default=2.0, type=float)
 parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument("--max_epoch", default=15, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
 
 parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--wd", default=1e-4, type=float)
@@ -103,6 +107,8 @@ if __name__ == "__main__":
   for k, v in vars(args).items():
     print(f"{k.ljust(pad)}: {v}")
   print("===================")
+
+  wandb_run = wandb.init(project="research-wsss", entity="lerdl", config=args)
 
   log_dir = create_directory(f"./experiments/logs/")
   data_dir = create_directory(f"./experiments/data/")
@@ -168,6 +174,8 @@ if __name__ == "__main__":
   log("[i] Regularization is {}".format(args.regularization))
   log("[i] Total Params: %.2fM" % (calculate_parameters(cgnet)))
   log()
+
+  wandb.watch(cgnet, log_freq=100)
 
   # Ordinary Classifier.
   print(f"Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)")
@@ -257,53 +265,51 @@ if __name__ == "__main__":
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
   def evaluate(loader):
+    classes = train_dataset.info.classes
     
     cgnet.eval()
     ocnet.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
+    meter_dic = {th: Calculator_For_mIoU(classes) for th in thresholds}
 
-    preds = []
-    targets = []
+    targets, preds = [], []
 
     with torch.no_grad():
-      for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.to(DEVICE)
-        labels = labels.to(DEVICE)
+      for step, (images_batch, targets_batch, masks_batch) in enumerate(loader):
+        images_batch = images_batch.to(DEVICE)
+        targets_batch = to_numpy(targets_batch)
+        masks_batch = to_numpy(masks_batch)
 
-        _, features = cgnet(images, with_cam=True)
+        logits, features = cgnet(images_batch, with_cam=True)
+        oc_preds_batch = to_numpy(torch.sigmoid(ocnet(images_batch)))
 
-        preds += [to_numpy(torch.sigmoid(ocnet(images)))]
-        targets += [to_numpy(labels)]
+        targets += [targets_batch]
+        preds += [oc_preds_batch]
 
-        # features = resize_for_tensors(features, images.size()[-2:])
-        # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
+        labels_mask = targets_batch[..., np.newaxis, np.newaxis]
+        cams_batch = to_numpy(make_cam(features.cpu())) * labels_mask
+        cams_batch = cams_batch.transpose(0, 2, 3, 1)
 
-        mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = make_cam(features) * mask
+        if step == 0:
+          cg_preds_batch = to_numpy(torch.sigmoid(logits))
 
-        for b in range(images.size()[0]):
-          # c, h, w -> h, w, c
-          cam = to_numpy(cams[b]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[b])
+          wandb_utils.log_evaluation_table(
+            to_numpy(images_batch),
+            targets_batch,
+            cg_preds_batch,
+            oc_preds_batch,
+            cams_batch,
+            classes,
+          )
 
-          h, w, c = cam.shape
-          gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+        accumulate_batch_iou_lowres(masks_batch, cams_batch, meter_dic)
 
-          for th in thresholds:
-            bg = np.ones_like(cam[:, :, 0]) * th
-            pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
-
-            meter_dic[th].add(pred_mask, gt_mask)
-    
     preds, targets = (np.concatenate(preds, axis=0),
                       np.concatenate(targets, axis=0))
-    
-    r = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='macro')
-    log(f"oc predictions (macro):    precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
-    r = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='weighted')
-    log(f"oc predictions (weighted): precision={r[0]:.5f} recall={r[1]:.5f} f1={r[2]:.5f} support={r[3]}")
+
+    rm = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='macro')
+    rw = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='weighted')
 
     best_th = 0.0
     best_mIoU = 0.0
@@ -316,7 +322,9 @@ if __name__ == "__main__":
         best_mIoU = mIoU
         best_iou = [round(iou[c], 2) for c in train_dataset.info.classes]
 
-    return best_th, best_mIoU, best_iou
+    del images_batch, targets, preds, labels_mask, cams_batch, meter_dic
+
+    return best_th, best_mIoU, best_iou, rm, rw
 
   train_iterator = Iterator(train_loader)
 
@@ -337,7 +345,6 @@ if __name__ == "__main__":
     ##############################
     # CAM Generator Training
     ##############################
-    cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     # Normal
     logits, features = cgnet(images, with_cam=True)
@@ -358,14 +365,17 @@ if __name__ == "__main__":
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
     labels_oc = (targets - labels_mask).clip(min=0)
 
-    images_mask = occse.images_with_masked_objects(images, features, labels_mask)
+    images_mask = occse.soft_mask_images(images, features, labels_mask)
     cl_logits = ocnet(images_mask)
 
     o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
 
     cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
     cg_loss.backward()
-    cgopt.step()
+
+    if (step + 1) % args.accumulate_steps == 0:
+      cgopt.step()
+      cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     occse.update_focal(
       targets,
@@ -384,40 +394,34 @@ if __name__ == "__main__":
       ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
     else:
       ocnet.train()
-      ocopt.zero_grad()
 
       if args.oc_train_masks == "cams":
-        features = features.cpu()
-        mask = features[labels_mask == 1, :, :].unsqueeze(1)
-        mask = F.relu(mask)
-        mask = resize_for_tensors(mask, images.size()[2:])
-        mask /= F.adaptive_max_pool2d(mask, (1, 1)) + 1e-5
-        mask = mask > args.oc_train_mask_threshold
-        images_mask = (images * (1 - mask.to(images)))
-
-      images_mask = images_mask.detach()
+        images_mask = occse.hard_mask_images(images, features, labels_mask, args.oc_train_mask_threshold)
 
       cl_logits = ocnet(images_mask.detach())
 
       ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
       ot_loss.backward()
-      ocopt.step()
+
+      oc_step = int((step + 1) // args.oc_train_interval_steps)
+      if oc_step % args.accumulate_steps == 0:
+        ocopt.step()
+        ocopt.zero_grad()
 
     # region logging
-    train_metrics.update(
-      {
-        "loss": cg_loss.item(),
-        "c_loss": c_loss.item(),
-        "p_loss": p_loss.item(),
-        "re_loss": re_loss.item(),
-        "o_loss": o_loss.item(),
-        "ot_loss": ot_loss.item(),
-        "alpha": ap,
-        "oc_alpha": ao,
-        "ot_weight": ow,
-        "k": k,
-      }
-    )
+    epoch = step // step_valid
+    train_metrics.update({
+      "loss": cg_loss.item(),
+      "c_loss": c_loss.item(),
+      "p_loss": p_loss.item(),
+      "re_loss": re_loss.item(),
+      "o_loss": o_loss.item(),
+      "ot_loss": ot_loss.item(),
+      "alpha": ap,
+      "oc_alpha": ao,
+      "ot_weight": ow,
+      "k": k,
+    })
 
     if (step + 1) % step_log == 0:
       (cg_loss, c_loss, p_loss, re_loss, o_loss, ot_loss, ap, ao, ow, k) = train_metrics.get(clear=True)
@@ -439,12 +443,19 @@ if __name__ == "__main__":
         "oc_alpha": ao,
         "ow": ow,
         "k": k,
-        "time": train_timer.tok(clear=True),
         "choices": cs,
         "focal_factor": ffs,
+        "time": train_timer.tok(clear=True),
       }
       data_dic["train"].append(data)
       write_json(data_path, data_dic)
+
+      wandb.log({f"train/{k}": v for k, v in data.items()} | {"epoch": epoch}, commit=False)
+
+      wandb.log({
+        "train/features": features,
+        "train/re_features": re_features,
+      })
 
       log(
         "iteration    = {iteration:,}\n"
@@ -468,10 +479,14 @@ if __name__ == "__main__":
 
     # region evaluation
     if (step + 1) % step_valid == 0:
-      threshold, mIoU, iou = evaluate(valid_loader)
+      threshold, mIoU, iou, rm, rw = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
+        wandb.run.summary["best_train_miou"] = mIoU
+      
+      rm = dict(zip('precision_m recall_m f1_m'.split(), rm))
+      rw = dict(zip('precision_w recall_w f1_w'.split(), rw))
 
       data = {
         "iteration": step + 1,
@@ -481,6 +496,7 @@ if __name__ == "__main__":
         "best_train_mIoU": best_train_mIoU,
         "time": eval_timer.tok(clear=True),
       }
+      data = data | rm | rw
       data_dic["validation"].append(data)
       write_json(data_path, data_dic)
 
@@ -490,12 +506,24 @@ if __name__ == "__main__":
         "threshold       = {threshold:.2f}\n"
         "train_mIoU      = {train_mIoU:.2f}%\n"
         "best_train_mIoU = {best_train_mIoU:.2f}%\n"
-        "train_iou       = {train_iou}".format(**data)
+        "train_iou       = {train_iou}\n"
+        "oc-precision-m  = {precision_m}\n"
+        "oc-recall-m     = {recall_m}\n"
+        "oc-f1-m         = {f1_m}\n"
+        "oc-precision-w  = {precision_w}\n"
+        "oc-recall-w     = {recall_w}\n"
+        "oc-f1-w         = {f1_w}".format(**data)
       )
+      wandb.log({f"val/{k}": v for k, v in data.items()}, commit=False)
 
       log(f"saving weights `{model_path}`\n")
       save_model_fn()
     # endregion
+  
+    if (step + 1) % step_log == 0 or (step + 1) % step_valid == 0:
+      wandb.log(commit=True)
 
   write_json(data_path, data_dic)
   log(TAG)
+
+  wandb_run.finish()

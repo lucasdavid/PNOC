@@ -2,7 +2,9 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
 import numpy as np
+
 from tools.general.txt_utils import add_txt
+
 
 def log_config(args, title=None, print_fn=print):
   margin = '=' * 80

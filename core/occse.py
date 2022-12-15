@@ -130,17 +130,27 @@ def update_focal(
   return focal_factor
 
 
-def images_with_masked_objects(images, features, label_mask, eps=1e-5, globalnorm=True):
+def soft_mask_images(images, features, label_mask, eps=1e-5, globalnorm=True):
   mask = features[label_mask == 1, :, :].unsqueeze(1)
   mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
   mask = F.relu(mask)
 
   if globalnorm:
     # Normalize considering all samples/channels because that's OC-CSE's default policy.
-    mask = mask / mask.max() + eps
+    mask = mask / (mask.max() + eps)
   else:
     b, c = mask.size()[:2]
     mask_max = mask.view(b, c, -1).max(dim=-1).view(b, c, 1, 1)
-    mask = mask / mask_max + eps
+    mask = mask / (mask_max + eps)
 
   return images * (1 - mask)
+
+
+def hard_mask_images(images, features, label_mask, t=0.3, eps=1e-5):
+  mask = features[label_mask == 1, :, :].unsqueeze(1)
+  mask = F.relu(mask)
+  mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
+  mask /= F.adaptive_max_pool2d(mask, (1, 1)) + eps
+  mask = mask > t
+
+  return images * (1 - mask.to(images))

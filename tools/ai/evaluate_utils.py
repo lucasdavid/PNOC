@@ -1,6 +1,8 @@
+import cv2
 import numpy as np
 
 from tools.general.json_utils import read_json
+
 
 def calculate_for_tags(pred_tags, gt_tags):
     """This function calculates precision, recall, and f1-score using tags.
@@ -45,6 +47,7 @@ def calculate_for_tags(pred_tags, gt_tags):
 
     return precision, recall, f1_score
 
+
 def calculate_mIoU(pred_mask, gt_mask):
     """This function is to calculate precision, recall, and f1-score using tags.
 
@@ -65,6 +68,22 @@ def calculate_mIoU(pred_mask, gt_mask):
     epsilon = 1e-5
     miou = (np.sum(inter) + epsilon) / (np.sum(union) + epsilon)
     return miou * 100
+
+
+def accumulate_batch_iou_lowres(masks, cams, meters):
+    for b in range(len(cams)):
+        # c, h, w -> h, w, c
+        cam = cams[b]
+        gt_mask = masks[b]
+
+        h, w, c = cam.shape
+        gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+
+        for th, meter in meters.items():
+            bg = np.ones_like(cam[:, :, 0]) * th
+            pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
+            meter.add(pred_mask, gt_mask)
+
 
 class Calculator_For_mIoU:
     def __init__(self, classes):
@@ -146,6 +165,7 @@ class Calculator_For_mIoU:
             self.TP.append(0)
             self.P.append(0)
             self.T.append(0)
+
 
 class MIoUCalcFromNames(Calculator_For_mIoU):
     def __init__(self, class_names):

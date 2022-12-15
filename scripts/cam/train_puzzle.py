@@ -53,6 +53,7 @@ parser.add_argument('--restore', default=None, type=str)
 ###############################################################################
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -251,8 +252,6 @@ if __name__ == '__main__':
     images, targets = train_iterator.get()
     images = images.cuda()
 
-    optimizer.zero_grad()
-
     ###############################################################################
     # Normal
     ###############################################################################
@@ -314,7 +313,10 @@ if __name__ == '__main__':
     #################################################################################################
 
     loss.backward()
-    optimizer.step()
+
+    if (iteration + 1) % args.accumulate_steps == 0:
+      optimizer.step()
+      optimizer.zero_grad()
 
     train_meter.update(
       {

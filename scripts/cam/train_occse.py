@@ -283,7 +283,7 @@ if __name__ == '__main__':
 
     # OC-CSE
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-    cl_logits = oc_nn(occse.images_with_masked_objects(images, features, labels_mask.cuda()))
+    cl_logits = oc_nn(occse.soft_mask_images(images, features, labels_mask.cuda()))
 
     labels_oc = targets - labels_mask
     labels_oc_sm = label_smoothing(labels_oc, args.label_smoothing)

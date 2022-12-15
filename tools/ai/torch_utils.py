@@ -76,12 +76,17 @@ def make_cam(x, eps=1e-5, shift_min=False, global_norm=False, inplace=True):
     x_min = flat_x.min(axis=-1)[0].view((b, c, 1, 1)) if shift_min else 0
     x_max = flat_x.max(axis=-1)[0].view((b, c, 1, 1)) - x_min
   
-  if inplace:
-    if shift_min:
+  if shift_min:
+    if inplace:
       x -= x_min
-    x /= x_max + eps
+      x /= x_max + eps
+    else:
+      x = (x - x_min) / (x_max + eps)
   else:
-    x = (x - x_min) / (x_max + eps)
+    if inplace:
+      x /= x_max + eps
+    else:
+      x = x / (x_max + eps)
 
   return x
 

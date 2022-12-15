@@ -16,10 +16,6 @@ from .aff_utils import PathIndex
 from .deeplab_utils import ASPP, Decoder
 from .mcar import mcar_resnet50, mcar_resnet101
 from .puzzle_utils import merge_features, tile_features
-#######################################################################
-# Normalization
-#######################################################################
-from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 
 class FixedBatchNorm(nn.BatchNorm2d):

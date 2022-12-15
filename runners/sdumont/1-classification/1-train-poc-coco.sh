@@ -41,7 +41,7 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/cam/train_poc.py
-WORKERS=16
+WORKERS=32
 DEVICES=0,1,2,3
 
 # DATASET=voc12
@@ -64,9 +64,10 @@ MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=16
+ACCUMULATE_STEPS=1
 
-OC_NAME=rs269
-OC_PRETRAINED=experiments/models/coco14-rs269.pth
+OC_NAME=rs269-ra
+OC_PRETRAINED=experiments/models/coco14-rs269-ra.pth
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_REGULAR=none
 
@@ -87,6 +88,9 @@ MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
 run_training () {
+    echo "============================================================"
+    echo "Experiment $TAG"
+    echo "============================================================"
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     $PY $SOURCE                              \
         --tag               $TAG             \
@@ -108,6 +112,7 @@ run_training () {
         --mixup_prob        $MIXUP           \
         --label_smoothing   $LABELSMOOTHING  \
         --max_epoch         $EPOCHS          \
+        --accumulate_steps  $ACCUMULATE_STEPS \
         --alpha             $P_ALPHA         \
         --alpha_init        $P_INIT          \
         --alpha_schedule    $P_SCHEDULE      \
@@ -124,9 +129,9 @@ run_training () {
 # TAG=$DATASET-$ARCH-poc@$OC_NAME
 # run_training
 
-LABELSMOOTHING=0.1
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
-run_training
+# LABELSMOOTHING=0.1
+# TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING-as$ACCUMULATE_STEPS@$OC_NAME
+# run_training
 
 # OC_NAME=rs269ra
 # OC_PRETRAINED=experiments/models/resnest269@randaug.pth
@@ -134,3 +139,8 @@ run_training
 # LABELSMOOTHING=0.1
 # TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
 # run_training
+
+LABELSMOOTHING=0.1
+ACCUMULATE_STEPS=2
+TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING-as$ACCUMULATE_STEPS@$OC_NAME
+run_training
