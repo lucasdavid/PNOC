@@ -31,36 +31,39 @@ def _load_images_list(domain):
   return np.loadtxt(filepath, dtype=np.int32)[::-1]
 
 
-def load_sample_with_labels(root_dir, domain, images, labels, idx):
-  label = labels[idx]
-
-  if label.sum() == 0:
-    return load_sample_with_labels(root_dir, domain, images, labels, idx + 1)
-
-  image_id = _decode_id(images[idx])
-  filename = f"COCO_{domain}_{image_id}.jpg"
-  filepath = os.path.join(root_dir, IMAGES_DIR, filename)
-
-  image = Image.open(filepath).convert('RGB')
-
-  return image_id, image, label
-
-
 class COCO14Dataset(Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     self.root_dir = root_dir
     self.domain = domain
-    self.img_name_list = _load_images_list(domain)
     self.transform = transform
-
+    self.img_name_list = _load_images_list(domain)
     self.label_list = _load_labels_from_npy(self.img_name_list)
 
   def __len__(self):
     return len(self.img_name_list)
 
   def __getitem__(self, idx):
-    return load_sample_with_labels(self.root_dir, self.domain, self.img_name_list, self.label_list, idx)
+    return self.load_sample_with_labels(idx)
+
+  def get_image_path(self, image_id):
+    return os.path.join(
+      self.root_dir,
+      IMAGES_DIR,
+      f"COCO_{self.domain}_{image_id}.jpg"
+    )
+
+  def load_sample_with_labels(self, idx, ignore_bg_only=True):
+    label = self.label_list[idx]
+
+    if ignore_bg_only and label.sum() == 0:
+      return self.load_sample_with_labels(idx + 1, ignore_bg_only)
+
+    image_id = _decode_id(self.img_name_list[idx])
+    file_path = self.get_image_path(image_id)
+    image = Image.open(file_path).convert('RGB')
+
+    return image_id, image, label
 
 
 class COCO14ClassificationDataset(COCO14Dataset):
@@ -111,6 +114,21 @@ class COCO14SegmentationDataset(COCO14CAMEvaluationDataset):
     image, _, mask = super().__getitem__(idx)
 
     return image, mask
+
+
+class COCO14PathsDataset(COCO14Dataset):
+
+  def __init__(self, root_dir, domain, masks_dir=None):
+    super().__init__(root_dir, domain)
+
+    self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
+
+  def __getitem__(self, idx):
+    image_id = _decode_id(self.img_name_list[idx])
+    image_path = self.get_image_path(image_id)
+    mask_path = os.path.join(self.masks_dir, image_id + '.png')
+
+    return image_id, image_path, mask_path
 
 
 class COCO14AffinityDataset(COCO14SegmentationDataset):

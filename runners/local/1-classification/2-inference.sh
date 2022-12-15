@@ -15,13 +15,13 @@ DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 
 DOMAIN=train2014
 
-ARCHITECTURE=resnest50
+ARCHITECTURE=resnest101
 DILATED=false
 MODE=normal
 REG=none
-WEIGHTS=coco14-rs50
+WEIGHTS=coco14-rs101-ra
 
-TAG=$WEIGHTS
+TAG=coco14/rs50
 
 CUDA_VISIBLE_DEVICES=0                      \
     $PY $SOURCE                             \
@@ -33,6 +33,4 @@ CUDA_VISIBLE_DEVICES=0                      \
     --tag            $TAG                   \
     --domain         $DOMAIN                \
     --dataset        $DATASET               \
-    --data_dir       $DATA_DIR              &
-
-wait
+    --data_dir       $DATA_DIR

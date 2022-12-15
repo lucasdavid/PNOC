@@ -30,6 +30,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
+parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
@@ -53,30 +54,20 @@ parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 
-if __name__ == '__main__':
-  args = parser.parse_args()
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
 
-  TAG = args.tag
-  TAG += '@train' if 'train' in args.domain else '@val'
-  TAG += '@scale=%s' % args.scales
+normalize_fn = Normalize(*imagenet_stats())
 
-  pred_dir = create_directory(f'./experiments/predictions/{TAG}/')
-  model_path = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
-  set_seed(args.seed)
-  log = lambda string='': print(string)
-
-  ###################################################################################
-  # Transform, Dataset, DataLoader
-  ###################################################################################
+def run(args):
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-  log(f'NUM_CLASSES={dataset.info.num_classes}')
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 
-  normalize_fn = Normalize(*imagenet_stats())
-
-  ###################################################################################
-  # Network
-  ###################################################################################
   model = Classifier(
     args.architecture,
     dataset.info.num_classes,
@@ -85,77 +76,40 @@ if __name__ == '__main__':
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
+  model = model.to(DEVICE)
 
-  model = model.cuda()
-  model.eval()
+  print('[i] Architecture is {}'.format(args.architecture))
+  print('[i] Total Params: %.2fM' % (calculate_parameters(model)))
+  print()
 
-  log('[i] Architecture is {}'.format(args.architecture))
-  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log()
-
-  try:
-    use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
-  except KeyError:
-    use_gpu = '0'
-
-  the_number_of_gpu = len(use_gpu.split(','))
-  if the_number_of_gpu > 1:
-    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
+  if GPUS_COUNT > 1:
+    print(f"GPUS={GPUS}")
     model = nn.DataParallel(model)
 
-  load_model(model, model_path, parallel=the_number_of_gpu > 1)
-
-  #################################################################################################
-  # Evaluation
-  #################################################################################################
-  eval_timer = Timer()
-  scales = [float(scale) for scale in args.scales.split(',')]
-
+  load_model(model, WEIGHTS_PATH, parallel=GPUS_COUNT > 1)
   model.eval()
-  eval_timer.tik()
 
-  def get_cam(ori_image, scale):
-    # preprocessing
-    image = copy.deepcopy(ori_image)
-    image = image.resize((round(ori_w * scale), round(ori_h * scale)), resample=PIL.Image.CUBIC)
-
-    image = normalize_fn(image)
-    image = image.transpose((2, 0, 1))
-
-    image = torch.from_numpy(image)
-    flipped_image = image.flip(-1)
-
-    images = torch.stack([image, flipped_image])
-    images = images.cuda()
-
-    # inferenece
-    _, features = model(images, with_cam=True)
-
-    # postprocessing
-    cams = F.relu(features)
-    cams = cams[0] + cams[1].flip(-1)
-
-    return cams
+  scales = [float(scale) for scale in args.scales.split(',')]
 
   with torch.no_grad():
     length = len(dataset)
-    for step, (ori_image, image_id, label) in enumerate(dataset):
-      ori_w, ori_h = ori_image.size
+    for step, (image, image_id, label) in enumerate(dataset):
+      W, H = image.size
 
-      npy_path = pred_dir + image_id + '.npy'
+      npy_path = PREDICTIONS_DIR + image_id + '.npy'
       if os.path.isfile(npy_path):
         continue
 
-      strided_size = get_strided_size((ori_h, ori_w), 4)
-      strided_up_size = get_strided_up_size((ori_h, ori_w), 16)
+      strided_size = get_strided_size((H, W), 4)
+      strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams_list = [get_cam(ori_image, scale) for scale in scales]
+      cams_list = [get_cam(model, image, scale) for scale in scales]
 
       strided_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_size)[0] for cams in cams_list]
       strided_cams = torch.sum(torch.stack(strided_cams_list), dim=0)
 
       hr_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams_list]
-      hr_cams = torch.sum(torch.stack(hr_cams_list), dim=0)[:, :ori_h, :ori_w]
+      hr_cams = torch.sum(torch.stack(hr_cams_list), dim=0)[:, :H, :W]
 
       keys = torch.nonzero(torch.from_numpy(label))[:, 0]
 
@@ -167,12 +121,51 @@ if __name__ == '__main__':
 
       # save cams
       keys = np.pad(keys + 1, (1, 0), mode='constant')
-      np.save(npy_path, {"keys": keys, "cam": strided_cams.cpu(), "hr_cam": hr_cams.cpu().numpy()})
+      np.save(npy_path, {
+        "keys": keys,
+        "cam": strided_cams.cpu(),
+        "hr_cam": hr_cams.cpu().numpy()
+      })
 
       sys.stdout.write(
-        '\r# Make CAM [{}/{}] = {:.2f}%, ({}, {})'.format(
-          step + 1, length, (step + 1) / length * 100, (ori_h, ori_w), hr_cams.size()
-        )
+        f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}%, '
+        f'({(H, W)}, {tuple(hr_cams.shape)})'
       )
       sys.stdout.flush()
     print()
+
+
+def get_cam(model, ori_image, scale):
+  W, H = ori_image.size
+
+  # Preprocessing
+  x = copy.deepcopy(ori_image)
+  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
+  x = normalize_fn(x)
+  x = x.transpose((2, 0, 1))
+  x = torch.from_numpy(x)
+  xf = x.flip(-1)
+  images = torch.stack([x, xf])
+  images = images.to(DEVICE)
+
+  _, features = model(images, with_cam=True)
+  cams = F.relu(features)
+  cams = cams[0] + cams[1].flip(-1)
+
+  return cams
+
+
+if __name__ == '__main__':
+  args = parser.parse_args()
+
+  DEVICE = args.device
+  SEED = args.seed
+  TAG = args.tag
+  TAG += '@train' if 'train' in args.domain else '@val'
+  TAG += '@scale=%s' % args.scales
+
+  PREDICTIONS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
+  WEIGHTS_PATH = './experiments/models/' + f'{args.weights or args.tag}.pth'
+
+  set_seed(SEED)
+  run(args)

@@ -2,7 +2,7 @@ import argparse
 import multiprocessing
 import os
 import sys
-from core.datasets import DatasetInfo
+from core.datasets import get_segmentation_evaluation_dataset
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,6 @@ parser.add_argument("--threshold", default=None, type=float)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument("--domain", default='train', type=str)
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
-parser.add_argument('--gt_dir', default='../VOCtrainval_11-May-2012/SegmentationClass', type=str)
 parser.add_argument("--pred_dir", default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
 parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODES)
@@ -35,33 +34,18 @@ parser.add_argument('--min_th', default=0.05, type=float)
 parser.add_argument('--max_th', default=0.50, type=float)
 parser.add_argument('--step_th', default=0.05, type=float)
 
-args = parser.parse_args()
 
-GT_DIR = args.gt_dir
-SAL_DIR = args.sal_dir
-PRED_DIR = (
-  args.pred_dir
-  or f'./experiments/predictions/{args.experiment_name}/'
-)
+def compare(dataset, classes, start, step, TP, P, T):
+  skipped = 0
+  for idx in range(start, len(dataset), step):
+    image_id, image_path, mask_path = dataset[idx]
 
-args.list = f'./data/voc12/{args.domain}.txt'
-
-INFO = DatasetInfo.from_metafile(args.dataset)
-CLASSES = ['background'] + INFO.classes.tolist()
-
-
-def compare(start, step, TP, P, T, name_list):
-  for idx in range(start, len(name_list), step):
-    name = name_list[idx]
-
-    img_file = os.path.join(args.data_dir, 'JPEGImages', name + '.jpg')
-    npy_file = os.path.join(PRED_DIR, name + '.npy')
-    png_file = os.path.join(PRED_DIR, name + '.png')
-    label_file = os.path.join(GT_DIR, name + '.png')
-    sal_file = os.path.join(SAL_DIR, name + '.png') if SAL_DIR else None
+    npy_file = os.path.join(PRED_DIR, image_id + '.npy')
+    png_file = os.path.join(PRED_DIR, image_id + '.png')
+    sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None
 
     if os.path.exists(png_file):
-      y_pred = np.array(Image.open(PRED_DIR + name + '.png'))
+      y_pred = np.array(Image.open(PRED_DIR + image_id + '.png'))
 
       keys, cam = np.unique(y_pred, return_inverse=True)
       cam = cam.reshape(y_pred.shape)
@@ -70,7 +54,7 @@ def compare(start, step, TP, P, T, name_list):
       try:
         data = np.load(npy_file, allow_pickle=True).item()
       except:
-        print(f'  {name}.npy is corrupted', file=sys.stderr)
+        print(f'  {image_id}.npy is corrupted', file=sys.stderr)
         continue
 
       keys = data['keys']
@@ -94,20 +78,22 @@ def compare(start, step, TP, P, T, name_list):
 
       cam = np.argmax(cam, axis=0)
     else:
-      raise FileNotFoundError(f'Cannot find .png or .npy predictions for sample {name}.')
-    
+      skipped += 1
+      continue
+
     if args.crf_t:
-      img = np.asarray(Image.open(img_file).convert('RGB'))
-      cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+      with Image.open(image_path) as img:
+        cam = crf_inference_label(np.asarray(img), cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
 
     y_pred = keys[cam]
 
-    y_true = np.array(Image.open(label_file))
+    with Image.open(mask_path) as y_true:
+      y_true = np.array(y_true)
 
     valid_mask = y_true < 255
     mask = (y_pred == y_true) * valid_mask
 
-    for i in range(len(CLASSES)):
+    for i in range(len(classes)):
       P[i].acquire()
       P[i].value += np.sum((y_pred == i) * valid_mask)
       P[i].release()
@@ -118,19 +104,22 @@ def compare(start, step, TP, P, T, name_list):
       TP[i].value += np.sum((y_true == i) * mask)
       TP[i].release()
 
+  if skipped:
+    print(f"  {skipped} files were skipped because their predictions were not found")
 
-def do_python_eval(name_list, num_workers=8):
+
+def do_python_eval(dataset, classes, num_workers=8):
   TP = []
   P = []
   T = []
-  for i in range(len(CLASSES)):
+  for i in range(len(classes)):
     TP.append(multiprocessing.Value('i', 0, lock=True))
     P.append(multiprocessing.Value('i', 0, lock=True))
     T.append(multiprocessing.Value('i', 0, lock=True))
 
   p_list = []
   for i in range(num_workers):
-    p = multiprocessing.Process(target=compare, args=(i, num_workers, TP, P, T, name_list))
+    p = multiprocessing.Process(target=compare, args=(dataset, classes, i, num_workers, TP, P, T))
     p.start()
     p_list.append(p)
   for p in p_list:
@@ -141,7 +130,7 @@ def do_python_eval(name_list, num_workers=8):
   P_TP = []
   FP_ALL = []
   FN_ALL = []
-  for i in range(len(CLASSES)):
+  for i in range(len(classes)):
     IoU.append(TP[i].value / (T[i].value + P[i].value - TP[i].value + 1e-10))
     T_TP.append(T[i].value / (TP[i].value + 1e-10))
     P_TP.append(P[i].value / (TP[i].value + 1e-10))
@@ -149,8 +138,8 @@ def do_python_eval(name_list, num_workers=8):
     FN_ALL.append((T[i].value - TP[i].value) / (T[i].value + P[i].value - TP[i].value + 1e-10))
 
   loglist = {}
-  for i in range(len(CLASSES)):
-    loglist[CLASSES[i]] = IoU[i] * 100
+  for i in range(len(classes)):
+    loglist[classes[i]] = IoU[i] * 100
 
   miou = np.mean(np.array(IoU))
   t_tp = np.mean(np.array(T_TP)[1:])
@@ -166,9 +155,8 @@ def do_python_eval(name_list, num_workers=8):
   loglist['miou_foreground'] = miou_foreground
   return loglist
 
-def run():
-  df = pd.read_csv(args.list, names=['filename'])
-  filenames = df['filename'].values
+def run(args, dataset):
+  classes = ['background'] + dataset.info.classes.tolist()
 
   miou_ = threshold_ = fp_ = 0.
   iou_ = {}
@@ -182,7 +170,7 @@ def run():
 
   for t in thresholds:
     args.threshold = t
-    r = do_python_eval(filenames, num_workers=args.num_workers)
+    r = do_python_eval(dataset, classes, num_workers=args.num_workers)
 
     print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
 
@@ -231,7 +219,14 @@ def run():
 
 
 if __name__ == '__main__':
+  args = parser.parse_args()
+
+  PRED_DIR = args.pred_dir or f'./experiments/predictions/{args.experiment_name}/'
+  SAL_DIR = args.sal_dir
+
+  dataset = get_segmentation_evaluation_dataset(args.dataset, args.data_dir, args.domain)
+
   try:
-    run()
+    run(args, dataset)
   except KeyboardInterrupt:
     ...

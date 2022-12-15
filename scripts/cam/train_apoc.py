@@ -223,7 +223,7 @@ if __name__ == "__main__":
   GPUS = GPUS.split(",")
   GPUS_COUNT = len(GPUS)
   if GPUS_COUNT > 1:
-    log("[i] the number of gpu : {}".format(GPUS_COUNT))
+    log(f"GPUS={GPUS}")
     cgnet = nn.DataParallel(cgnet)
     ocnet = nn.DataParallel(ocnet)
 

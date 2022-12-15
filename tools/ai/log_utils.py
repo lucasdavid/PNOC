@@ -16,7 +16,7 @@ def log_config(args, title=None, print_fn=print):
   pad = max(map(len, args)) + 1
   for k, v in args.items():
     print_fn(f'{k.ljust(pad)}: {v}')
-  
+
   print_fn(margin)
 
 

@@ -56,7 +56,7 @@ def _work(process_id, dataset, args):
   for step, (ori_image, image_id, _, _) in enumerate(subset):
     png_path = os.path.join(aff_dir, image_id + '.png')
     cam_path = os.path.join(cams_dir, image_id + '.npy')
-    
+
     if os.path.isfile(png_path):
       continue
 

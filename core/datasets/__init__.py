@@ -116,6 +116,19 @@ def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
   return infer
 
 
+def get_segmentation_evaluation_dataset(dataset, data_dir, domain=None, transform=None):
+  if dataset == 'voc12':
+    from . import voc12
+    valid = voc12.VOC12PathsDataset(data_dir, domain or 'train_aug', transform)
+  else:
+    from . import coco14
+    valid = coco14.COCO14PathsDataset(data_dir, domain or 'train2014', transform)
+
+  valid.info = DatasetInfo.from_metafile(dataset)
+
+  return valid
+
+
 def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
   if 'cutormixup' in augment:
     print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
