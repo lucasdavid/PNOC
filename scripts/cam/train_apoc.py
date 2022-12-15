@@ -38,7 +38,7 @@ parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=st
 # Network
 parser.add_argument("--architecture", default="resnet50", type=str)
 parser.add_argument("--mode", default="normal", type=str)  # fix
-parser.add_argument("--regularization", default=None, type=str)  # kernel_usage
+parser.add_argument("--regularization", default=None, type=str)  # orthogonal
 parser.add_argument("--trainable-stem", default=True, type=str2bool)
 parser.add_argument("--dilated", default=False, type=str2bool)
 parser.add_argument("--restore", default=None, type=str)
@@ -108,7 +108,14 @@ if __name__ == "__main__":
     print(f"{k.ljust(pad)}: {v}")
   print("===================")
 
-  wandb_run = wandb.init(project="research-wsss", entity="lerdl", config=args)
+  wandb_run = wandb.init(
+    name=TAG,
+    job_type="train",
+    entity="lerdl",
+    project="research-wsss",
+    config=args,
+    tags=[args.dataset, args.architecture, "apoc"],
+  )
 
   log_dir = create_directory(f"./experiments/logs/")
   data_dir = create_directory(f"./experiments/data/")
@@ -271,7 +278,7 @@ if __name__ == "__main__":
     ocnet.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(classes) for th in thresholds}
+    iou_meters = {th: Calculator_For_mIoU(classes) for th in thresholds}
 
     targets, preds = [], []
 
@@ -292,18 +299,11 @@ if __name__ == "__main__":
         cams_batch = cams_batch.transpose(0, 2, 3, 1)
 
         if step == 0:
-          cg_preds_batch = to_numpy(torch.sigmoid(logits))
+          images_batch = to_numpy(images_batch)
+          preds_batch = to_numpy(torch.sigmoid(logits))
+          wandb_utils.log_cams(images_batch, targets_batch, preds_batch, oc_preds_batch, cams_batch, classes)
 
-          wandb_utils.log_evaluation_table(
-            to_numpy(images_batch),
-            targets_batch,
-            cg_preds_batch,
-            oc_preds_batch,
-            cams_batch,
-            classes,
-          )
-
-        accumulate_batch_iou_lowres(masks_batch, cams_batch, meter_dic)
+        accumulate_batch_iou_lowres(masks_batch, cams_batch, iou_meters)
 
     preds, targets = (np.concatenate(preds, axis=0),
                       np.concatenate(targets, axis=0))
@@ -311,20 +311,10 @@ if __name__ == "__main__":
     rm = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='macro')
     rw = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='weighted')
 
-    best_th = 0.0
-    best_mIoU = 0.0
-    best_iou = None
+    t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
+    del images_batch, targets, preds, labels_mask, cams_batch, iou_meters
 
-    for th in thresholds:
-      mIoU, mIoU_foreground, iou, *_ = meter_dic[th].get(clear=True, detail=True)
-      if best_mIoU < mIoU:
-        best_th = th
-        best_mIoU = mIoU
-        best_iou = [round(iou[c], 2) for c in train_dataset.info.classes]
-
-    del images_batch, targets, preds, labels_mask, cams_batch, meter_dic
-
-    return best_th, best_mIoU, best_iou, rm, rw
+    return t, miou, iou, rm, rw
 
   train_iterator = Iterator(train_loader)
 
@@ -410,6 +400,9 @@ if __name__ == "__main__":
 
     # region logging
     epoch = step // step_valid
+    do_logging = (step + 1) % step_log == 0
+    do_validation = (step + 1) % step_valid == 0
+
     train_metrics.update({
       "loss": cg_loss.item(),
       "c_loss": c_loss.item(),
@@ -423,7 +416,7 @@ if __name__ == "__main__":
       "k": k,
     })
 
-    if (step + 1) % step_log == 0:
+    if do_logging:
       (cg_loss, c_loss, p_loss, re_loss, o_loss, ot_loss, ap, ao, ow, k) = train_metrics.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(cgopt))
@@ -450,12 +443,10 @@ if __name__ == "__main__":
       data_dic["train"].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log({f"train/{k}": v for k, v in data.items()} | {"epoch": epoch}, commit=False)
-
-      wandb.log({
-        "train/features": features,
-        "train/re_features": re_features,
-      })
+      wandb.log(
+        {f"train/{k}": v for k, v in data.items()} | {"epoch": epoch},
+        commit=not do_validation
+      )
 
       log(
         "iteration    = {iteration:,}\n"
@@ -474,16 +465,17 @@ if __name__ == "__main__":
         "focal_factor = {focal_factor}\n"
         "choices      = {choices}\n".format(**data)
       )
-
-      # endregion
+    # endregion
 
     # region evaluation
-    if (step + 1) % step_valid == 0:
-      threshold, mIoU, iou, rm, rw = evaluate(valid_loader)
+    if do_validation:
+      threshold, miou, iou, rm, rw = evaluate(valid_loader)
 
-      if best_train_mIoU == -1 or best_train_mIoU < mIoU:
-        best_train_mIoU = mIoU
-        wandb.run.summary["best_train_miou"] = mIoU
+      if best_train_mIoU == -1 or best_train_mIoU < miou:
+        best_train_mIoU = miou
+        wandb.run.summary["train/best_t"] = threshold
+        wandb.run.summary["train/best_miou"] = miou
+        wandb.run.summary["train/best_iou"] = iou
       
       rm = dict(zip('precision_m recall_m f1_m'.split(), rm))
       rw = dict(zip('precision_w recall_w f1_w'.split(), rw))
@@ -491,7 +483,7 @@ if __name__ == "__main__":
       data = {
         "iteration": step + 1,
         "threshold": threshold,
-        "train_mIoU": mIoU,
+        "train_mIoU": miou,
         "train_iou": iou,
         "best_train_mIoU": best_train_mIoU,
         "time": eval_timer.tok(clear=True),
@@ -507,21 +499,18 @@ if __name__ == "__main__":
         "train_mIoU      = {train_mIoU:.2f}%\n"
         "best_train_mIoU = {best_train_mIoU:.2f}%\n"
         "train_iou       = {train_iou}\n"
-        "oc-precision-m  = {precision_m}\n"
-        "oc-recall-m     = {recall_m}\n"
-        "oc-f1-m         = {f1_m}\n"
-        "oc-precision-w  = {precision_w}\n"
-        "oc-recall-w     = {recall_w}\n"
-        "oc-f1-w         = {f1_w}".format(**data)
+        "oc-precision-m  = {precision_m:.2%}\n"
+        "oc-recall-m     = {recall_m:.2%}\n"
+        "oc-f1-m         = {f1_m:.2%}\n"
+        "oc-precision-w  = {precision_w:.2%}\n"
+        "oc-recall-w     = {recall_w:.2%}\n"
+        "oc-f1-w         = {f1_w:.2%}".format(**data)
       )
-      wandb.log({f"val/{k}": v for k, v in data.items()}, commit=False)
+      wandb.log({f"val/{k}": v for k, v in data.items()})
 
       log(f"saving weights `{model_path}`\n")
       save_model_fn()
     # endregion
-  
-    if (step + 1) % step_log == 0 or (step + 1) % step_valid == 0:
-      wandb.log(commit=True)
 
   write_json(data_path, data_dic)
   log(TAG)

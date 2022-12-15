@@ -85,6 +85,22 @@ def accumulate_batch_iou_lowres(masks, cams, meters):
             meter.add(pred_mask, gt_mask)
 
 
+def result_miou_from_thresholds(iou_meters, classes):
+    th_ = iou_ = None
+    # miou_fg_ = None
+    miou_ = 0.0
+
+    for th, meter in iou_meters.items():
+      miou, miou_fg, iou, *_ = meter.get(clear=True, detail=True)
+      if miou_ < miou:
+        th_ = th
+        miou_ = miou
+        # miou_fg_ = miou_fg
+        iou_ = [round(iou[c], 2) for c in classes]
+    
+    return th_, miou_, iou_
+
+
 class Calculator_For_mIoU:
     def __init__(self, classes):
         if isinstance(classes, np.ndarray):

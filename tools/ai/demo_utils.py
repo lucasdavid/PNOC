@@ -37,9 +37,10 @@ def denormalize(image, mean=None, std=None, dtype=np.uint8, tp=True):
         return image
 
 def colormap(cam, shape=None, mode=cv2.COLORMAP_JET):
+    cam = (cam.clip(0, 1) * 255).astype(np.uint8)
     if shape is not None:
-        h, w, c = shape
-        cam = cv2.resize(cam, (w, h))
+        h, w = shape[:2]
+        cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
     cam = cv2.applyColorMap(cam, mode)
     return cam
 

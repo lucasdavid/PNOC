@@ -8,28 +8,40 @@ from core.datasets import imagenet_stats
 
 
 def cams_to_wb_images(images, cams):
-  results = []
+  wb_images, wb_cams = [], []
+
   mu_std = imagenet_stats()
   cams = cams.max(-1)
 
   for b in range(8):
-    image = images[b]
-    cam = cams[b]
+    image = denormalize(images[b], *mu_std)[..., ::-1]
+    cam = colormap(cams[b], image.shape)
+    cam = cv2.addWeighted(image, 0.5, cam, 0.5, 0)
 
-    image = denormalize(image, *mu_std)[..., ::-1]
-    h, w, c = image.shape
+    wb_images.append(wandb.Image(image))
+    wb_cams.append(wandb.Image(cam))
 
-    cam = (cam.clip(0, 1) * 255).astype(np.uint8)
-    cam = cv2.resize(cam, (w, h), interpolation=cv2.INTER_LINEAR)
-    cam = colormap(cam)
-
-    image = cv2.addWeighted(image, 0.5, cam, 0.5, 0)[..., ::-1]
-    image = image.astype(np.float32) / 255.
-
-    results.append(wandb.Image(image))
-
-  return results
+  return wb_images, wb_cams
 
 
-def log_evaluation_table(images, targets, cg_predictions, oc_predictions, cams):
-  ...
+def log_cams(
+    images,
+    targets,
+    predictions,
+    oc_predictions,
+    cams,
+    classes,
+    commit=False,
+):
+  wb_images, wb_cams = cams_to_wb_images(images, cams)
+  
+  wb_targets = [classes[t > 0.5].tolist() for t in targets]
+  wb_predics = [classes[p > 0.5].tolist() for p in predictions]
+  wb_oc_preds = [classes[p > 0.5].tolist() for p in oc_predictions]
+
+  table = wandb.Table(
+    columns=["Image", "CAM", "Labels", "CG Predictions", "OC Predictions"],
+    data=list(zip(wb_images, wb_cams, wb_targets, wb_predics, wb_oc_preds))
+  )
+
+  wandb.log({"val/predictions": table}, commit=commit)
