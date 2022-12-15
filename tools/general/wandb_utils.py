@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 import wandb
 
 from tools.ai.demo_utils import colormap, denormalize
@@ -25,23 +24,30 @@ def cams_to_wb_images(images, cams):
 
 
 def log_cams(
+    classes,
     images,
     targets,
-    predictions,
-    oc_predictions,
     cams,
-    classes,
+    predictions,
+    oc_predictions=None,
     commit=False,
 ):
   wb_images, wb_cams = cams_to_wb_images(images, cams)
-  
-  wb_targets = [classes[t > 0.5].tolist() for t in targets]
-  wb_predics = [classes[p > 0.5].tolist() for p in predictions]
-  wb_oc_preds = [classes[p > 0.5].tolist() for p in oc_predictions]
+  wb_targets = _predictions_to_names(targets, classes)
+  wb_predics = _predictions_to_names(predictions, classes)
+  wb_oc_pred = _predictions_to_names(oc_predictions, classes)
 
-  table = wandb.Table(
-    columns=["Image", "CAM", "Labels", "CG Predictions", "OC Predictions"],
-    data=list(zip(wb_images, wb_cams, wb_targets, wb_predics, wb_oc_preds))
-  )
+  columns = ("Image", "CAM", "Labels", "CG Predictions", "OC Predictions")
+  entries = (wb_images, wb_cams, wb_targets, wb_predics, wb_oc_pred)
+
+  table = wandb.Table()
+  for c, d in zip(columns, entries):
+    if d is not None:
+      table.add_column(c, d)
 
   wandb.log({"val/predictions": table}, commit=commit)
+
+
+def _predictions_to_names(predictions, classes, threshold=0.5):
+  if predictions is not None:
+    return [classes[p > threshold].tolist() for p in predictions]

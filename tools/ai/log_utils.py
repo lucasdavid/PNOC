@@ -3,6 +3,7 @@
 
 import numpy as np
 
+from tools.ai.torch_utils import calculate_parameters
 from tools.general.txt_utils import add_txt
 
 
@@ -18,6 +19,36 @@ def log_config(args, title=None, print_fn=print):
     print_fn(f'{k.ljust(pad)}: {v}')
 
   print_fn(margin)
+
+
+def log_dataset(name, dataset, tt, tv):
+    print(
+        f"Dataset {name}\n"
+        f"  samples={len(dataset)}"
+        f"  classes={dataset.info.num_classes}\n"
+        f"  train transforms={tt}\n"
+        f"  valid transforms={tv}\n\n"
+    )
+
+
+def log_model(name, model, args):
+    print(
+        f"{name}\n"
+        f"  architecture   = {args.architecture}\n"
+        f"  mode           = {args.mode}\n"
+        f"  dilated        = {args.dilated}\n"
+        f"  regularization = {args.regularization}\n"
+        f"  trainable_stem = {args.trainable_stem}\n"
+        f"  total params   = {calculate_parameters(model):.2f}M\n"
+    )
+
+
+def log_opt_params(name, params):
+    print(
+    f"{name} Parameters\n"
+    f"  pretrained:\n    w={len(params[0])} b={len(params[1])}\n"
+    f"  scratch:\n    w={len(params[2])} b={len(params[3])}\n"
+  )
 
 
 def log_print(message='', path=None):
@@ -36,9 +67,11 @@ def log_print(message='', path=None):
     if path:
       add_txt(path, message)
 
+
 class Logger:
     def __init__(self):
         pass
+
 
 class MetricsContainer:
     def __init__(self, metric_names):

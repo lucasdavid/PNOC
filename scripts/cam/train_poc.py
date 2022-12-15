@@ -3,7 +3,8 @@ import os
 
 import numpy as np
 import torch
-import torch.nn as nn
+import wandb
+
 from torch.utils.data import DataLoader
 
 from core import occse
@@ -20,6 +21,7 @@ from tools.ai.torch_utils import *
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
+from tools.general import wandb_utils
 
 parser = argparse.ArgumentParser()
 
@@ -79,9 +81,17 @@ parser.add_argument('--alpha_schedule', default=0.50, type=float)
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
 parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
-# parser.add_argument('--oc-k', default=1.0, type=float)
-# parser.add_argument('--oc-k-init', default=1.0, type=float)
-# parser.add_argument('--oc-k-schedule', default=0.0, type=float)
+parser.add_argument('--oc-k', default=1.0, type=float)
+parser.add_argument('--oc-k-init', default=1.0, type=float)
+parser.add_argument('--oc-k-schedule', default=0.0, type=float)
+
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
+
 
 if __name__ == '__main__':
   # Arguments
@@ -91,55 +101,41 @@ if __name__ == '__main__':
   SEED = args.seed
   DEVICE = args.device
 
-  print('Train Configuration')
-  pad = max(map(len, vars(args))) + 1
-  for k, v in vars(args).items():
-    print(f'{k.ljust(pad)}: {v}')
-  print('===================')
+  wb_run = wandb.init(
+    name=TAG,
+    job_type="train",
+    entity="lerdl",
+    project="research-wsss",
+    config=args,
+    tags=[args.dataset, args.architecture, "poc"],
+  )
 
-  log_dir = create_directory(f'./experiments/logs/')
+  log_config(vars(args), TAG)
+
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
 
-  log_path = log_dir + f'{TAG}.txt'
   data_path = data_dir + f'{TAG}.json'
   model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
-  log = lambda string='': log_print(string, log_path)
 
-  log('[i] {}'.format(TAG))
-  log()
-
-  ###################################################################################
-  # Transform, Dataset, DataLoader
-  ###################################################################################
   tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_classification_datasets(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
-
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  log_dataset(args.dataset, train_dataset, tt, tv)
 
-  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
-  log('[i] train_transform is {}'.format(tt))
-  log('[i] test_transform is {}'.format(tv))
-  log()
-
-  val_iteration = len(train_loader)
-  log_iteration = int(val_iteration * args.print_ratio)
-  step_init = args.first_epoch * val_iteration
-  step_max = args.max_epoch * val_iteration
-
-  log('[i] log_iteration : {:,}'.format(log_iteration))
-  log('[i] val_iteration : {:,}'.format(val_iteration))
-  log('[i] max_iteration : {:,}'.format(step_max))
+  step_valid = len(train_loader)
+  step_log = int(step_valid * args.print_ratio)
+  step_init = args.first_epoch * step_valid
+  step_max = args.max_epoch * step_valid
+  print(f"Iterations: first={step_init} logging={step_log} validation={step_valid} max={step_max}")
 
   # Network
-  model = Classifier(
+  cgnet = Classifier(
     args.architecture,
     train_dataset.info.num_classes,
     mode=args.mode,
@@ -149,64 +145,52 @@ if __name__ == '__main__':
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
-    model.load_state_dict(torch.load(args.restore), strict=True)
-  param_groups = model.get_parameter_groups()  # (exclude_partial_names=['bn'])
-
-  model = model.to(DEVICE)
-  model.train()
-
-  log('[i] Architecture is {}'.format(args.architecture))
-  log('[i] Regularization is {}'.format(args.regularization))
-  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log()
+    cgnet.load_state_dict(torch.load(args.restore), strict=True)
+  log_model("CGNet", cgnet, args)
 
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
-  if 'mcar' in args.oc_architecture:
-    ps = 'avg'
-    topN = 4
-    threshold = 0.5
-    oc_nn = mcar_resnet101(train_dataset.info.num_classes, ps, topN, threshold, inference_mode=True, with_logits=True)
-    ckpt = torch.load(args.oc_pretrained)
-    oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
-  else:
-    oc_nn = Classifier(args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization)
-    oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
+  ocnet = Classifier(
+    args.oc_architecture,
+    train_dataset.info.num_classes,
+    mode=args.mode,
+    regularization=args.oc_regularization
+  )
+  ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
-  oc_nn = oc_nn.to(DEVICE)
-  oc_nn.eval()
-  for child in oc_nn.children():
+  cg_param_groups = cgnet.get_parameter_groups()
+
+  cgnet = cgnet.to(DEVICE)
+  ocnet = ocnet.to(DEVICE)
+  cgnet.train()
+  ocnet.eval()
+  wandb.watch(cgnet, log_freq=100)
+
+  for child in ocnet.children():
     for param in child.parameters():
       param.requires_grad = False
 
-  try:
-    use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
-  except KeyError:
-    use_gpu = '0'
 
-  the_number_of_gpu = len(use_gpu.split(','))
-  if the_number_of_gpu > 1:
-    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
-    model = nn.DataParallel(model)
-    oc_nn = nn.DataParallel(oc_nn)
+  if GPUS_COUNT > 1:
+    print(f"GPUs={GPUS_COUNT}")
+    cgnet = torch.nn.DataParallel(cgnet)
+    ocnet = torch.nn.DataParallel(ocnet)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
+  load_model_fn = lambda: load_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
+  save_model_fn = lambda: save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
 
   # Loss, Optimizer
-  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
+  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
   if args.re_loss == 'L1_Loss':
     r_loss_fn = L1_Loss
   else:
     r_loss_fn = L2_Loss
 
-  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
+  optimizer = get_optimizer(args.lr, args.wd, step_max, cg_param_groups)
+  
+  log_opt_params("CGNet", cg_param_groups)
 
-  optimizer = get_optimizer(args.lr, args.wd, step_max, param_groups)
 
   # Train
   data_dic = {'train': [], 'validation': []}
@@ -214,7 +198,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
+  train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
 
   best_train_mIoU = -1
   thresholds = list(np.arange(0.10, 0.50, 0.05))
@@ -225,44 +209,38 @@ if __name__ == '__main__':
   def evaluate(loader):
     classes = train_dataset.info.classes
 
-    model.eval()
+    cgnet.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(classes) for th in thresholds}
+    iou_meters = {th: Calculator_For_mIoU(classes) for th in thresholds}
 
     with torch.no_grad():
-      for step, (images_batch, targets_batch, gt_masks) in enumerate(loader):
+      for step, (images_batch, targets_batch, masks_batch) in enumerate(loader):
         images_batch = images_batch.to(DEVICE)
         targets_batch = to_numpy(targets_batch)
         masks_batch = to_numpy(masks_batch)
 
-        _, features = model(images_batch, with_cam=True)
+        _, features = cgnet(images_batch, with_cam=True)
 
         labels_mask = targets_batch[..., np.newaxis, np.newaxis]
         cams_batch = to_numpy(make_cam(features.cpu())) * labels_mask
         cams_batch = cams_batch.transpose(0, 2, 3, 1)
 
-        accumulate_batch_iou_lowres(masks_batch, cams_batch, meter_dic)
+        if step == 0:
+          images_batch = to_numpy(images_batch)
+          preds_batch = to_numpy(torch.sigmoid(logits))
+          wandb_utils.log_cams(classes, images_batch, targets_batch, cams_batch, preds_batch)
 
-    best_th = 0.0
-    best_mIoU = 0.0
-    best_iou = None
+        accumulate_batch_iou_lowres(masks_batch, cams_batch, iou_meters)
 
-    for th in thresholds:
-      mIoU, mIoU_foreground, iou, *_ = meter_dic[th].get(clear=True, detail=True)
-      if best_mIoU < mIoU:
-        best_th = th
-        best_mIoU = mIoU
-        best_iou = [round(iou[c], 2) for c in train_dataset.info.classes]
-
-    return best_th, best_mIoU, best_iou
+    return result_miou_from_thresholds(iou_meters, classes)
 
   train_iterator = Iterator(train_loader)
 
   for step in range(step_init, step_max):
     images, targets = train_iterator.get()
 
-    model.train()
+    cgnet.train()
     
     images = images.to(DEVICE)
     targets = targets.float()
@@ -272,11 +250,11 @@ if __name__ == '__main__':
     k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
     # Normal
-    logits, features = model(images, with_cam=True)
+    logits, features = cgnet(images, with_cam=True)
 
     # Puzzle Module
     tiled_images = tile_features(images, args.num_pieces)
-    tiled_logits, tiled_features = model(tiled_images, with_cam=True)
+    tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
     re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
     labels_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
@@ -290,7 +268,7 @@ if __name__ == '__main__':
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
     labels_oc = (targets - labels_mask).clip(min=0)
 
-    cl_logits = oc_nn(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
+    cl_logits = ocnet(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
     o_loss = class_loss_fn(
       cl_logits,
       label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)
@@ -309,7 +287,11 @@ if __name__ == '__main__':
     )
 
     # region logging
-    train_meter.update(
+    epoch = step // step_valid
+    do_logging = (step + 1) % step_log == 0
+    do_validation = (step + 1) % step_valid == 0
+
+    train_metrics.update(
       {
         'loss': loss.item(),
         'c_loss': c_loss.item(),
@@ -322,8 +304,8 @@ if __name__ == '__main__':
       }
     )
 
-    if (step + 1) % log_iteration == 0:
-      (loss, c_loss, p_loss, re_loss, o_loss, ap, ao, k) = train_meter.get(clear=True)
+    if do_logging:
+      (loss, c_loss, p_loss, re_loss, o_loss, ap, ao, k) = train_metrics.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(optimizer))
       cs = to_numpy(choices.int()).tolist()
@@ -347,7 +329,12 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      log(
+      wandb.log(
+        {f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch},
+        commit=not do_validation
+      )
+
+      print(
         'iteration    = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
@@ -366,11 +353,14 @@ if __name__ == '__main__':
       # endregion
 
     # region evaluation
-    if (step + 1) % val_iteration == 0:
+    if do_validation:
       threshold, mIoU, iou = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
+        wandb.run.summary["train/best_t"] = threshold
+        wandb.run.summary["train/best_miou"] = mIoU
+        wandb.run.summary["train/best_iou"] = iou
 
       data = {
         'iteration': step + 1,
@@ -382,8 +372,9 @@ if __name__ == '__main__':
       }
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
+      wandb.log({f"val/{k}": v for k, v in data.items()})
 
-      log(
+      print(
         '\niteration       = {iteration:,}\n'
         'time            = {time:.0f} sec'
         'threshold       = {threshold:.2f}\n'
@@ -392,9 +383,11 @@ if __name__ == '__main__':
         'train_iou       = {train_iou}\n'.format(**data)
       )
 
-      log(f'saving weights `{model_path}`')
+      print(f'saving weights `{model_path}`')
       save_model_fn()
     # endregion
 
   write_json(data_path, data_dic)
-  log(TAG)
+  print(TAG)
+
+  wb_run.finish()
