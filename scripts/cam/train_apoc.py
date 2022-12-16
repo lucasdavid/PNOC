@@ -169,7 +169,6 @@ if __name__ == "__main__":
   ocnet = ocnet.to(DEVICE)
   cgnet.train()
   ocnet.train()
-  wandb.watch(cgnet, log_freq=3)
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")

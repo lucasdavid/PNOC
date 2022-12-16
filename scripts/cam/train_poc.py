@@ -164,7 +164,6 @@ if __name__ == '__main__':
   ocnet = ocnet.to(DEVICE)
   cgnet.train()
   ocnet.eval()
-  wandb.watch(cgnet, log_freq=3)
 
   for child in ocnet.children():
     for param in child.parameters():

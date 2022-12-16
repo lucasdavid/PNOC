@@ -143,7 +143,6 @@ if __name__ == '__main__':
 
   model = model.to(DEVICE)
   model.train()
-  wandb.watch(model, log_freq=3)
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
