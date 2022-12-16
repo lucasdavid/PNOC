@@ -3,6 +3,7 @@
 
 import pickle
 
+
 def dump_pickle(path, data):
     pickle.dump(data, open(path, 'wb'))
 

@@ -8,7 +8,8 @@
 """ResNeSt models"""
 
 import torch
-from .resnet import ResNet, Bottleneck
+
+from .resnet import Bottleneck, ResNet
 
 __all__ = ['resnest50', 'resnest101', 'resnest200', 'resnest269']
 

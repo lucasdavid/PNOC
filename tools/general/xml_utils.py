@@ -3,6 +3,7 @@
 
 import xml.etree.ElementTree as ET
 
+
 def read_xml(xml_path):
     tree = ET.parse(xml_path)
     root = tree.getroot()

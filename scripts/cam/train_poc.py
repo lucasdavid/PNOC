@@ -3,10 +3,9 @@ import os
 
 import numpy as np
 import torch
-import wandb
-
 from torch.utils.data import DataLoader
 
+import wandb
 from core import occse
 from core.datasets import *
 from core.networks import *
@@ -18,10 +17,10 @@ from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
+from tools.general import wandb_utils
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
-from tools.general import wandb_utils
 
 parser = argparse.ArgumentParser()
 

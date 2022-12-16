@@ -7,8 +7,8 @@ import copy
 import os
 import sys
 
-import PIL
 import numpy as np
+import PIL
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

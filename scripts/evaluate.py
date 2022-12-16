@@ -2,12 +2,12 @@ import argparse
 import multiprocessing
 import os
 import sys
-from core.datasets import get_segmentation_evaluation_dataset
 
 import numpy as np
 import pandas as pd
 from PIL import Image
 
+from core.datasets import get_segmentation_evaluation_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file
 

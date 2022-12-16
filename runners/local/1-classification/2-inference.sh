@@ -2,6 +2,7 @@
 
 
 export PYTHONPATH=$(pwd)
+export WANDB_PROJECT=research-wsss-dev
 
 PY=python
 SOURCE=scripts/cam/inference.py

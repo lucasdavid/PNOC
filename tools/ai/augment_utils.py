@@ -37,17 +37,17 @@ class RandomResize:
 
 class RandomResize_For_Segmentation:
 
-  def __init__(self, min_image_size, max_image_size, scale_largest_dim=True):
+  def __init__(self, min_image_size, max_image_size, overcrop=True):
     self.min_image_size = min_image_size
     self.max_image_size = max_image_size
-    self.scale_largest_dim = scale_largest_dim
+    self.overcrop = overcrop
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']
     W, H = image.size
 
     alpha = random.randint(self.min_image_size, self.max_image_size)
-    alpha /= max(W, H) if self.scale_largest_dim else min(W, H)
+    alpha /= max(W, H) if self.overcrop else min(W, H)
 
     size = (int(round(W * alpha)), int(round(H * alpha)))
     if size[0] != W or size[1] == H:
@@ -240,7 +240,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
   def __init__(self, crop_size, channels=3, channels_last=True, with_bbox=False, bg_value=0, ignore_value=255):
     super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
 
-    self.ignore_value
+    self.ignore_value = ignore_value
     self.mask_crop_shape = (self.crop_size, self.crop_size)
 
   def __call__(self, data):
@@ -256,6 +256,22 @@ class RandomCrop_For_Segmentation(RandomCrop):
 
     data['image'] = ci
     data['mask'] = cm
+
+    return data
+
+
+class RandomCropForCAMs(RandomCrop):
+
+  def __init__(self, crop_size):
+    super().__init__(crop_size, channels_last=False)
+    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
+
+  def __call__(self, data):
+    _, src = random_crop_box(self.crop_size, *data['image'].shape[1:])
+    ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
+
+    data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
+    data['cams'] = data['cams'][:, ymin:ymax, xmin:xmax]
 
     return data
 

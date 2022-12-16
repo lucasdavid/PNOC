@@ -1,9 +1,24 @@
-import cv2
-import wandb
+import os
 
+import cv2
+
+import wandb
+from core.datasets import imagenet_stats
 from tools.ai.demo_utils import colormap, denormalize
 from tools.general.txt_utils import add_txt
-from core.datasets import imagenet_stats
+
+
+def setup(name, config, job_type="train", tags=None):
+  wb_run = wandb.init(
+    name=name,
+    job_type=job_type,
+    entity="lerdl",
+    project="research-wsss",
+    config=config,
+    tags=tags,
+  )
+
+  return wb_run
 
 
 def cams_to_wb_images(images, cams):

@@ -5,9 +5,9 @@ import math
 from os.path import join
 
 import torch
-from torch import nn
-import torch.utils.model_zoo as model_zoo
 import torch.nn.functional as F
+import torch.utils.model_zoo as model_zoo
+from torch import nn
 
 BatchNorm = nn.BatchNorm2d
 

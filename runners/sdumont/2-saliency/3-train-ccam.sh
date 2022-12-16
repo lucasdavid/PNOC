@@ -64,19 +64,21 @@ LR=0.0001
 
 TAG=ccam-$ARCH-moco-e$EPOCHS-b$BATCH_SIZE-lr$LR-r2
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
-  --tag             $TAG                 \
-  --alpha           $ALPHA               \
-  --max_epoch       $EPOCHS              \
-  --batch_size      $BATCH_SIZE          \
-  --lr              $LR                  \
-  --accumule_steps  $ACCUMULATE_STEPS    \
-  --num_workers     $WORKERS             \
-  --architecture    $ARCHITECTURE        \
-  --stage4_out_features $S4_OUT_FEATURES \
-  --dilated         $DILATED             \
-  --mode            $MODE                \
-  --weights         $WEIGHTS             \
-  --trainable-stem  $TRAINABLE_STEM      \
-  --image_size      $IMAGE_SIZE          \
+WANDB_PROJECT=research-wsss-dev           \
+WANDB_TAGS="$DATASET,$ARCH,ccam"          \
+CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
+  --tag             $TAG                  \
+  --alpha           $ALPHA                \
+  --max_epoch       $EPOCHS               \
+  --batch_size      $BATCH_SIZE           \
+  --lr              $LR                   \
+  --accumule_steps  $ACCUMULATE_STEPS     \
+  --num_workers     $WORKERS              \
+  --architecture    $ARCHITECTURE         \
+  --stage4_out_features $S4_OUT_FEATURES  \
+  --dilated         $DILATED              \
+  --mode            $MODE                 \
+  --weights         $WEIGHTS              \
+  --trainable-stem  $TRAINABLE_STEM       \
+  --image_size      $IMAGE_SIZE           \
   --data_dir        $DATA_DIR

@@ -2,12 +2,14 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 # modified by Sierkinhane <sierkinhane@163.com>
 
-import sys
+import argparse
+import os
 
-from torch import nn
+import numpy as np
+import torch
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
+import wandb
 from core.ccam import SimMaxLoss, SimMinLoss
 from core.datasets import *
 from core.networks import *
@@ -18,12 +20,12 @@ from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
+from tools.general import wandb_utils
+from tools.general.cam_utils import *
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
-from tools.general.cam_utils import *
 
-# os.environ["NUMEXPR_NUM_THREADS"] = "8"
 parser = argparse.ArgumentParser()
 
 ###############################################################################
@@ -70,8 +72,14 @@ parser.add_argument('--hint_w', type=float, default=1.0)
 # parser.add_argument('--bg_threshold', type=float, default=0.1)
 parser.add_argument('--fg_threshold', type=float, default=0.4)
 
-GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
-GPUS_COUNT = len(GPUS_VISIBLE.split(','))
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
+
+IS_POSITIVE = True
 
 
 class VOCDatasetWithCAMs(VOC12Dataset):
@@ -121,27 +129,8 @@ def random_horizontal_flip(data):
   return data
 
 
-class RandomCropForCams(RandomCrop):
-
-  def __init__(self, crop_size):
-    super().__init__(crop_size, channels_last=False)
-    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
-
-  def __call__(self, data):
-    _, src = random_crop_box(self.crop_size, *data['image'].shape[1:])
-    ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
-
-    data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
-    data['cams'] = data['cams'][:, ymin:ymax, xmin:xmax]
-
-    return data
-
-
 if __name__ == '__main__':
-  # global flag
-  ###################################################################################
   # Arguments
-  ###################################################################################
   args = parser.parse_args()
 
   DEVICE = args.device
@@ -185,7 +174,7 @@ if __name__ == '__main__':
     transforms.ToTensor(),
     transforms.Normalize(mean=imagenet_mean, std=imagenet_std)
   ])
-  aug_transform = transforms.Compose([random_horizontal_flip, RandomCropForCams(SIZE)])
+  aug_transform = transforms.Compose([random_horizontal_flip, RandomCropForCAMs(SIZE)])
   test_transform = transforms.Compose(
     [
       Normalize_For_Segmentation(imagenet_mean, imagenet_std),
@@ -235,7 +224,7 @@ if __name__ == '__main__':
 
   if GPUS_COUNT > 1:
     log('[i] the number of gpu : {}'.format(GPUS_COUNT))
-    model = nn.DataParallel(model)
+    model = torch.nn.DataParallel(model)
 
   model = model.to(DEVICE)
 
@@ -245,7 +234,7 @@ if __name__ == '__main__':
   ###################################################################################
   # Loss, Optimizer
   ###################################################################################
-  hint_loss_fn = nn.BCEWithLogitsLoss(reduction='none').to(DEVICE)
+  hint_loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none').to(DEVICE)
 
   criterion = [
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE),
@@ -253,31 +242,7 @@ if __name__ == '__main__':
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE),
   ]
 
-  optimizer = PolyOptimizer(
-    [
-      {
-        'params': param_groups[0],
-        'lr': args.lr,
-        'weight_decay': args.wd
-      }, {
-        'params': param_groups[1],
-        'lr': 2 * args.lr,
-        'weight_decay': 0
-      }, {
-        'params': param_groups[2],
-        'lr': 10 * args.lr,
-        'weight_decay': args.wd
-      }, {
-        'params': param_groups[3],
-        'lr': 20 * args.lr,
-        'weight_decay': 0
-      }
-    ],
-    lr=args.lr,
-    momentum=0.9,
-    weight_decay=args.wd,
-    max_step=max_iteration
-  )
+  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
 
   #################################################################################################
   # Train

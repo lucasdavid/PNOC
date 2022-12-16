@@ -1,8 +1,9 @@
-import cv2
 import random
-import numpy as np
 
+import cv2
+import numpy as np
 from PIL import Image
+
 
 def get_strided_size(orig_size, stride):
     return ((orig_size[0]-1)//stride+1, (orig_size[1]-1)//stride+1)

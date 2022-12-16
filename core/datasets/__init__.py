@@ -191,11 +191,12 @@ def get_segmentation_transforms(
   max_image_size,
   image_size,
   augment,
+  overcrop: bool = True,
 ):
   mean, std = imagenet_stats()
 
   tt = transforms.Compose([
-    RandomResize_For_Segmentation(min_image_size, max_image_size),
+    RandomResize_For_Segmentation(min_image_size, max_image_size, overcrop=overcrop),
     RandomHorizontalFlip_For_Segmentation(),
     Normalize_For_Segmentation(mean, std),
     RandomCrop_For_Segmentation(image_size),

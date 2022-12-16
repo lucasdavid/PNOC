@@ -3,6 +3,7 @@
 
 export PYTHONPATH=$(pwd)
 export OMP_NUM_THREADS=8
+export WANDB_PROJECT=research-wsss-dev
 
 PY=python
 SOURCE=scripts/cam/train_vanilla.py

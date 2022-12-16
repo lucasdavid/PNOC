@@ -6,8 +6,8 @@ import sys
 import numpy as np
 import pandas as pd
 from PIL import Image
-from tools.ai.demo_utils import crf_inference_label
 
+from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file, str2bool
 
 parser = argparse.ArgumentParser()

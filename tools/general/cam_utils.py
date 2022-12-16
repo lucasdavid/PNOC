@@ -3,9 +3,10 @@ import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
-from tools.ai.torch_utils import *
-from tools.ai.demo_utils import *
 from torchvision import utils
+
+from tools.ai.demo_utils import *
+from tools.ai.torch_utils import *
 
 
 def check_positive(am):

@@ -1,10 +1,12 @@
 from __future__ import division
+
 import math
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
-import torch
 import torch.utils.model_zoo as model_zoo
+from torch.nn import init
 
 __all__ = ['res2next50']
 model_urls = {

@@ -1,8 +1,9 @@
 export PYTHONPATH=$(pwd)
 export OMP_NUM_THREADS=8
+export WANDB_PROJECT=research-wsss-dev
 
 PY=python
-SOURCE=scripts/ccam/train.py
+SOURCE=scripts/ccam/train_with_cam_hints.py
 DEVICE=cuda
 DEVICES=0
 WORKERS=8
@@ -30,6 +31,8 @@ LR=0.0001
 
 TAG=ccam-$ARCH-moco-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
+WANDB_PROJECT=research-wsss-dev           \
+WANDB_TAGS="$DATASET,$ARCH,ccam"          \
 CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --tag             $TAG                  \
   --alpha           $ALPHA                \

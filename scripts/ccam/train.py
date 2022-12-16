@@ -2,11 +2,14 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 # modified by Sierkinhane <sierkinhane@163.com>
 
-import torch
-import wandb
-from torch.utils.data import DataLoader
-from torchvision import transforms
+import argparse
+import os
 
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
+import wandb
 from core.ccam import SimMaxLoss, SimMinLoss
 from core.datasets import *
 from core.networks import *
@@ -17,10 +20,11 @@ from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
+from tools.general import wandb_utils
+from tools.general.cam_utils import *
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
-from tools.general.cam_utils import *
 
 # os.environ["NUMEXPR_NUM_THREADS"] = "8"
 parser = argparse.ArgumentParser()
@@ -88,15 +92,7 @@ if __name__ == '__main__':
   DEVICE = args.device
   SIZE = args.image_size
 
-  wb_run = wandb.init(
-    name=TAG,
-    job_type="train",
-    entity="lerdl",
-    project="research-wsss",
-    config=args,
-    tags=[args.dataset, args.architecture, "ccam"],
-  )
-
+  wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
   data_dir = create_directory('./experiments/data/')

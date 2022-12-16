@@ -1,11 +1,10 @@
-import cv2
 import math
-import torch
 import random
+
+import cv2
 import numpy as np
-
+import torch
 import torch.nn.functional as F
-
 from torch.optim.lr_scheduler import LambdaLR
 
 

@@ -1,35 +1,31 @@
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
-import os
-import sys
-import copy
-import shutil
-import random
 import argparse
-import numpy as np
+import copy
+import os
+import random
+import shutil
+import sys
 
 import imageio
-
+import numpy as np
 import torch
 import torch.nn.functional as F
 
-from core.puzzle_utils import *
-from core.networks import *
 from core.datasets import *
-
-from tools.general.io_utils import *
-from tools.general.time_utils import *
-from tools.general.json_utils import *
-
-from tools.ai.log_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.optim_utils import *
-from tools.ai.torch_utils import *
-from tools.ai.evaluate_utils import *
-
+from core.networks import *
+from core.puzzle_utils import *
 from tools.ai.augment_utils import *
+from tools.ai.demo_utils import *
+from tools.ai.evaluate_utils import *
+from tools.ai.log_utils import *
+from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
+from tools.ai.torch_utils import *
+from tools.general.io_utils import *
+from tools.general.json_utils import *
+from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
