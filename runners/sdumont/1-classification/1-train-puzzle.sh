@@ -93,10 +93,11 @@ run_experiment() {
     --data_dir        $DATA_DIR
 }
 
+ARCH=rs269
+ARCHITECTURE=resnest269
 AUGMENT=colorjitter
 TAG=$DATASET-$ARCH-p
 run_experiment
-
 
 # ARCH=rs101
 # ARCHITECTURE=resnest101
@@ -106,7 +107,6 @@ run_experiment
 # AUGMENT=randaugment_cutormixup
 # TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-cutormixup
 # run_experiment
-
 
 # ARCH=rs101
 # ARCHITECTURE=resnest101

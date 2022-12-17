@@ -51,11 +51,8 @@ def _work(process_id, dataset, args, work_dir):
   length = len(subset)
   missing = 0
 
-  tag = args.tag
   sal_dir = args.sal_dir
-
   cams_dir = args.cams_dir
-  work_dir = f'./experiments/predictions/{tag}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/'
 
   for step, (ori_image, image_id, _) in enumerate(subset):
     png_path = os.path.join(work_dir, image_id + '.png')
@@ -72,6 +69,7 @@ def _work(process_id, dataset, args, work_dir):
       print(f"Error loading CAM file {cam_path}: {error}")
       continue
     except FileNotFoundError:
+      print(f"Missing file {cam_path}")
       missing += 1
       continue
 

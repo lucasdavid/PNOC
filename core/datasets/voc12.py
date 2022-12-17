@@ -226,7 +226,7 @@ class VOC12AffinityDataset(VOC12Dataset):
   def __getitem__(self, idx):
     image, image_id = super().__getitem__(idx)
 
-    label = imageio.imread(self.label_dir + image_id + '.png')
+    label = imageio.imread(os.path.join(self.label_dir, image_id + '.png'))
     label = Image.fromarray(label)
 
     entry = self.transform({'image': image, 'mask': label})

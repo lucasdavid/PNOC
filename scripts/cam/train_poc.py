@@ -100,15 +100,7 @@ if __name__ == '__main__':
   SEED = args.seed
   DEVICE = args.device
 
-  wb_run = wandb.init(
-    name=TAG,
-    job_type="train",
-    entity="lerdl",
-    project="research-wsss",
-    config=args,
-    tags=[args.dataset, args.architecture, "poc"],
-  )
-
+  wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
   data_dir = create_directory(f'./experiments/data/')

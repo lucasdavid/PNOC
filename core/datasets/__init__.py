@@ -54,7 +54,7 @@ def get_classification_datasets(
   train_transforms=None,
   valid_transforms=None,
 ):
-  print(f'Loading {dataset} dataset')
+  print(f'Loading {dataset} Classification Dataset')
 
   if dataset == 'voc12':
     from . import voc12
@@ -74,6 +74,28 @@ def get_classification_datasets(
   return train, valid
 
 
+def get_affinity_datasets(
+  dataset,
+  data_dir,
+  label_dir,
+  path_index,
+  train_transforms=None,
+):
+  print(f'Loading {dataset} Affinity Dataset')
+
+  if dataset == 'voc12':
+    from . import voc12
+    train = voc12.VOC12AffinityDataset(data_dir, 'train_aug', path_index, label_dir, train_transforms)
+  else:
+    from . import coco14
+    train = coco14.COCO14AffinityDataset(data_dir, 'train2014', path_index, label_dir, train_transforms)
+
+  info = DatasetInfo.from_metafile(dataset)
+  train.info = info
+
+  return train
+
+
 def get_segmentation_datasets(
   dataset,
   data_dir,
@@ -85,7 +107,7 @@ def get_segmentation_datasets(
   train_transforms=None,
   valid_transforms=None,
 ):
-  print(f'Loading {dataset} dataset')
+  print(f'Loading {dataset} Segmentation Dataset')
 
   if dataset == 'voc12':
     from . import voc12
@@ -104,6 +126,8 @@ def get_segmentation_datasets(
 
 
 def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
+  print(f'Loading {dataset} Inference Dataset')
+
   if dataset == 'voc12':
     from . import voc12
     infer = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
@@ -117,6 +141,8 @@ def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
 
 
 def get_segmentation_evaluation_dataset(dataset, data_dir, domain=None, transform=None):
+  print(f'Loading {dataset} Segmentation Evaluation Dataset')
+  
   if dataset == 'voc12':
     from . import voc12
     valid = voc12.VOC12PathsDataset(data_dir, domain or 'train_aug', transform)
@@ -154,7 +180,7 @@ def imagenet_stats():
 def get_classification_transforms(
   min_size,
   max_size,
-  crop_sizes,
+  crop_size,
   augment,
 ):
   mean, std = imagenet_stats()
@@ -172,40 +198,61 @@ def get_classification_transforms(
   tt += [Normalize(mean, std)]
   if 'cutmix' not in augment:
     # This will happen inside CutMix.
-    tt += [RandomCrop(crop_sizes)]
+    tt += [RandomCrop(crop_size)]
   tt += [Transpose()]
 
   tt = transforms.Compose(tt)
   tv = transforms.Compose([
     # RandomResize_For_Segmentation(image_size, image_size),
     Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(crop_sizes),
+    Top_Left_Crop_For_Segmentation(crop_size),
     Transpose_For_Segmentation()
   ])
 
   return tt, tv
 
 
+def get_affinity_transforms(
+    min_image_size,
+    max_image_size,
+    crop_size,
+):
+  mean, std = imagenet_stats()
+  
+  tt = transforms.Compose(
+    [
+      RandomResize_For_Segmentation(min_image_size, max_image_size),
+      RandomHorizontalFlip_For_Segmentation(),
+      Normalize_For_Segmentation(mean, std),
+      RandomCrop_For_Segmentation(crop_size),
+      Transpose_For_Segmentation(),
+      Resize_For_Mask(crop_size // 4),
+    ]
+  )
+
+  return tt
+
+
 def get_segmentation_transforms(
-  min_image_size,
-  max_image_size,
-  image_size,
+  min_size,
+  max_size,
+  crop_size,
   augment,
   overcrop: bool = True,
 ):
   mean, std = imagenet_stats()
 
   tt = transforms.Compose([
-    RandomResize_For_Segmentation(min_image_size, max_image_size, overcrop=overcrop),
+    RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
     RandomHorizontalFlip_For_Segmentation(),
     Normalize_For_Segmentation(mean, std),
-    RandomCrop_For_Segmentation(image_size),
+    RandomCrop_For_Segmentation(crop_size),
     Transpose_For_Segmentation()
   ])
 
   tv = transforms.Compose([
     Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(image_size),
+    Top_Left_Crop_For_Segmentation(crop_size),
     Transpose_For_Segmentation()
   ])
 

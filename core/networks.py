@@ -187,7 +187,7 @@ class Classifier(Backbone):
     num_classes=20,
     mode='fix',
     dilated=False,
-    strides=None,
+    strides=(2, 2, 2, 1),
     regularization=None,
     trainable_stem=True
   ):
@@ -241,7 +241,7 @@ class CCAM(Backbone):
     weights='imagenet',
     mode='fix',
     dilated=False,
-    strides=(1, 2, 2, 1),
+    strides=(2, 2, 2, 1),
     trainable_stem=True,
     stage4_out_features=1024
   ):
@@ -283,7 +283,7 @@ class CCAM(Backbone):
 
 class AffinityNet(Backbone):
 
-  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None):
+  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     in_features = self.out_features

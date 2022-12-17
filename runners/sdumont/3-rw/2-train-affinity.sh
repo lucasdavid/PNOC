@@ -37,43 +37,30 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=scripts/rw/train.py
+SOURCE=scripts/rw/train_affinity.py
+
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train_aug
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
 
 # Architecture
 ARCHITECTURE=resnest269
 BATCH_SIZE=32
 LR=0.1
 
-LABEL=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
 TAG=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
-CAM_DIR=ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+LABEL_DIR=./experiments/predictions/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
 
-# CUDA_VISIBLE_DEVICES=0,1,2,3     \
-# $PY $SOURCE                      \
-#     --architecture $ARCHITECTURE \
-#     --tag          $TAG          \
-#     --label_name   $LABEL        \
-#     --batch_size   $BATCH_SIZE   \
-#     --lr           $LR           \
-#     --data_dir     $DATA_DIR
-
-CUDA_VISIBLE_DEVICES=0           \
-$PY inference_rw.py              \
+CUDA_VISIBLE_DEVICES=0,1,2,3     \
+WANDB_TAGS="$DATASET,$ARCH,rw"   \
+$PY $SOURCE                      \
     --architecture $ARCHITECTURE \
-    --model_name   $TAG          \
-    --cam_dir      $CAM_DIR      \
-    --domain       train_aug     \
-    --beta         10            \
-    --exp_times    8             \
+    --tag          $TAG          \
+    --batch_size   $BATCH_SIZE   \
+    --lr           $LR           \
+    --dataset      $DATASET      \
+    --label_dir    $LABEL_DIR    \
     --data_dir     $DATA_DIR
-
-RW_DIR=$TAG@train@beta=10@exp_times=8@rw
-
-$PY evaluate.py                         \
-  --experiment_name "$RW_DIR"           \
-  --domain train                        \
-  --gt_dir "$DATA_DIR"SegmentationClass \
-  --min_th 0.05                         \
-  --max_th 0.9                          \
-  --step_th 0.05

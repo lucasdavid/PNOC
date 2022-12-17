@@ -1,5 +1,6 @@
 import os
 
+import imageio
 import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
@@ -133,18 +134,43 @@ class COCO14PathsDataset(COCO14Dataset):
 
 class COCO14AffinityDataset(COCO14SegmentationDataset):
 
-  def __init__(
-    self,
-    root_dir,
-    domain,
-    indices_from,
-    indices_to,
-    transform=None,
-  ):
-    super().__init__(root_dir, domain, transform=transform)
+  # def __init__(
+  #   self,
+  #   root_dir,
+  #   domain,
+  #   indices_from,
+  #   indices_to,
+  #   transform=None,
+  # ):
+  def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
+    super().__init__(root_dir, domain, masks_dir=label_dir, transform=transform)
     self.extract_aff_lab_func = GetAffinityLabelFromIndices(indices_from, indices_to, classes=81)
 
   def __getitem__(self, idx):
     image, mask = super().__getitem__(idx)
 
     return image, self.extract_aff_lab_func(mask)
+
+
+class COCO14AffinityDataset(COCO14Dataset):
+
+  def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
+    super().__init__(root_dir, domain, transform=transform)
+
+    self.label_dir = label_dir
+    self.path_index = path_index
+
+    self.extract_aff_lab_func = GetAffinityLabelFromIndices(
+      path_index.src_indices, path_index.dst_indices, classes=81
+    )
+
+  def __getitem__(self, idx):
+    image_id, image, _ = super().__getitem__(idx)
+
+    label = imageio.imread(os.path.join(self.label_dir, image_id + '.png'))
+    label = Image.fromarray(label)
+
+    entry = self.transform({'image': image, 'mask': label})
+    image, label = entry['image'], entry['mask']
+
+    return image, self.extract_aff_lab_func(label)

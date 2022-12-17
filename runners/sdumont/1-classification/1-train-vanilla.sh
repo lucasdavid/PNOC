@@ -93,12 +93,14 @@ run_experiment () {
 # TAG=$DATASET-$ARCH
 # run_experiment
 
+AUGMENT=randaugment
+TAG=$DATASET-$ARCH-ra
+run_experiment
 
 # AUGMENT=randaugment
 # TAG=$DATASET-$ARCH-ra
 # CUTMIX=0.5
 # run_experiment
-
 
 # AUGMENT=randaugment_cutmix
 # CUTMIX=0.5
@@ -108,16 +110,11 @@ run_experiment () {
 # TAG=$DATASET-$ARCH-$AUG
 # run_experiment
 
-
 # AUGMENT=colorjitter_cutmix
 # CUTMIX=0.5
 # AUG=cm$CUTMIX
 # TAG=$DATASET-$ARCH-$AUG
 # run_experiment
-
-AUGMENT=randaugment
-TAG=$DATASET-$ARCH-ra
-run_experiment
 
 # LABELSMOOTHING=0.1
 # AUGMENT=randaugment
