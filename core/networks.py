@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from torchvision import models
 
-from tools.ai.torch_utils import freeze_and_eval, gap2d, resize_for_tensors
+from tools.ai.torch_utils import batchnorm_freeze, freeze_and_eval, gap2d, resize_for_tensors
 
 from . import ccam, regularizers
 from .aff_utils import PathIndex
@@ -212,8 +212,8 @@ class Classifier(Backbone):
 
   def train(self, mode=True):
     super().train(mode)
-    freeze_and_eval(self.not_training)
-
+    for m in self.not_training:
+      m.eval()
     return self
 
   def forward(self, x, with_cam=False):

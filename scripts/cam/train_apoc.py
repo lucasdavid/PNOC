@@ -52,6 +52,7 @@ parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument("--max_epoch", default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument("--mixed_precision", default=False, type=str2bool)
 
 parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--wd", default=1e-4, type=float)
@@ -190,6 +191,9 @@ if __name__ == "__main__":
   log_opt_params("CGNet", cg_param_groups)
   log_opt_params("OCNet", oc_param_groups)
 
+  cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
+  oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
+
   # Train
   data_dic = {"train": [], "validation": []}
 
@@ -206,8 +210,6 @@ if __name__ == "__main__":
 
   def evaluate(loader):
     classes = train_dataset.info.classes
-    cgnet.eval()
-    ocnet.eval()
     eval_timer.tik()
 
     iou_meters = {th: Calculator_For_mIoU(classes) for th in thresholds}
@@ -252,8 +254,10 @@ if __name__ == "__main__":
 
   for step in range(step_init, step_max):
     images, targets = train_iterator.get()
-    cgnet.train()
-    ocnet.eval()
+
+    if step % args.accumulate_steps == 0:
+      # weights updated in previous step.
+      cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     images = images.to(DEVICE)
     targets = targets.float()
@@ -263,39 +267,38 @@ if __name__ == "__main__":
     ow =       linear_schedule(step, step_max, args.ow_init,       args.ow,       args.ow_schedule      )
     k  = round(linear_schedule(step, step_max, args.oc_k_init,     args.oc_k,     args.oc_k_schedule    ))
 
-    ##############################
     # CAM Generator Training
-    ##############################
+    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      # Normal
+      logits, features = cgnet(images, with_cam=True)
+      # Puzzle Module
+      tiled_images = tile_features(images, args.num_pieces)
+      tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
+      re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
-    # Normal
-    logits, features = cgnet(images, with_cam=True)
-    # Puzzle Module
-    tiled_images = tile_features(images, args.num_pieces)
-    tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
-    re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
+      targets_sm = label_smoothing(targets, args.label_smoothing).to(logits)
+      c_loss = class_loss_fn(logits, targets_sm).mean()
+      p_loss = class_loss_fn(gap2d(re_features), targets_sm).mean()
 
-    targets_sm = label_smoothing(targets, args.label_smoothing).to(logits)
-    c_loss = class_loss_fn(logits, targets_sm).mean()
-    p_loss = class_loss_fn(gap2d(re_features), targets_sm).mean()
+      re_mask = targets.unsqueeze(2).unsqueeze(3)
+      re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
 
-    re_mask = targets.unsqueeze(2).unsqueeze(3)
-    re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
+      # OC-CSE
+      labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
+      labels_oc = (targets - labels_mask).clip(min=0)
 
-    # OC-CSE
-    labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-    labels_oc = (targets - labels_mask).clip(min=0)
+      images_mask = occse.soft_mask_images(images, features, labels_mask)
+      cl_logits = ocnet(images_mask)
 
-    images_mask = occse.soft_mask_images(images, features, labels_mask)
-    cl_logits = ocnet(images_mask)
+      o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
 
-    o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
-
-    cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
-    cg_loss.backward()
+      cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
+    
+    cg_scaler.scale(cg_loss).backward()
 
     if (step + 1) % args.accumulate_steps == 0:
-      cgopt.step()
-      cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
+      cg_scaler.step(cgopt)
+      cg_scaler.update()
 
     occse.update_focal(
       targets,
@@ -306,27 +309,32 @@ if __name__ == "__main__":
       args.oc_focal_gamma,
     )
 
-    ##############################
     # Ordinary Classifier Training
-    ##############################
     if (step + 1) % args.oc_train_interval_steps != 0:
       # Skip OC-CSE training this step.
       ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
     else:
       ocnet.train()
 
+      oc_step = int((step + 1) // args.oc_train_interval_steps)
+      if (oc_step - 1) % args.accumulate_steps == 0:
+        # weights updated in previous step.
+        ocopt.zero_grad()
+
       if args.oc_train_masks == "cams":
         images_mask = occse.hard_mask_images(images, features, labels_mask, args.oc_train_mask_threshold)
 
-      cl_logits = ocnet(images_mask.detach())
+      with torch.autocast():
+        cl_logits = ocnet(images_mask.detach())
 
-      ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
-      ot_loss.backward()
+        ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
+      oc_scaler.scale(ot_loss).backward()
 
-      oc_step = int((step + 1) // args.oc_train_interval_steps)
       if oc_step % args.accumulate_steps == 0:
-        ocopt.step()
-        ocopt.zero_grad()
+        oc_scaler.step(ocopt)
+        oc_scaler.update()
+
+      ocnet.eval()
 
     # region logging
     epoch = step // step_valid
@@ -399,7 +407,12 @@ if __name__ == "__main__":
 
     # region evaluation
     if do_validation:
+      cgnet.eval()
+      ocnet.eval()
+
       threshold, miou, iou, rm, rw = evaluate(valid_loader)
+
+      cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
         best_train_mIoU = miou

@@ -11,7 +11,7 @@ import torch
 from torch import multiprocessing
 from torch.utils.data import Subset
 
-from core.datasets import VOC12InferenceDataset
+from core.datasets import get_inference_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import create_directory, load_saliency_file
@@ -20,12 +20,14 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=24, type=int)
+
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
-parser.add_argument('--sal_dir', default=None, type=str)
-parser.add_argument('--pred_dir', default=None, type=str)
+parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--experiment_name', default='', type=str)
-parser.add_argument('--domain', default='train', type=str)
+parser.add_argument('--sal_dir', default=None, type=str)
+parser.add_argument('--pred_dir', default=None, type=str)
 
 parser.add_argument('--threshold', default=0.25, type=float)
 parser.add_argument('--crf_t', default=10, type=int)
@@ -40,19 +42,15 @@ def _work(process_id, dataset, args):
   subset = dataset[process_id]
   length = len(subset)
 
-  cam_dir = f'./experiments/predictions/{args.experiment_name}/'
-  pred_dir = args.pred_dir or f'./experiments/predictions/{args.experiment_name}@crf={args.crf_t}/'
-  sal_dir = args.sal_dir
-
   with torch.no_grad():
     for step, (x, _id, _, _) in enumerate(subset):
-      png_path = os.path.join(pred_dir, _id + '.png')
-      sal_file = os.path.join(sal_dir, _id + '.png') if sal_dir else None
+      png_path = os.path.join(PRED_DIR, _id + '.png')
+      sal_file = os.path.join(SAL_DIR, _id + '.png') if SAL_DIR else None
       if os.path.isfile(png_path):
         continue
 
       W, H = x.size
-      data = np.load(cam_dir + _id + '.npy', allow_pickle=True).item()
+      data = np.load(CAM_DIR + _id + '.npy', allow_pickle=True).item()
       
       keys = data['keys']
       cam = data['rw']
@@ -78,10 +76,13 @@ def _work(process_id, dataset, args):
 if __name__ == '__main__':
   args = parser.parse_args()
 
-  set_seed(args.seed)
-  create_directory(args.pred_dir or f'./experiments/predictions/{args.experiment_name}@crf={args.crf_t}/')
+  CAM_DIR = f'./experiments/predictions/{args.experiment_name}/'
+  SAL_DIR = args.sal_dir
+  PRED_DIR = create_directory(args.pred_dir or f'./experiments/predictions/{args.experiment_name}@crf={args.crf_t}/')
 
-  dataset = VOC12InferenceDataset(args.data_dir, args.domain)
+  set_seed(args.seed)
+
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)

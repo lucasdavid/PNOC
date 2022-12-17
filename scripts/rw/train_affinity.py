@@ -115,11 +115,6 @@ if __name__ == '__main__':
   model = model.to(DEVICE)
   model.train()
 
-  try:
-    use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
-  except KeyError:
-    use_gpu = '0'
-
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
     model = torch.nn.DataParallel(model)
