@@ -53,7 +53,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.3, type=float)
+parser.add_argument('--print_ratio', default=0.1, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--label_dir', default='./experiments/predictions/rn50@train_aug@aff', type=str)
@@ -132,7 +132,6 @@ if __name__ == '__main__':
     [{'params': param_groups, 'lr': args.lr, 'weight_decay': args.wd}],
     lr=args.lr,
     momentum=0.9,
-    weight_decay=args.wd,
     max_step=step_max
   )
 

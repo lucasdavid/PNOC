@@ -38,29 +38,51 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/rw/train_affinity.py
+WORKERS=16
 
-DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DOMAIN=train_aug
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
+# Dataset
+IMAGE_SIZE=512
+MIN_IMAGE_SIZE=320
+MAX_IMAGE_SIZE=640
 
 # Architecture
 ARCHITECTURE=resnest269
 BATCH_SIZE=32
 LR=0.1
 
+
+run() {
+    echo "============================================================"
+    echo "Experiment $TAG"
+    echo "============================================================"
+
+    CUDA_VISIBLE_DEVICES=0,1,2,3     \
+    WANDB_TAGS="$DATASET,$ARCH,rw"   \
+    $PY $SOURCE                      \
+        --architecture $ARCHITECTURE \
+        --tag          $TAG          \
+        --batch_size   $BATCH_SIZE   \
+        --image_size   $IMAGE_SIZE   \
+        --min_image_size $MIN_IMAGE_SIZE \
+        --max_image_size $MAX_IMAGE_SIZE \
+        --dataset      $DATASET      \
+        --lr           $LR           \
+        --label_dir    $LABEL_DIR    \
+        --data_dir     $DATA_DIR     \
+        --num_workers  $WORKERS
+}
+
+
+DATASET=voc12
+DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
+DOMAIN=train_aug
 TAG=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
 LABEL_DIR=./experiments/predictions/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
+run
 
-CUDA_VISIBLE_DEVICES=0,1,2,3     \
-WANDB_TAGS="$DATASET,$ARCH,rw"   \
-$PY $SOURCE                      \
-    --architecture $ARCHITECTURE \
-    --tag          $TAG          \
-    --batch_size   $BATCH_SIZE   \
-    --lr           $LR           \
-    --dataset      $DATASET      \
-    --label_dir    $LABEL_DIR    \
-    --data_dir     $DATA_DIR
+# DATASET=coco14
+# DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+# DOMAIN=train2014
+# TAG=
+# LABEL_DIR=
+# run

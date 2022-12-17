@@ -246,7 +246,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
-    ci, (b, a) = super()(image)
+    ci, (b, a) = super().__call__(image)
 
     cm = np.ones(self.mask_crop_shape, mask.dtype) * self.ignore_value
     cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[
