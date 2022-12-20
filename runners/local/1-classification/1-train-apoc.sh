@@ -23,18 +23,18 @@ LABELSMOOTHING=0.1
 EPOCHS=3
 BATCH=8
 
-ARCHITECTURE=resnest50
-ARCH=rs50
+ARCHITECTURE=resnet50
+ARCH=rn50
 
 DILATED=false
 MODE=normal
 TRAINABLE_STEM=true
 
-OC_ARCHITECTURE=resnest50
-OC_PRETRAINED=./experiments/models/ResNeSt50@Puzzle@optimal.pth
+OC_ARCHITECTURE=resnet50
+OC_PRETRAINED=./experiments/models/ResNet50.pth
 # OC_PRETRAINED=./experiments/models/coco14-rs50.pth
 
-TAG=$DATASET-$ARCH-poc@rs50
+TAG=$DATASET-$ARCH-poc@rn50
 
 
 $PY $SOURCE                          \

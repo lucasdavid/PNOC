@@ -126,7 +126,7 @@ def train_step(train_iterator):
   if (step + 1) % args.oc_train_interval_steps == 0:
     ocnet.train()
     oc_step = int((step + 1) // args.oc_train_interval_steps) - 1
-    oc_metrics = train_step_oc(oc_step, inputs, targets_sm, cg_features, images_mask, labels_mask)
+    oc_metrics = train_step_oc(oc_step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow)
     ocnet.eval()
 
   return cg_metrics | oc_metrics | schedules
@@ -189,7 +189,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
   )
 
 
-def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask):
+def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow):
   if args.oc_train_masks == "cams":
     images_mask = occse.hard_mask_images(
       inputs, cg_features.cpu().float(), labels_mask,
