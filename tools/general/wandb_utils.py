@@ -28,9 +28,11 @@ def cams_to_wb_images(images, cams):
   cams = cams.max(-1)
 
   for b in range(8):
-    image = denormalize(images[b], *mu_std)[..., ::-1]
-    cam = colormap(cams[b], image.shape)
-    cam = cv2.addWeighted(image, 0.5, cam, 0.5, 0)
+    image = denormalize(images[b], *mu_std)
+    img = image[..., ::-1]
+    cam = colormap(cams[b], img.shape)
+    cam = cv2.addWeighted(img, 0.5, cam, 0.5, 0)
+    cam = cam[..., ::-1]
 
     wb_images.append(wandb.Image(image))
     wb_cams.append(wandb.Image(cam))

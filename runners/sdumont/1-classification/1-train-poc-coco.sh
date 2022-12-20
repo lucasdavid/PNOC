@@ -143,7 +143,7 @@ run_training () {
 ARCH=rs269
 ARCHITECTURE=resnest269
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_PRETRAINED=experiments/models/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
 BATCH=16
 ACCUMULATE_STEPS=2

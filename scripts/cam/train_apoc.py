@@ -98,6 +98,165 @@ except KeyError:
   GPUS = "0"
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
+THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
+
+
+def train_step(train_iterator):
+  inputs, targets = train_iterator.get()
+
+  images = inputs.to(DEVICE)
+  targets = targets.float()
+  targets_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
+
+  ap =       linear_schedule(step, step_max, args.alpha_init,    args.alpha,    args.alpha_schedule   )
+  ao =       linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
+  ow =       linear_schedule(step, step_max, args.ow_init,       args.ow,       args.ow_schedule      )
+  k  = round(linear_schedule(step, step_max, args.oc_k_init,     args.oc_k,     args.oc_k_schedule    ))
+  schedules = {"alpha": ap, "oc_alpha": ao, "ot_weight": ow, "k": k}
+
+  # CAM Generator Training
+  (
+    cg_features,
+    images_mask,
+    labels_mask,
+    cg_metrics
+  ) = train_step_cg(step, images, targets, targets_sm, ap, ao, k)
+
+  # Ordinary Classifier Training
+  if (step + 1) % args.oc_train_interval_steps == 0:
+    ocnet.train()
+    oc_step = int((step + 1) // args.oc_train_interval_steps) - 1
+    oc_metrics = train_step_oc(oc_step, inputs, targets_sm, cg_features, images_mask, labels_mask)
+    ocnet.eval()
+
+  return cg_metrics | oc_metrics | schedules
+
+
+def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
+  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    # Normal
+    logits, features = cgnet(images, with_cam=True)
+
+    # Puzzle Module
+    tiled_images = tile_features(images, args.num_pieces)
+    tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
+    re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
+
+    c_loss = class_loss_fn(logits, targets_sm).mean()
+    p_loss = class_loss_fn(gap2d(re_features), targets_sm).mean()
+
+    re_mask = targets.unsqueeze(2).unsqueeze(3)
+    re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
+
+    # OC-CSE
+    labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
+    labels_oc = (targets - labels_mask).clip(min=0)
+
+    images_mask = occse.soft_mask_images(images, features, labels_mask)
+    cl_logits = ocnet(images_mask)
+
+    o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
+
+    cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
+
+  cg_scaler.scale(cg_loss).backward()
+
+  if (step + 1) % args.accumulate_steps == 0:
+    cg_scaler.step(cgopt)
+    cg_scaler.update()
+    cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
+
+  occse.update_focal(
+    targets,
+    labels_oc,
+    cl_logits.to(targets),
+    focal_factor,
+    args.oc_focal_momentum,
+    args.oc_focal_gamma,
+  )
+
+  return (
+    features,
+    images_mask,
+    labels_mask,
+    {
+      "loss": cg_loss.item(),
+      "c_loss": c_loss.item(),
+      "p_loss": p_loss.item(),
+      "re_loss": re_loss.item(),
+      "o_loss": o_loss.item(),
+    }
+  )
+
+
+def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask):
+  if args.oc_train_masks == "cams":
+    images_mask = occse.hard_mask_images(
+      inputs, cg_features.cpu().float(), labels_mask,
+      t=args.oc_train_mask_threshold
+    ).to(DEVICE)
+  else:
+    images_mask = images_mask.detach()
+
+  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    cl_logits = ocnet(images_mask)
+
+    ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
+  oc_scaler.scale(ot_loss).backward()
+
+  if (step + 1) % args.accumulate_steps == 0:
+    oc_scaler.step(ocopt)
+    oc_scaler.update()
+    ocopt.zero_grad()
+
+  return {
+    "ot_loss": ot_loss.item()
+  }
+
+
+def evaluate(loader, classes):
+  eval_timer.tik()
+
+  iou_meters = {th: Calculator_For_mIoU(classes) for th in THRESHOLDS}
+
+  targets_, preds_ = [], []
+
+  with torch.no_grad():
+    for step, (inputs, targets, masks) in enumerate(loader):
+      inputs = inputs.to(DEVICE)
+      targets = to_numpy(targets)
+      masks = to_numpy(masks)
+
+      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        logits, features = cgnet(inputs, with_cam=True)
+        oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)).float())
+
+      targets_ += [targets]
+      preds_ += [oc_preds_batch]
+
+      labels_mask = targets[..., np.newaxis, np.newaxis]
+      cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
+      cams = cams.transpose(0, 2, 3, 1)
+
+      if step == 0:
+        inputs = to_numpy(inputs)
+        preds = to_numpy(torch.sigmoid(logits).float())
+        wandb_utils.log_cams(classes, inputs, targets, cams, preds, oc_preds_batch)
+
+      accumulate_batch_iou_lowres(masks, cams, iou_meters)
+
+  preds_, targets_ = (np.concatenate(preds_, axis=0),
+                    np.concatenate(targets_, axis=0))
+
+  rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
+  rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
+
+  t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
+  del inputs, targets_, preds_, labels_mask, cams, iou_meters
+
+  return t, miou, iou, rm, rw
+
+
 if __name__ == "__main__":
   # Arguments
   args = parser.parse_args()
@@ -168,7 +327,7 @@ if __name__ == "__main__":
   cgnet = cgnet.to(DEVICE)
   ocnet = ocnet.to(DEVICE)
   cgnet.train()
-  ocnet.train()
+  ocnet.eval()
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
@@ -203,156 +362,19 @@ if __name__ == "__main__":
   train_metrics = MetricsContainer(["loss", "c_loss", "p_loss", "re_loss", "o_loss", "ot_loss", "alpha", "oc_alpha", "ot_weight", "k"])
 
   best_train_mIoU = -1
-  thresholds = list(np.arange(0.10, 0.50, 0.05))
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
-  def evaluate(loader):
-    classes = train_dataset.info.classes
-    eval_timer.tik()
-
-    iou_meters = {th: Calculator_For_mIoU(classes) for th in thresholds}
-
-    targets, preds = [], []
-
-    with torch.no_grad():
-      for step, (images_batch, targets_batch, masks_batch) in enumerate(loader):
-        images_batch = images_batch.to(DEVICE)
-        targets_batch = to_numpy(targets_batch)
-        masks_batch = to_numpy(masks_batch)
-
-        logits, features = cgnet(images_batch, with_cam=True)
-        oc_preds_batch = to_numpy(torch.sigmoid(ocnet(images_batch)))
-
-        targets += [targets_batch]
-        preds += [oc_preds_batch]
-
-        labels_mask = targets_batch[..., np.newaxis, np.newaxis]
-        cams_batch = to_numpy(make_cam(features.cpu())) * labels_mask
-        cams_batch = cams_batch.transpose(0, 2, 3, 1)
-
-        if step == 0:
-          images_batch = to_numpy(images_batch)
-          preds_batch = to_numpy(torch.sigmoid(logits))
-          wandb_utils.log_cams(classes, images_batch, targets_batch, cams_batch, preds_batch, oc_preds_batch)
-
-        accumulate_batch_iou_lowres(masks_batch, cams_batch, iou_meters)
-
-    preds, targets = (np.concatenate(preds, axis=0),
-                      np.concatenate(targets, axis=0))
-
-    rm = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='macro')
-    rw = skmetrics.precision_recall_fscore_support(targets, preds.round(), average='weighted')
-
-    t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
-    del images_batch, targets, preds, labels_mask, cams_batch, iou_meters
-
-    return t, miou, iou, rm, rw
-
   train_iterator = Iterator(train_loader)
 
   for step in range(step_init, step_max):
-    images, targets = train_iterator.get()
+    metrics_values = train_step(train_iterator)
+    train_metrics.update(metrics_values)
 
-    if step % args.accumulate_steps == 0:
-      # weights updated in previous step.
-      cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
-
-    images = images.to(DEVICE)
-    targets = targets.float()
-
-    ap =       linear_schedule(step, step_max, args.alpha_init,    args.alpha,    args.alpha_schedule   )
-    ao =       linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
-    ow =       linear_schedule(step, step_max, args.ow_init,       args.ow,       args.ow_schedule      )
-    k  = round(linear_schedule(step, step_max, args.oc_k_init,     args.oc_k,     args.oc_k_schedule    ))
-
-    # CAM Generator Training
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-      # Normal
-      logits, features = cgnet(images, with_cam=True)
-      # Puzzle Module
-      tiled_images = tile_features(images, args.num_pieces)
-      tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
-      re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
-
-      targets_sm = label_smoothing(targets, args.label_smoothing).to(logits)
-      c_loss = class_loss_fn(logits, targets_sm).mean()
-      p_loss = class_loss_fn(gap2d(re_features), targets_sm).mean()
-
-      re_mask = targets.unsqueeze(2).unsqueeze(3)
-      re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
-
-      # OC-CSE
-      labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-      labels_oc = (targets - labels_mask).clip(min=0)
-
-      images_mask = occse.soft_mask_images(images, features, labels_mask)
-      cl_logits = ocnet(images_mask)
-
-      o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
-
-      cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
-    
-    cg_scaler.scale(cg_loss).backward()
-
-    if (step + 1) % args.accumulate_steps == 0:
-      cg_scaler.step(cgopt)
-      cg_scaler.update()
-
-    occse.update_focal(
-      targets,
-      labels_oc,
-      cl_logits.to(targets),
-      focal_factor,
-      args.oc_focal_momentum,
-      args.oc_focal_gamma,
-    )
-
-    # Ordinary Classifier Training
-    if (step + 1) % args.oc_train_interval_steps != 0:
-      # Skip OC-CSE training this step.
-      ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
-    else:
-      ocnet.train()
-
-      oc_step = int((step + 1) // args.oc_train_interval_steps)
-      if (oc_step - 1) % args.accumulate_steps == 0:
-        # weights updated in previous step.
-        ocopt.zero_grad()
-
-      if args.oc_train_masks == "cams":
-        images_mask = occse.hard_mask_images(images, features, labels_mask, args.oc_train_mask_threshold)
-
-      with torch.autocast():
-        cl_logits = ocnet(images_mask.detach())
-
-        ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
-      oc_scaler.scale(ot_loss).backward()
-
-      if oc_step % args.accumulate_steps == 0:
-        oc_scaler.step(ocopt)
-        oc_scaler.update()
-
-      ocnet.eval()
-
-    # region logging
     epoch = step // step_valid
     do_logging = (step + 1) % step_log == 0
     do_validation = (step + 1) % step_valid == 0
-
-    train_metrics.update({
-      "loss": cg_loss.item(),
-      "c_loss": c_loss.item(),
-      "p_loss": p_loss.item(),
-      "re_loss": re_loss.item(),
-      "o_loss": o_loss.item(),
-      "ot_loss": ot_loss.item(),
-      "alpha": ap,
-      "oc_alpha": ao,
-      "ot_weight": ow,
-      "k": k,
-    })
 
     if do_logging:
       (cg_loss, c_loss, p_loss, re_loss, o_loss, ot_loss, ap, ao, ow, k) = train_metrics.get(clear=True)
@@ -403,15 +425,10 @@ if __name__ == "__main__":
         "focal_factor = {focal_factor}\n"
         "choices      = {choices}\n".format(**data)
       )
-    # endregion
 
-    # region evaluation
     if do_validation:
       cgnet.eval()
-      ocnet.eval()
-
-      threshold, miou, iou, rm, rw = evaluate(valid_loader)
-
+      threshold, miou, iou, rm, rw = evaluate(valid_loader, train_dataset.info.classes)
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
@@ -452,7 +469,6 @@ if __name__ == "__main__":
 
       print(f"saving weights `{model_path}`\n")
       save_model_fn()
-    # endregion
 
   print(TAG)
   wb_run.finish()
