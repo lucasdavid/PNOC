@@ -66,8 +66,11 @@ def log_cams(
 
   data = [list(row) for row in zip(*entries_v)]
   table = wandb.Table(columns=columns_v, data=data)
-  wandb.log({"val/predictions": table}, commit=commit)
-  wandb.log({"val/cams": wb_cams}, commit=commit)
+
+  wandb.log({
+    "val/predictions": table,
+    "val/cams": wb_cams
+  }, commit=commit)
 
 
 def _predictions_to_names(predictions, classes, threshold=0.5):

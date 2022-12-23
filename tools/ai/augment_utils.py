@@ -91,7 +91,7 @@ class Normalize:
 
   def __call__(self, image):
     x = np.array(image, dtype=np.float32)
-    if isinstance(image, Image.Image): image.close()
+    # if isinstance(image, Image.Image): image.close()
 
     norm_image = np.empty_like(x, np.float32)
 
@@ -114,8 +114,8 @@ class Normalize_For_Segmentation:
     x = np.array(image, dtype=np.float32)
     y = np.array(mask, dtype=np.int64)
 
-    if isinstance(image, Image.Image): image.close()
-    if isinstance(mask, Image.Image): mask.close()
+    # if isinstance(image, Image.Image): image.close()
+    # if isinstance(mask, Image.Image): mask.close()
 
     z = np.empty_like(x, np.float32)
 
@@ -219,7 +219,7 @@ class RandomCrop:
   def __call__(self, x):
     sizes = x.shape[:2] if self.channels_last else x.shape[1:]
     b, a = random_crop_box(self.crop_size, *sizes)
-    
+
     y = np.ones(self.crop_shape, x.dtype) * self.bg_value
 
     if self.channels_last:
@@ -228,7 +228,7 @@ class RandomCrop:
     else:
       crop = x[:, a['ymin']:a['ymax'], a['xmin']:a['xmax']]
       y[:, b['ymin']:b['ymax'], b['xmin']:b['xmax']] = crop
-  
+
     if self.with_bbox:
       return y, (b, a)
     else:
@@ -317,7 +317,7 @@ class MixUp(torch.utils.data.Dataset):
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
-  
+
   def __len__(self):
     return len(self.dataset)
 
@@ -373,7 +373,7 @@ class CutMix(torch.utils.data.Dataset):
 
   def __len__(self):
     return len(self.dataset)
-  
+
   def do_cutmix(self, image_a, target_a, image_b, target_b, alpha):
     # Cut random bbox.
     bH, bW = image_b.shape[1:]

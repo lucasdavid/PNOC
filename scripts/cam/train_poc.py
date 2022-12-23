@@ -178,7 +178,7 @@ if __name__ == '__main__':
     r_loss_fn = L2_Loss
 
   optimizer = get_optimizer(args.lr, args.wd, step_max, cg_param_groups)
-  
+
   log_opt_params("CGNet", cg_param_groups)
 
 
@@ -223,6 +223,8 @@ if __name__ == '__main__':
 
         accumulate_batch_iou_lowres(masks_batch, cams_batch, iou_meters)
 
+    cgnet.train()
+
     return result_miou_from_thresholds(iou_meters, classes)
 
   train_iterator = Iterator(train_loader)
@@ -230,11 +232,10 @@ if __name__ == '__main__':
   for step in range(step_init, step_max):
     images, targets = train_iterator.get()
 
-    cgnet.train()
 
     images = images.to(DEVICE)
     targets = targets.float()
-    
+
     ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
     k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))

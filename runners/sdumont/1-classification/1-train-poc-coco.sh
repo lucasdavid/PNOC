@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-poc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/poc-%j.out
-#SBATCH --time=72:00:00
+#SBATCH --time=96:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -147,6 +147,17 @@ OC_PRETRAINED=experiments/models/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
 BATCH=16
 ACCUMULATE_STEPS=2
-LABELSMOOTHING=0.1
-TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING-b$BATCH-as$ACCUMULATE_STEPS@$OC_NAME
+LABELSMOOTHING=0
+TAG=$DATASET-$ARCH-poc-b$BATCH-as$ACCUMULATE_STEPS@$OC_NAME
 run_training
+
+# ARCH=rs269
+# ARCHITECTURE=resnest269
+# OC_NAME=rs269ra
+# OC_PRETRAINED=experiments/models/coco14-rs269-ra.pth
+# OC_ARCHITECTURE=resnest269
+# BATCH=16
+# ACCUMULATE_STEPS=2
+# LABELSMOOTHING=0.1
+# TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING-b$BATCH-as$ACCUMULATE_STEPS@$OC_NAME
+# run_training

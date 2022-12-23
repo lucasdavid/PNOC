@@ -128,6 +128,8 @@ def train_step(train_iterator):
     oc_step = int((step + 1) // args.oc_train_interval_steps) - 1
     oc_metrics = train_step_oc(oc_step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow)
     ocnet.eval()
+  else:
+    oc_metrics = {}
 
   return cg_metrics | oc_metrics | schedules
 
@@ -219,7 +221,7 @@ def evaluate(loader, classes):
 
   iou_meters = {th: Calculator_For_mIoU(classes) for th in THRESHOLDS}
 
-  targets_, preds_ = [], []
+  # targets_, preds_ = [], []
 
   with torch.no_grad():
     for step, (inputs, targets, masks) in enumerate(loader):
@@ -229,10 +231,10 @@ def evaluate(loader, classes):
 
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
         logits, features = cgnet(inputs, with_cam=True)
-        oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)).float())
+        # oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)).float())
 
-      targets_ += [targets]
-      preds_ += [oc_preds_batch]
+      # targets_ += [targets]
+      # preds_ += [oc_preds_batch]
 
       labels_mask = targets[..., np.newaxis, np.newaxis]
       cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
@@ -241,20 +243,19 @@ def evaluate(loader, classes):
       if step == 0:
         inputs = to_numpy(inputs)
         preds = to_numpy(torch.sigmoid(logits).float())
-        wandb_utils.log_cams(classes, inputs, targets, cams, preds, oc_preds_batch)
+        wandb_utils.log_cams(classes, inputs, targets, cams, preds)
 
       accumulate_batch_iou_lowres(masks, cams, iou_meters)
 
-  preds_, targets_ = (np.concatenate(preds_, axis=0),
-                    np.concatenate(targets_, axis=0))
-
-  rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
-  rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
+  # preds_ = np.concatenate(preds_, axis=0)
+  # targets_ = np.concatenate(targets_, axis=0)
+  # rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
+  # rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
 
   t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
-  del inputs, targets_, preds_, labels_mask, cams, iou_meters
+  # del inputs, targets_, preds_, labels_mask, cams, iou_meters
 
-  return t, miou, iou, rm, rw
+  return t, miou, iou # , rm, rw
 
 
 if __name__ == "__main__":
@@ -428,7 +429,7 @@ if __name__ == "__main__":
 
     if do_validation:
       cgnet.eval()
-      threshold, miou, iou, rm, rw = evaluate(valid_loader, train_dataset.info.classes)
+      threshold, miou, iou = evaluate(valid_loader, train_dataset.info.classes)
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
@@ -436,8 +437,8 @@ if __name__ == "__main__":
         wandb.run.summary["train/best_t"] = threshold
         wandb.run.summary["train/best_miou"] = miou
         wandb.run.summary["train/best_iou"] = iou
-      rm = dict(zip('precision_m recall_m f1_m'.split(), rm))
-      rw = dict(zip('precision_w recall_w f1_w'.split(), rw))
+      # rm = dict(zip('precision_m recall_m f1_m'.split(), rm))
+      # rw = dict(zip('precision_w recall_w f1_w'.split(), rw))
 
       data = {
         "iteration": step + 1,
@@ -447,7 +448,7 @@ if __name__ == "__main__":
         "best_train_mIoU": best_train_mIoU,
         "time": eval_timer.tok(clear=True),
       }
-      data = data | rm | rw
+      # data = data | rm | rw
       data_dic["validation"].append(data)
       write_json(data_path, data_dic)
       wandb.log({f"val/{k}": v for k, v in data.items()})
@@ -459,12 +460,13 @@ if __name__ == "__main__":
         "train_mIoU      = {train_mIoU:.2f}%\n"
         "best_train_mIoU = {best_train_mIoU:.2f}%\n"
         "train_iou       = {train_iou}\n"
-        "oc-precision-m  = {precision_m:.2%}\n"
-        "oc-recall-m     = {recall_m:.2%}\n"
-        "oc-f1-m         = {f1_m:.2%}\n"
-        "oc-precision-w  = {precision_w:.2%}\n"
-        "oc-recall-w     = {recall_w:.2%}\n"
-        "oc-f1-w         = {f1_w:.2%}".format(**data)
+        # "oc-precision-m  = {precision_m:.2%}\n"
+        # "oc-recall-m     = {recall_m:.2%}\n"
+        # "oc-f1-m         = {f1_m:.2%}\n"
+        # "oc-precision-w  = {precision_w:.2%}\n"
+        # "oc-recall-w     = {recall_w:.2%}\n"
+        # "oc-f1-w         = {f1_w:.2%}"
+        .format(**data)
       )
 
       print(f"saving weights `{model_path}`\n")
