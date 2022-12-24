@@ -67,7 +67,9 @@ def get_color_map_dic():
 
 class VOC12Dataset(torch.utils.data.Dataset):
 
-  def __init__(self, root_dir, domain, masks_dir=None, with_image=True, with_id=False, with_tags=False, with_mask=False):
+  def __init__(
+    self, root_dir, domain, masks_dir=None, with_image=True, with_id=False, with_tags=False, with_mask=False
+  ):
     self.root_dir = root_dir
     self.image_dir = os.path.join(self.root_dir, 'JPEGImages/')
     self.xml_dir = os.path.join(self.root_dir, 'Annotations/')
@@ -90,7 +92,7 @@ class VOC12Dataset(torch.utils.data.Dataset):
 
   def __len__(self):
     return len(self.image_id_list)
-  
+
   def get_image_path(self, image_id):
     return os.path.join(self.image_dir, image_id + '.jpg')
 
@@ -233,3 +235,31 @@ class VOC12AffinityDataset(VOC12Dataset):
     image, label = entry['image'], entry['mask']
 
     return image, self.extract_aff_lab_func(label)
+
+
+class VOC12HRCAMsDataset(VOC12Dataset):
+
+  def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
+    super().__init__(root_dir, domain, with_id=True, with_tags=True)
+    self.cams_dir = cams_dir
+    self.resize_fn = resize_fn
+    self.normalize_fn = normalize_fn
+    self.transform = transform
+
+  def __getitem__(self, index):
+    image, image_id, tags = super().__getitem__(index)
+    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+
+    mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
+    mask_pack = np.load(mask_path, allow_pickle=True).item()
+    cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
+
+    image = self.resize_fn(image)
+    image = self.normalize_fn(image)
+
+    cams = self.resize_fn(cams)
+
+    data = self.transform({'image': image, 'masks': cams})
+    image, cams = data['image'], data['masks']
+
+    return image, label, cams

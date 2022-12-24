@@ -50,6 +50,7 @@ IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=64
 ACCUMULATE_STEPS=1
+MIXED_PRECISION=true
 
 ARCHITECTURE=resnet50
 ARCH=rn50
@@ -73,6 +74,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
   --batch_size      $BATCH_SIZE           \
   --lr              $LR                   \
   --accumule_steps  $ACCUMULATE_STEPS     \
+  --mixed_precision $MIXED_PRECISION      \
   --num_workers     $WORKERS              \
   --architecture    $ARCHITECTURE         \
   --stage4_out_features $S4_OUT_FEATURES  \

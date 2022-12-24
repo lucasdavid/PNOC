@@ -83,6 +83,13 @@ class RandomHorizontalFlip_For_Segmentation:
     return data
 
 
+def random_hflip_fn(data):
+  if bool(random.getrandbits(1)):
+    data['image'] = data['image'].flip(-1)
+    data['masks'] = data['masks'].flip(-1)
+  return data
+
+
 class Normalize:
 
   def __init__(self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
@@ -192,13 +199,18 @@ def random_crop_box(crop_size, h, w):
 
   if h_space > 0:
     cont_top = 0
-    img_top = random.randrange(h_space + 1)     # rand(65)   = 10
+    img_top = random.randrange(h_space + 1)  # rand(65)   = 10
   else:
     cont_top = random.randrange(-h_space + 1)
     img_top = 0
 
-  dst_bbox = {'xmin': cont_left, 'ymin': cont_top, 'xmax': cont_left + cw, 'ymax': cont_top + ch}  # 20,  0, 20+300, 0+448
-  src_bbox = {'xmin': img_left, 'ymin': img_top, 'xmax': img_left + cw, 'ymax': img_top + ch}      #  0, 10,    300, 10+448
+  dst_bbox = {
+    'xmin': cont_left,
+    'ymin': cont_top,
+    'xmax': cont_left + cw,
+    'ymax': cont_top + ch
+  }  # 20,  0, 20+300, 0+448
+  src_bbox = {'xmin': img_left, 'ymin': img_top, 'xmax': img_left + cw, 'ymax': img_top + ch}  #  0, 10,    300, 10+448
 
   return dst_bbox, src_bbox
 
@@ -211,9 +223,7 @@ class RandomCrop:
     self.crop_size = crop_size
     self.channels_last = channels_last
     self.crop_shape = (
-      (self.crop_size, self.crop_size, channels)
-      if channels_last
-      else (channels, self.crop_size, self.crop_size)
+      (self.crop_size, self.crop_size, channels) if channels_last else (channels, self.crop_size, self.crop_size)
     )
 
   def __call__(self, x):
@@ -249,10 +259,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
     ci, (b, a) = super().__call__(image)
 
     cm = np.ones(self.mask_crop_shape, mask.dtype) * self.ignore_value
-    cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[
-      a['ymin']:a['ymax'],
-      a['xmin']:a['xmax'],
-    ]
+    cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[a['ymin']:a['ymax'], a['xmin']:a['xmax'],]
 
     data['image'] = ci
     data['mask'] = cm
@@ -312,6 +319,7 @@ class Resize_For_Mask:
 
 
 class MixUp(torch.utils.data.Dataset):
+
   def __init__(self, dataset, num_mix=1, beta=1., prob=1.0):
     self.dataset = dataset
     self.num_mix = num_mix
@@ -342,7 +350,6 @@ class MixUp(torch.utils.data.Dataset):
 
 # endregion
 
-
 # region CutMix
 
 
@@ -351,8 +358,8 @@ def rand_bbox(h, w, lam):
   cw = np.int(w * ratio)
   ch = np.int(h * ratio)
 
-  cx = np.random.randint(cw//2, w - cw//2)
-  cy = np.random.randint(ch//2, h - ch//2)
+  cx = np.random.randint(cw // 2, w - cw // 2)
+  cy = np.random.randint(ch // 2, h - ch // 2)
 
   h1 = np.clip(cy - ch // 2, 0, h)
   h2 = np.clip(cy + ch // 2, 0, h)
@@ -383,14 +390,14 @@ class CutMix(torch.utils.data.Dataset):
     # Central crop if B larger than A.
     aH, aW = image_a.shape[1:]
     bH, bW = image_b.shape[1:]
-    bhs = (bH-aH) // 2 if bH > aH else 0
-    bws = (bW-aW) // 2 if bW > aW else 0
-    image_b = image_b[:, bhs:bhs+aH, bws:bws+aW]
+    bhs = (bH - aH) // 2 if bH > aH else 0
+    bws = (bW - aW) // 2 if bW > aW else 0
+    image_b = image_b[:, bhs:bhs + aH, bws:bws + aW]
 
     # Random (x,y) placement if A larger than B.
     bH, bW = image_b.shape[1:]
-    bhs, bws = random.randint(0, aH-bH), random.randint(0, aW-bW)
-    image_a[:, bhs:bhs+bH, bws:bws+bW] = image_b
+    bhs, bws = random.randint(0, aH - bH), random.randint(0, aW - bW)
+    image_a[:, bhs:bhs + bH, bws:bws + bW] = image_b
 
     alpha = 1 - ((bH * bW) / (aH * aW))
     target_a = target_a * alpha + target_b * (1. - alpha)
@@ -418,6 +425,7 @@ class CutMix(torch.utils.data.Dataset):
 
 
 class CutOrMixUp(CutMix):
+
   def __getitem__(self, index):
     x, y = self.dataset[index]
 
@@ -440,5 +448,6 @@ class CutOrMixUp(CutMix):
         y = y * alpha + yb * (1. - alpha)
 
     return x, y
+
 
 # endregion

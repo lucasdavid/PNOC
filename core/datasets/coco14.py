@@ -48,11 +48,7 @@ class COCO14Dataset(Dataset):
     return self.load_sample_with_labels(idx)
 
   def get_image_path(self, image_id):
-    return os.path.join(
-      self.root_dir,
-      IMAGES_DIR,
-      f"COCO_{self.domain}_{image_id}.jpg"
-    )
+    return os.path.join(self.root_dir, IMAGES_DIR, f"COCO_{self.domain}_{image_id}.jpg")
 
   def load_sample_with_labels(self, idx, ignore_bg_only=True):
     label = self.label_list[idx]
@@ -132,26 +128,6 @@ class COCO14PathsDataset(COCO14Dataset):
     return image_id, image_path, mask_path
 
 
-class COCO14AffinityDataset(COCO14SegmentationDataset):
-
-  # def __init__(
-  #   self,
-  #   root_dir,
-  #   domain,
-  #   indices_from,
-  #   indices_to,
-  #   transform=None,
-  # ):
-  def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
-    super().__init__(root_dir, domain, masks_dir=label_dir, transform=transform)
-    self.extract_aff_lab_func = GetAffinityLabelFromIndices(indices_from, indices_to, classes=81)
-
-  def __getitem__(self, idx):
-    image, mask = super().__getitem__(idx)
-
-    return image, self.extract_aff_lab_func(mask)
-
-
 class COCO14AffinityDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
@@ -160,9 +136,7 @@ class COCO14AffinityDataset(COCO14Dataset):
     self.label_dir = label_dir
     self.path_index = path_index
 
-    self.extract_aff_lab_func = GetAffinityLabelFromIndices(
-      path_index.src_indices, path_index.dst_indices, classes=81
-    )
+    self.extract_aff_lab_func = GetAffinityLabelFromIndices(path_index.src_indices, path_index.dst_indices, classes=81)
 
   def __getitem__(self, idx):
     image_id, image, _ = super().__getitem__(idx)
@@ -174,3 +148,29 @@ class COCO14AffinityDataset(COCO14Dataset):
     image, label = entry['image'], entry['mask']
 
     return image, self.extract_aff_lab_func(label)
+
+
+class COCO14HRCAMsDataset(COCO14Dataset):
+
+  def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
+    super().__init__(root_dir, domain, transform)
+    self.cams_dir = cams_dir
+    self.resize_fn = resize_fn
+    self.normalize_fn = normalize_fn
+
+  def __getitem__(self, index):
+    image_id, image, label = super().__getitem__(index)
+
+    mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
+    mask_pack = np.load(mask_path, allow_pickle=True).item()
+    cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
+
+    image = self.resize_fn(image)
+    image = self.normalize_fn(image)
+
+    cams = self.resize_fn(cams)
+
+    data = self.transform({'image': image, 'masks': cams})
+    image, cams = data['image'], data['masks']
+
+    return image, label, cams

@@ -26,21 +26,16 @@ from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
 
-# os.environ["NUMEXPR_NUM_THREADS"] = "8"
 parser = argparse.ArgumentParser()
 
-###############################################################################
 # Dataset
-###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
-###############################################################################
 # Network
-###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
@@ -50,15 +45,14 @@ parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--stage4_out_features', default=1024, type=int)
 parser.add_argument('--restore', default=None, type=str)
 
-###############################################################################
 # Hyperparameter
-###############################################################################
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--batch_size_val', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=10, type=int)
 parser.add_argument('--depth', default=50, type=int)
 parser.add_argument('--accumule_steps', default=1, type=int)
+parser.add_argument("--mixed_precision", default=False, type=str2bool)
 
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -81,10 +75,9 @@ GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
 IS_POSITIVE = True
-
+IOU_THRESHOLDS = np.arange(0., 0.50, 0.05).astype(float).tolist()
 
 if __name__ == '__main__':
-  # Arguments
   args = parser.parse_args()
 
   TAG = args.tag
@@ -112,7 +105,9 @@ if __name__ == '__main__':
   train_dataset, valid_dataset = get_classification_datasets(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size_val, num_workers=args.num_workers, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
@@ -136,6 +131,7 @@ if __name__ == '__main__':
   log_model("CCAM", model, args)
 
   ccam_param_groups = model.get_parameter_groups()
+  log_opt_params("CCAM", ccam_param_groups)
 
   model = model.to(DEVICE)
   model.train()
@@ -155,7 +151,7 @@ if __name__ == '__main__':
   ]
 
   optimizer = get_optimizer(args.lr, args.wd, step_max, ccam_param_groups)
-  log_opt_params("CCAM", ccam_param_groups)
+  scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
   data_dic = {'train': [], 'validation': []}
@@ -166,7 +162,6 @@ if __name__ == '__main__':
   train_metrics = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
 
   best_train_mIoU = -1
-  thresholds = np.arange(0., 0.50, 0.05).astype(float).tolist()
 
   def evaluate(loader):
     length = len(loader)
@@ -177,14 +172,16 @@ if __name__ == '__main__':
     eval_timer.tik()
 
     classes = ['background', 'foreground']
-    iou_meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
+    iou_meters = {th: MIoUCalcFromNames(classes) for th in IOU_THRESHOLDS}
 
     with torch.no_grad():
       for _, (images, _, masks) in enumerate(loader):
         B, C, H, W = images.size()
-        _, _, ccams = model(images.to(DEVICE))
 
-        ccams = resize_for_tensors(ccams.cpu(), (H, W))
+        with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+          _, _, ccams = model(images.to(DEVICE))
+
+        ccams = resize_for_tensors(ccams.cpu().float(), (H, W))
         ccams = to_numpy(make_cam(ccams).squeeze())
         masks = to_numpy(masks)
 
@@ -196,19 +193,23 @@ if __name__ == '__main__':
     model.train()
 
     for step, (images, labels) in enumerate(train_loader):
-      fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
-      loss1 = criterion[0](fg_feats)
-      loss2 = criterion[1](bg_feats, fg_feats)
-      loss3 = criterion[2](bg_feats)
+      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
-      loss = loss1 + loss2 + loss3
-      loss.backward()
+        loss1 = criterion[0](fg_feats)
+        loss2 = criterion[1](bg_feats, fg_feats)
+        loss3 = criterion[2](bg_feats)
+
+        loss = loss1 + loss2 + loss3
+
+      scaler.scale(loss).backward()
 
       if (step + 1) % args.accumule_steps == 0:
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
         optimizer.zero_grad()
-      
+
       if epoch == 0 and step == 600:
         IS_POSITIVE = check_positive(ccams)
         print(f"Is Negative: {IS_POSITIVE}")
@@ -228,6 +229,7 @@ if __name__ == '__main__':
       )
 
       if do_logging:
+        ccams = torch.sigmoid(ccams)
         visualize_heatmap(TAG, images.clone().detach(), ccams, 0, step)
         loss, positive_loss, negative_loss = train_metrics.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
@@ -243,10 +245,7 @@ if __name__ == '__main__':
         }
         data_dic['train'].append(data)
 
-        wandb.log(
-          {f"train/{k}": v for k, v in data.items()},
-          commit=not do_validation
-        )
+        wandb.log({f"train/{k}": v for k, v in data.items()}, commit=not do_validation)
 
         print(
           'Epoch[{epoch:,}/{max_epoch:,}] iteration={iteration:,} lr={learning_rate:.4f} '
@@ -285,7 +284,7 @@ if __name__ == '__main__':
       'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
       'time={time:.0f}sec'.format(**data)
     )
-    
+
     print(f'saving weights `{model_path}`')
     save_model_fn()
     # endregion

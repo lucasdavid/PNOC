@@ -3,9 +3,12 @@ export OMP_NUM_THREADS=8
 
 PY=python
 SOURCE=scripts/ccam/train.py
+WORKERS=4
 DEVICE=cuda
 DEVICES=0
-WORKERS=8
+# DEVICE=cpu
+# DEVICES=""
+
 
 DATASET=voc12
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
@@ -16,6 +19,7 @@ IMAGE_SIZE=64
 BATCH_SIZE=8
 EPOCHS=5
 ACCUMULATE_STEPS=1
+MIXED_PRECISION=true
 
 ARCHITECTURE=resnet50
 ARCH=rn50
@@ -39,6 +43,7 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --batch_size      $BATCH_SIZE           \
   --lr              $LR                   \
   --accumule_steps  $ACCUMULATE_STEPS     \
+  --mixed_precision $MIXED_PRECISION      \
   --num_workers     $WORKERS              \
   --architecture    $ARCHITECTURE         \
   --stage4_out_features $S4_OUT_FEATURES  \

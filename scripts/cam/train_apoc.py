@@ -108,19 +108,14 @@ def train_step(train_iterator):
   targets = targets.float()
   targets_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
 
-  ap =       linear_schedule(step, step_max, args.alpha_init,    args.alpha,    args.alpha_schedule   )
-  ao =       linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
-  ow =       linear_schedule(step, step_max, args.ow_init,       args.ow,       args.ow_schedule      )
-  k  = round(linear_schedule(step, step_max, args.oc_k_init,     args.oc_k,     args.oc_k_schedule    ))
+  ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
+  ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
+  ow = linear_schedule(step, step_max, args.ow_init, args.ow, args.ow_schedule)
+  k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
   schedules = {"alpha": ap, "oc_alpha": ao, "ot_weight": ow, "k": k}
 
   # CAM Generator Training
-  (
-    cg_features,
-    images_mask,
-    labels_mask,
-    cg_metrics
-  ) = train_step_cg(step, images, targets, targets_sm, ap, ao, k)
+  (cg_features, images_mask, labels_mask, cg_metrics) = train_step_cg(step, images, targets, targets_sm, ap, ao, k)
 
   # Ordinary Classifier Training
   if (step + 1) % args.oc_train_interval_steps == 0:
@@ -178,10 +173,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
   )
 
   return (
-    features,
-    images_mask,
-    labels_mask,
-    {
+    features, images_mask, labels_mask, {
       "loss": cg_loss.item(),
       "c_loss": c_loss.item(),
       "p_loss": p_loss.item(),
@@ -194,8 +186,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow):
   if args.oc_train_masks == "cams":
     images_mask = occse.hard_mask_images(
-      inputs, cg_features.cpu().float(), labels_mask,
-      t=args.oc_train_mask_threshold
+      inputs, cg_features.cpu().float(), labels_mask, t=args.oc_train_mask_threshold
     ).to(DEVICE)
   else:
     images_mask = images_mask.detach()
@@ -211,9 +202,7 @@ def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mas
     oc_scaler.update()
     ocopt.zero_grad()
 
-  return {
-    "ot_loss": ot_loss.item()
-  }
+  return {"ot_loss": ot_loss.item()}
 
 
 def evaluate(loader, classes):
@@ -255,7 +244,7 @@ def evaluate(loader, classes):
   t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
   # del inputs, targets_, preds_, labels_mask, cams, iou_meters
 
-  return t, miou, iou # , rm, rw
+  return t, miou, iou  # , rm, rw
 
 
 if __name__ == "__main__":
@@ -272,7 +261,7 @@ if __name__ == "__main__":
     entity="lerdl",
     project="research-wsss",
     config=args,
-    tags=[args.dataset, args.architecture, "apoc"],
+    tags=[args.dataset, args.architecture, "apoc", f"ls:{args.label_smoothing}"],
   )
 
   log_config(vars(args), TAG)
@@ -287,9 +276,18 @@ if __name__ == "__main__":
 
   tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv,
+    args.dataset,
+    args.data_dir,
+    args.augment,
+    args.image_size,
+    args.cutmix_prob,
+    args.mixup_prob,
+    tt,
+    tv,
   )
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
@@ -360,7 +358,9 @@ if __name__ == "__main__":
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_metrics = MetricsContainer(["loss", "c_loss", "p_loss", "re_loss", "o_loss", "ot_loss", "alpha", "oc_alpha", "ot_weight", "k"])
+  train_metrics = MetricsContainer(
+    ["loss", "c_loss", "p_loss", "re_loss", "o_loss", "ot_loss", "alpha", "oc_alpha", "ot_weight", "k"]
+  )
 
   best_train_mIoU = -1
 
@@ -404,10 +404,7 @@ if __name__ == "__main__":
       data_dic["train"].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log(
-        {f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch},
-        commit=not do_validation
-      )
+      wandb.log({f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch}, commit=not do_validation)
 
       print(
         "iteration    = {iteration:,}\n"

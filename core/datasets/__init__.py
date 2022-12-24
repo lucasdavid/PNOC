@@ -111,8 +111,8 @@ def get_segmentation_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms)
-    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms)
+    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms, pseudo_masks_dir)
+    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms, pseudo_masks_dir)
   else:
     from . import coco14
     train = coco14.COCO14SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
@@ -142,7 +142,7 @@ def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
 
 def get_segmentation_evaluation_dataset(dataset, data_dir, domain=None, transform=None):
   print(f'Loading {dataset} Segmentation Evaluation Dataset')
-  
+
   if dataset == 'voc12':
     from . import voc12
     valid = voc12.VOC12PathsDataset(data_dir, domain or 'train_aug', transform)
@@ -153,6 +153,40 @@ def get_segmentation_evaluation_dataset(dataset, data_dir, domain=None, transfor
   valid.info = DatasetInfo.from_metafile(dataset)
 
   return valid
+
+
+def get_hrcams_datasets(
+  dataset,
+  data_dir,
+  cams_dir,
+  domain=None,
+  train_transforms=None,
+  valid_transforms=None,
+  resize_fn=None,
+  normalize_fn=None,
+):
+  print(f'Loading {dataset} Classification Dataset')
+
+  if dataset == 'voc12':
+    from . import voc12
+    train = voc12.VOC12HRCAMsDataset(
+      data_dir, domain or 'train_aug', cams_dir, resize_fn, normalize_fn, train_transforms
+    )
+    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
+  else:
+    from . import coco14
+    train = coco14.COCO14HRCAMsDataset(
+      data_dir, domain or 'train2014', cams_dir, resize_fn, normalize_fn, train_transforms
+    )
+    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
+
+  # train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
+
+  info = DatasetInfo.from_metafile(dataset)
+  train.info = info
+  valid.info = info
+
+  return train, valid
 
 
 def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
@@ -202,23 +236,25 @@ def get_classification_transforms(
   tt += [Transpose()]
 
   tt = transforms.Compose(tt)
-  tv = transforms.Compose([
-    # RandomResize_For_Segmentation(image_size, image_size),
-    Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(crop_size),
-    Transpose_For_Segmentation()
-  ])
+  tv = transforms.Compose(
+    [
+      # RandomResize_For_Segmentation(image_size, image_size),
+      Normalize_For_Segmentation(mean, std),
+      Top_Left_Crop_For_Segmentation(crop_size),
+      Transpose_For_Segmentation()
+    ]
+  )
 
   return tt, tv
 
 
 def get_affinity_transforms(
-    min_image_size,
-    max_image_size,
-    crop_size,
+  min_image_size,
+  max_image_size,
+  crop_size,
 ):
   mean, std = imagenet_stats()
-  
+
   tt = transforms.Compose(
     [
       RandomResize_For_Segmentation(min_image_size, max_image_size),
@@ -242,18 +278,38 @@ def get_segmentation_transforms(
 ):
   mean, std = imagenet_stats()
 
-  tt = transforms.Compose([
-    RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
-    RandomHorizontalFlip_For_Segmentation(),
-    Normalize_For_Segmentation(mean, std),
-    RandomCrop_For_Segmentation(crop_size),
-    Transpose_For_Segmentation()
-  ])
+  tt = transforms.Compose(
+    [
+      RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
+      RandomHorizontalFlip_For_Segmentation(),
+      Normalize_For_Segmentation(mean, std),
+      RandomCrop_For_Segmentation(crop_size),
+      Transpose_For_Segmentation()
+    ]
+  )
 
-  tv = transforms.Compose([
-    Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(crop_size),
-    Transpose_For_Segmentation()
-  ])
+  tv = transforms.Compose(
+    [Normalize_For_Segmentation(mean, std),
+     Top_Left_Crop_For_Segmentation(crop_size),
+     Transpose_For_Segmentation()]
+  )
 
   return tt, tv
+
+
+def get_ccam_transforms(
+  image_size,
+  crop_size,
+):
+  resize_fn = transforms.Resize(size=[image_size] * 2)
+  normalize_fn = transforms.Compose([transforms.ToTensor(), transforms.Normalize(*imagenet_stats())])
+  tt = transforms.Compose([random_hflip_fn, RandomCrop_For_Segmentation(crop_size, ignore_value=0.)])
+  tv = transforms.Compose(
+    [
+      Normalize_For_Segmentation(*imagenet_stats()),
+      Top_Left_Crop_For_Segmentation(crop_size),
+      Transpose_For_Segmentation(),
+    ]
+  )
+
+  return tt, tv, resize_fn, normalize_fn

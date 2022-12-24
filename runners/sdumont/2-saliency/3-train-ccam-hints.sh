@@ -53,6 +53,7 @@ IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=32
 ACCUMULATE_STEPS=4
+MIXED_PRECISION=true
 
 ARCHITECTURE=resnest269
 DILATED=false
@@ -69,22 +70,23 @@ FG_T=0.4
 
 TAG=ccam-fg-hints@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE \
-  --tag             $TAG                 \
-  --alpha           $ALPHA               \
-  --hint_w          $HINT_W              \
-  --max_epoch       $EPOCHS              \
-  --batch_size      $BATCH_SIZE          \
-  --lr              $LR                  \
-  --accumule_steps  $ACCUMULATE_STEPS    \
-  --num_workers     $WORKERS             \
-  --architecture    $ARCHITECTURE        \
-  --stage4_out_features $S4_OUT_FEATURES \
-  --dilated         $DILATED             \
-  --mode            $MODE                \
-  --trainable-stem  $TRAINABLE_STEM      \
-  --image_size      $IMAGE_SIZE          \
-  --cams_dir        $CAMS_DIR            \
-  --fg_threshold    $FG_T                \
+CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
+  --tag             $TAG                  \
+  --alpha           $ALPHA                \
+  --hint_w          $HINT_W               \
+  --max_epoch       $EPOCHS               \
+  --batch_size      $BATCH_SIZE           \
+  --lr              $LR                   \
+  --accumule_steps  $ACCUMULATE_STEPS     \
+  --mixed_precision $MIXED_PRECISION      \
+  --num_workers     $WORKERS              \
+  --architecture    $ARCHITECTURE         \
+  --stage4_out_features $S4_OUT_FEATURES  \
+  --dilated         $DILATED              \
+  --mode            $MODE                 \
+  --trainable-stem  $TRAINABLE_STEM       \
+  --image_size      $IMAGE_SIZE           \
+  --cams_dir        $CAMS_DIR             \
+  --fg_threshold    $FG_T                 \
   --data_dir        $DATA_DIR
   # --bg_threshold    $BG_T                \
