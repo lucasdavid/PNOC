@@ -150,6 +150,6 @@ def hard_mask_images(images, features, label_mask, t=0.3, eps=1e-5):
   mask = F.relu(mask)
   mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
   mask /= F.adaptive_max_pool2d(mask, (1, 1)) + eps
-  mask = mask > t
+  mask = (mask > t).to(images)
 
-  return images * (1 - mask.to(images))
+  return images * (1 - mask)

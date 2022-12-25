@@ -7,7 +7,7 @@ Many of the code lines here were borrowed from OC-CSE, Puzzle-CAM and CCAM repos
 
 ## Experiments
 
-### Common settings
+### Common Setup
 ```shell
 export PYTHONPATH=$(pwd)
 
@@ -24,10 +24,10 @@ DATA_DIR=/datasets/VOCdevkit/VOC2012
 # DATA_DIR=/datasets/coco14
 ```
 
-### 1 Train classifiers and generate priors
+### 1 Train classifiers and generate segmentation priors
 #### 1.1 Train Ordinary Classifier (OC)
 ```shell
-TAG_OC=$DATASET-rs269-ra
+TAG_OC=$DATASET-rs269ra
 
 CUDA_VISIBLE_DEVICES=$DEVICES        \
   $PY scripts/cam/train_vanilla.py   \
@@ -40,29 +40,27 @@ CUDA_VISIBLE_DEVICES=$DEVICES        \
     --data_dir        $DATA_DIR
 ```
 
-#### 1.2 Train Adversarial Puzzle-OC
-
+#### 1.2 Train Adversarial Puzzle-OC (APOC)
 ```shell
 TAG_APOC=$DATASET-rs269apoc@rs269ra
 
-CUDA_VISIBLE_DEVICES=$DEVICES                \
-    python scripts/cam/train_apoc.py         \
-        --tag               $TAG             \
-        --batch_size        32               \
-        --mixed_precision   true             \
-        --architecture      resnest269       \
-        --oc-architecture   resnest269       \
+CUDA_VISIBLE_DEVICES=$DEVICES            \
+    python scripts/cam/train_apoc.py     \
+        --tag               $TAG         \
+        --batch_size        32           \
+        --mixed_precision   true         \
+        --architecture      resnest269   \
+        --oc-architecture   resnest269   \
         --oc-pretrained     ./experiments/models/$TAG_OC  \
-        --augment           colorjitter      \
-        --label_smoothing   0.1              \
-        --oc-train-masks    cams             \
-        --oc_train_mask_threshold 0.2        \
-        --dataset           $DATASET         \
+        --augment           colorjitter  \
+        --label_smoothing   0.1          \
+        --oc-train-masks    cams         \
+        --oc_train_mask_t   0.2          \
+        --dataset           $DATASET     \
         --data_dir          $DATA_DIR
 ```
 
 #### 1.3 Inference of CAMs with TTA
-
 ```shell
 CUDA_VISIBLE_DEVICES=0 $PY scripts/cam/inference.py --domain $DOMAIN_TRAIN --architecture resnest269 --tag $TAG_APOC --dataset $DATASET --data_dir $DATA_DIR &
 CUDA_VISIBLE_DEVICES=1 $PY scripts/cam/inference.py --domain $DOMAIN_VALID --architecture resnest269 --tag $TAG_APOC --dataset $DATASET --data_dir $DATA_DIR &
@@ -127,7 +125,7 @@ $PY scripts/rw/make_affinity_labels.py  \
     --cams_dir ./experiments/predictions/$TAG_APOC  \
     --sal_dir  ./experiments/predictions/$TAG_PN    \
     --num_workers  48                   \
-    --domain       $DOMAIN_TRAIN              \
+    --domain       $DOMAIN_TRAIN        \
     --dataset      $DATASET             \
     --data_dir     $DATA_DIR
 ```
@@ -181,9 +179,9 @@ $PY scripts/segmentation/train.py  \
 #### 4.3 Inference with DeepLabV3+ and TTA
 ```shell
 
-CUDA_VISIBLE_DEVICES=0 $PY scripts/segmentation/inference.py --domain $DOMAIN_TRAIN --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=0 $PY scripts/segmentation/inference.py --domain train --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR &
 
-CUDA_VISIBLE_DEVICES=1 $PY scripts/segmentation/inference.py --domain $DOMAIN_VALID --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=1 $PY scripts/segmentation/inference.py --domain val --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR &
 
 CUDA_VISIBLE_DEVICES=2 $PY scripts/segmentation/inference.py --domain test --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR &
 

@@ -90,10 +90,9 @@ except KeyError:
   GPUS = "0"
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
-
+THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
 
 if __name__ == '__main__':
-  # Arguments
   args = parser.parse_args()
 
   TAG = args.tag
@@ -115,7 +114,9 @@ if __name__ == '__main__':
   train_dataset, valid_dataset = get_classification_datasets(
     args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
   )
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
@@ -142,10 +143,7 @@ if __name__ == '__main__':
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
   ocnet = Classifier(
-    args.oc_architecture,
-    train_dataset.info.num_classes,
-    mode=args.mode,
-    regularization=args.oc_regularization
+    args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
@@ -159,7 +157,6 @@ if __name__ == '__main__':
   for child in ocnet.children():
     for param in child.parameters():
       param.requires_grad = False
-
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
@@ -181,7 +178,6 @@ if __name__ == '__main__':
 
   log_opt_params("CGNet", cg_param_groups)
 
-
   # Train
   data_dic = {'train': [], 'validation': []}
 
@@ -191,7 +187,6 @@ if __name__ == '__main__':
   train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
 
   best_train_mIoU = -1
-  thresholds = list(np.arange(0.10, 0.50, 0.05))
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
@@ -202,7 +197,7 @@ if __name__ == '__main__':
     cgnet.eval()
     eval_timer.tik()
 
-    iou_meters = {th: Calculator_For_mIoU(classes) for th in thresholds}
+    iou_meters = {th: Calculator_For_mIoU(classes) for th in THRESHOLDS}
 
     with torch.no_grad():
       for step, (images_batch, targets_batch, masks_batch) in enumerate(loader):
@@ -232,7 +227,6 @@ if __name__ == '__main__':
   for step in range(step_init, step_max):
     images, targets = train_iterator.get()
 
-
     images = images.to(DEVICE)
     targets = targets.float()
 
@@ -260,10 +254,7 @@ if __name__ == '__main__':
     labels_oc = (targets - labels_mask).clip(min=0)
 
     cl_logits = ocnet(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
-    o_loss = class_loss_fn(
-      cl_logits,
-      label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)
-    ).mean()
+    o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
 
     loss = (c_loss + p_loss + ap * re_loss + ao * o_loss)
 
@@ -274,10 +265,14 @@ if __name__ == '__main__':
       optimizer.zero_grad()
 
     occse.update_focal(
-      targets, labels_oc, cl_logits.to(targets), focal_factor, momentum=args.oc_focal_momentum, gamma=args.oc_focal_gamma
+      targets,
+      labels_oc,
+      cl_logits.to(targets),
+      focal_factor,
+      momentum=args.oc_focal_momentum,
+      gamma=args.oc_focal_gamma
     )
 
-    # region logging
     epoch = step // step_valid
     do_logging = (step + 1) % step_log == 0
     do_validation = (step + 1) % step_valid == 0
@@ -320,10 +315,7 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log(
-        {f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch},
-        commit=not do_validation
-      )
+      wandb.log({f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch}, commit=not do_validation)
 
       print(
         'iteration    = {iteration:,}\n'
@@ -341,9 +333,6 @@ if __name__ == '__main__':
         'choices      = {choices}\n'.format(**data)
       )
 
-      # endregion
-
-    # region evaluation
     if do_validation:
       threshold, mIoU, iou = evaluate(valid_loader)
 
@@ -376,7 +365,6 @@ if __name__ == '__main__':
 
       print(f'saving weights `{model_path}`')
       save_model_fn()
-    # endregion
 
   print(TAG)
   wb_run.finish()

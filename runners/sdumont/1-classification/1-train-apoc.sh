@@ -131,7 +131,7 @@ run_training () {
         --ow-init           $OW_INIT         \
         --ow-schedule       $OW_SCHEDULE     \
         --oc-train-masks    $OC_TRAIN_MASKS  \
-        --oc_train_mask_threshold $OC_TRAIN_MASK_T    \
+        --oc_train_mask_t   $OC_TRAIN_MASK_T    \
         --oc-train-interval-steps $OC_TRAIN_INT_STEPS \
         --dataset           $DATASET         \
         --data_dir          $DATA_DIR

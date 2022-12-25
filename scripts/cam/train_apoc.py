@@ -4,7 +4,7 @@ import os
 import numpy as np
 import torch
 import wandb
-from sklearn import metrics as skmetrics
+# from sklearn import metrics as skmetrics
 from torch.utils.data import DataLoader
 
 from core import occse
@@ -90,7 +90,7 @@ parser.add_argument("--ow-init", default=0, type=float)
 parser.add_argument("--ow-schedule", default=1.0, type=float)
 parser.add_argument("--oc-train-interval-steps", default=1, type=int)
 parser.add_argument("--oc-train-masks", default="features", choices=["features", "cams"], type=str)
-parser.add_argument("--oc_train_mask_threshold", default=0.2, type=float)
+parser.add_argument("--oc_train_mask_t", default=0.2, type=float)
 
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
@@ -185,9 +185,8 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
 def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow):
   if args.oc_train_masks == "cams":
-    images_mask = occse.hard_mask_images(
-      inputs, cg_features.cpu().float(), labels_mask, t=args.oc_train_mask_threshold
-    ).to(DEVICE)
+    images_mask = occse.hard_mask_images(inputs, cg_features.cpu().float(), labels_mask,
+                                         t=args.oc_train_mask_t).to(DEVICE)
   else:
     images_mask = images_mask.detach()
 
@@ -243,28 +242,18 @@ def evaluate(loader, classes):
   # rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
 
   t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
-  # del inputs, targets_, preds_, labels_mask, cams, iou_meters
 
   return t, miou, iou  # , rm, rw
 
 
 if __name__ == "__main__":
-  # Arguments
   args = parser.parse_args()
 
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device
 
-  wb_run = wandb.init(
-    name=TAG,
-    job_type="train",
-    entity="lerdl",
-    project="research-wsss",
-    config=args,
-    tags=[args.dataset, args.architecture, "apoc", f"ls:{args.label_smoothing}"],
-  )
-
+  wb_run = wandb_utils.setup(TAG, args, tags=[args.dataset, args.architecture, "apoc", f"ls:{args.label_smoothing}"])
   log_config(vars(args), TAG)
 
   data_dir = create_directory(f"./experiments/data/")
@@ -292,11 +281,11 @@ if __name__ == "__main__":
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
-  step_valid = len(train_loader)
-  step_log = int(step_valid * args.print_ratio)
-  step_init = args.first_epoch * step_valid
-  step_max = args.max_epoch * step_valid
-  print(f"Iterations: first={step_init} logging={step_log} validation={step_valid} max={step_max}")
+  step_val = len(train_loader)
+  step_log = int(step_val * args.print_ratio)
+  step_init = args.first_epoch * step_val
+  step_max = args.max_epoch * step_val
+  print(f"Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}")
 
   # Network
   cgnet = Classifier(
@@ -374,9 +363,9 @@ if __name__ == "__main__":
     metrics_values = train_step(train_iterator)
     train_metrics.update(metrics_values)
 
-    epoch = step // step_valid
+    epoch = step // step_val
     do_logging = (step + 1) % step_log == 0
-    do_validation = (step + 1) % step_valid == 0
+    do_validation = (step + 1) % step_val == 0
 
     if do_logging:
       (cg_loss, c_loss, p_loss, re_loss, o_loss, ot_loss, ap, ao, ow, k) = train_metrics.get(clear=True)
@@ -470,5 +459,6 @@ if __name__ == "__main__":
       print(f"saving weights `{model_path}`\n")
       save_model_fn()
 
+  write_json(data_path, data_dic)
   print(TAG)
   wb_run.finish()
