@@ -3,9 +3,9 @@ import os
 
 import numpy as np
 import torch
+import wandb
 from torch.utils.data import DataLoader
 
-import wandb
 from core import occse
 from core.datasets import *
 from core.networks import *

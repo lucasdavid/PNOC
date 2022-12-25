@@ -63,7 +63,7 @@ class COCO14Dataset(Dataset):
     return image_id, image, label
 
 
-class COCO14ClassificationDataset(COCO14Dataset):
+class ClassificationDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
     _, image, label = super().__getitem__(idx)
@@ -74,7 +74,7 @@ class COCO14ClassificationDataset(COCO14Dataset):
     return image, label
 
 
-class COCO14InferenceDataset(COCO14Dataset):
+class InferenceDataset(COCO14Dataset):
 
   def __getitem__(self, idx):
     image_id, image, label = super().__getitem__(idx)
@@ -85,7 +85,7 @@ class COCO14InferenceDataset(COCO14Dataset):
     return image, image_id, label
 
 
-class COCO14CAMEvaluationDataset(COCO14Dataset):
+class CAMEvaluationDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, transform=None, masks_dir=None):
     super().__init__(root_dir, domain, transform)
@@ -105,7 +105,7 @@ class COCO14CAMEvaluationDataset(COCO14Dataset):
     return image, label, mask
 
 
-class COCO14SegmentationDataset(COCO14CAMEvaluationDataset):
+class SegmentationDataset(CAMEvaluationDataset):
 
   def __getitem__(self, idx):
     image, _, mask = super().__getitem__(idx)
@@ -113,7 +113,7 @@ class COCO14SegmentationDataset(COCO14CAMEvaluationDataset):
     return image, mask
 
 
-class COCO14PathsDataset(COCO14Dataset):
+class PathsDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, masks_dir=None):
     super().__init__(root_dir, domain)
@@ -128,7 +128,7 @@ class COCO14PathsDataset(COCO14Dataset):
     return image_id, image_path, mask_path
 
 
-class COCO14AffinityDataset(COCO14Dataset):
+class AffinityDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
     super().__init__(root_dir, domain, transform=transform)
@@ -150,7 +150,7 @@ class COCO14AffinityDataset(COCO14Dataset):
     return image, self.extract_aff_lab_func(label)
 
 
-class COCO14HRCAMsDataset(COCO14Dataset):
+class HRCAMsDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
     super().__init__(root_dir, domain, transform)

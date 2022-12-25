@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -9,9 +8,9 @@ def random_label_split(label, k, choices):
   indices = []
 
   for i in range(bs):
-    label_idx = torch.nonzero(label[i] > 0.5)      # [0, 1, 14]
+    label_idx = torch.nonzero(label[i] > 0.5)  # [0, 1, 14]
     rand_idx = torch.randperm(len(label_idx))[:k]  # [2]
-    target = label_idx[rand_idx]                   # [14]
+    target = label_idx[rand_idx]  # [14]
     y_mask[i, target] = 1
     choices[target] += 1
     indices.append(target)

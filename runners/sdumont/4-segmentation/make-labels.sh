@@ -34,13 +34,18 @@ module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=make_pseudo_labels.py
+SOURCE=scripts/segmentation/make_pseudo_labels.py
+
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train_aug
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
 
 CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
 # SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
 
-DOMAIN=train_aug
 THRESHOLD=0.3
 CRF_T=1
 CRF_GT=0.9

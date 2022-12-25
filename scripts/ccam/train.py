@@ -7,9 +7,9 @@ import os
 
 import numpy as np
 import torch
+import wandb
 from torch.utils.data import DataLoader
 
-import wandb
 from core.ccam import SimMaxLoss, SimMinLoss
 from core.datasets import *
 from core.networks import *

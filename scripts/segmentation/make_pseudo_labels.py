@@ -51,7 +51,7 @@ def _work(process_id, dataset, args):
 
       W, H = x.size
       data = np.load(CAM_DIR + _id + '.npy', allow_pickle=True).item()
-      
+
       keys = data['keys']
       cam = data['rw']
       if sal_file:
@@ -69,7 +69,9 @@ def _work(process_id, dataset, args):
       imageio.imwrite(png_path, conf.astype(np.uint8))
 
       if process_id == args.num_workers - 1 and step % max(1, length // 20) == 0:
-        sys.stdout.write(f'\r# Make pseudo labels [{step + 1}/{length}] = {(step + 1) / length * 100:.2f}%, ({(H, W)}, {cam.shape})')
+        sys.stdout.write(
+          f'\r# Make pseudo labels [{step + 1}/{length}] = {(step + 1) / length * 100:.2f}%, ({(H, W)}, {cam.shape})'
+        )
         sys.stdout.flush()
 
 

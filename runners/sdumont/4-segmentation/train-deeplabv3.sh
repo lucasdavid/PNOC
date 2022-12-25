@@ -37,8 +37,14 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=train_segmentation.py
+SOURCE=scripts/segmentation/train.py
+
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
 
 # Architecture
 ARCHITECTURE=resnest269

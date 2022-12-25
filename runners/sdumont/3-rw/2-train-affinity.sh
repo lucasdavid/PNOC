@@ -38,7 +38,7 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/rw/train_affinity.py
-WORKERS=16
+WORKERS=8
 
 # Dataset
 IMAGE_SIZE=512

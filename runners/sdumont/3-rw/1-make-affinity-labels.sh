@@ -38,7 +38,7 @@ module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=make_affinity_labels.py
+SOURCE=scripts/rw/make_affinity_labels.py
 WORKERS=48
 
 DATASET=voc12

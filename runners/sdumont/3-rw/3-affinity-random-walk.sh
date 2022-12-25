@@ -38,8 +38,13 @@ module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=inference_rw.py
+SOURCE=scripts/rw/inference.py
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train_aug
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
 
 # Architecture
 ARCHITECTURE=resnest269
@@ -53,7 +58,7 @@ $PY $SOURCE                      \
     --architecture $ARCHITECTURE \
     --model_name   $TAG          \
     --cam_dir      $CAM_DIR      \
-    --domain       train_aug     \
+    --domain       $DOMAIN       \
     --beta         10            \
     --exp_times    8             \
     --data_dir     $DATA_DIR     &
@@ -63,7 +68,7 @@ $PY $SOURCE                      \
 
 # $PY make_pseudo_labels.py        \
 #     --experiment_name $RW_DIR    \
-#     --domain          train_aug  \
+#     --domain          $DOMAIN    \
 #     --threshold       0.35       \
 #     --crf_iteration   1          \
 #     --pred_dir        $PRED_DIR  \
@@ -74,7 +79,7 @@ $PY $SOURCE                      \
 
 # $PY make_pseudo_labels.py        \
 #     --experiment_name $RW_DIR    \
-#     --domain          train_aug  \
+#     --domain          $DOMAIN    \
 #     --threshold       0.35       \
 #     --crf_iteration   1          \
 #     --sal_dir         $SAL_DIR   \

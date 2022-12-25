@@ -34,7 +34,7 @@ OC_ARCHITECTURE=resnet50
 OC_PRETRAINED=./experiments/models/ResNet50.pth
 # OC_PRETRAINED=./experiments/models/coco14-rs50.pth
 
-TAG=$DATASET-$ARCH-poc@rn50
+TAG=$DATASET-$ARCH-apoc@rn50
 
 
 $PY $SOURCE                          \

@@ -7,7 +7,6 @@ import sys
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from core.aff_utils import propagate_to_edge
@@ -57,6 +56,7 @@ except KeyError:
   GPUS = "0"
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
+
 
 def run(model, dataset):
   skipped = 0
@@ -113,7 +113,7 @@ if __name__ == '__main__':
   SEED = args.seed
   DEVICE = args.device
   TAG = args.model_name
-  TAG +=  '@train' if 'train' in args.domain else '@val'
+  TAG += '@train' if 'train' in args.domain else '@val'
   TAG += f"@beta={args.beta}@exp_times={args.exp_times}@rw"
 
   log_config(vars(args), TAG)
@@ -127,7 +127,7 @@ if __name__ == '__main__':
 
   normalize_fn = Normalize(*imagenet_stats())
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
-  
+
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
 
   # Network

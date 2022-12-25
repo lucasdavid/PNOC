@@ -3,10 +3,10 @@ import os
 
 import numpy as np
 import torch
+import wandb
 from sklearn import metrics as skmetrics
 from torch.utils.data import DataLoader
 
-import wandb
 from core import occse
 from core.datasets import *
 from core.networks import *
@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 parser.add_argument("--device", default="cuda", type=str)
 parser.add_argument("--seed", default=0, type=int)
-parser.add_argument("--num_workers", default=4, type=int)
+parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
 parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=str)
 
@@ -85,9 +85,9 @@ parser.add_argument("--oc-k", default=1.0, type=float)
 parser.add_argument("--oc-k-init", default=1.0, type=float)
 parser.add_argument("--oc-k-schedule", default=0, type=float)
 
-parser.add_argument("--ow", default=1.0, type=float)
+parser.add_argument("--ow", default=0.5, type=float)
 parser.add_argument("--ow-init", default=0, type=float)
-parser.add_argument("--ow-schedule", default=0.5, type=float)
+parser.add_argument("--ow-schedule", default=1.0, type=float)
 parser.add_argument("--oc-train-interval-steps", default=1, type=int)
 parser.add_argument("--oc-train-masks", default="features", choices=["features", "cams"], type=str)
 parser.add_argument("--oc_train_mask_threshold", default=0.2, type=float)
@@ -195,6 +195,7 @@ def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mas
     cl_logits = ocnet(images_mask)
 
     ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
+
   oc_scaler.scale(ot_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:

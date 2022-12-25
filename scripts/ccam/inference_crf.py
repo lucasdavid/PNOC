@@ -9,9 +9,9 @@ import sys
 import imageio
 import numpy as np
 from torch import multiprocessing
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import Subset
 
-from core.datasets import VOC12InferenceDataset
+from core.datasets import *
 from tools.ai.demo_utils import *
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import *
@@ -22,7 +22,8 @@ parser = argparse.ArgumentParser()
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=24, type=int)
+parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
 
 ###############################################################################
@@ -85,7 +86,7 @@ if __name__ == '__main__':
 
   create_directory(f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_iteration}/')
 
-  dataset = VOC12InferenceDataset(args.data_dir, args.domain)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)

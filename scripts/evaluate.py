@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from core.datasets import get_segmentation_evaluation_dataset
+from core.datasets import get_paths_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file
 
@@ -45,8 +45,8 @@ def compare(dataset, classes, start, step, TP, P, T):
     sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None
 
     if os.path.exists(png_file):
-      y_pred = np.array(Image.open(PRED_DIR + image_id + '.png'))
-
+      with Image.open(png_file) as y_pred:
+        y_pred = np.array(y_pred)
       keys, cam = np.unique(y_pred, return_inverse=True)
       cam = cam.reshape(y_pred.shape)
 
@@ -66,11 +66,7 @@ def compare(dataset, classes, start, step, TP, P, T):
 
       if sal_file:
         sal = load_saliency_file(sal_file, args.sal_mode)
-        bg = (
-          (sal < args.sal_threshold).astype(float)
-          if args.sal_threshold
-          else (1 - sal)
-        )
+        bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
 
         cam = np.concatenate((bg, cam), axis=0)
       else:
@@ -83,7 +79,9 @@ def compare(dataset, classes, start, step, TP, P, T):
 
     if args.crf_t:
       with Image.open(image_path) as img:
-        cam = crf_inference_label(np.asarray(img), cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+        cam = crf_inference_label(
+          np.asarray(img), cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob
+        )
 
     y_pred = keys[cam]
 
@@ -155,6 +153,7 @@ def do_python_eval(dataset, classes, num_workers=8):
   loglist['miou_foreground'] = miou_foreground
   return loglist
 
+
 def run(args, dataset):
   classes = ['background'] + dataset.info.classes.tolist()
 
@@ -224,9 +223,9 @@ if __name__ == '__main__':
   PRED_DIR = args.pred_dir or f'./experiments/predictions/{args.experiment_name}/'
   SAL_DIR = args.sal_dir
 
-  dataset = get_segmentation_evaluation_dataset(args.dataset, args.data_dir, args.domain)
+  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
 
   try:
     run(args, dataset)
   except KeyboardInterrupt:
-    ...
+    print('\ninterrupted')

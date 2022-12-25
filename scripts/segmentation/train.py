@@ -41,7 +41,7 @@ parser.add_argument('--masks_dir', default='../VOCtrainval_11-May-2012/Segmentat
 # Network
 ###############################################################################
 parser.add_argument('--backbone', default='resnest269', type=str)
-parser.add_argument('--mode', default='fix', type=str)
+parser.add_argument('--mode', default='normal', type=str)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 
@@ -93,17 +93,21 @@ if __name__ == '__main__':
   # Transform, Dataset, DataLoader
   ###################################################################################
 
-  tt, tv = get_segmentation_transforms(
-    args.min_image_size, args.max_image_size, args.image_size, args.augment
-  )
+  tt, tv = get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
 
   train_dataset, valid_dataset = get_segmentation_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.masks_dir,
+    args.dataset,
+    args.data_dir,
+    args.augment,
+    args.image_size,
+    args.masks_dir,
     train_transforms=tt,
     valid_transforms=tv
   )
 
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
 
   log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
@@ -118,9 +122,7 @@ if __name__ == '__main__':
   log('[i] val_iteration : {:,}'.format(val_iteration))
   log('[i] max_iteration : {:,}'.format(max_iteration))
 
-  ###################################################################################
   # Network
-  ###################################################################################
   model = DeepLabV3Plus(
     model_name=args.backbone,
     num_classes=train_dataset.info.num_classes + 1,
@@ -215,8 +217,7 @@ if __name__ == '__main__':
     logits = model(images)
 
     if 'Seg' in args.architecture:
-      labels = resize_for_tensors(labels.float().unsqueeze(1),
-                                  logits.size()[2:], 'nearest', None)[:, 0, :, :]
+      labels = resize_for_tensors(labels.float().unsqueeze(1), logits.size()[2:], 'nearest', None)[:, 0, :, :]
       labels = labels.long().cuda()
 
       # print(labels.size(), labels.min(), labels.max())

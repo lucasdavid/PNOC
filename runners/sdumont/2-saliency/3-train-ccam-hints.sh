@@ -42,8 +42,12 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/ccam/train_with_cam_hints.py
 
-LOGS_DIR=$SCRATCH/logs/ccam
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+
+LOGS_DIR=$SCRATCH/logs/ccam
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
 CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 
@@ -88,5 +92,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
   --image_size      $IMAGE_SIZE           \
   --cams_dir        $CAMS_DIR             \
   --fg_threshold    $FG_T                 \
+  --dataset         $DATASET              \
   --data_dir        $DATA_DIR
   # --bg_threshold    $BG_T                \

@@ -58,12 +58,12 @@ def get_classification_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.VOC12ClassificationDataset(data_dir, 'train_aug', train_transforms)
-    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
+    train = voc12.ClassificationDataset(data_dir, 'train_aug', train_transforms)
+    valid = voc12.CAMEvaluationDataset(data_dir, 'train', valid_transforms)
   else:
     from . import coco14
-    train = coco14.COCO14ClassificationDataset(data_dir, 'train2014', train_transforms)
-    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
+    train = coco14.ClassificationDataset(data_dir, 'train2014', train_transforms)
+    valid = coco14.CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
 
   train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
 
@@ -85,10 +85,10 @@ def get_affinity_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.VOC12AffinityDataset(data_dir, 'train_aug', path_index, label_dir, train_transforms)
+    train = voc12.AffinityDataset(data_dir, 'train_aug', path_index, label_dir, train_transforms)
   else:
     from . import coco14
-    train = coco14.COCO14AffinityDataset(data_dir, 'train2014', path_index, label_dir, train_transforms)
+    train = coco14.AffinityDataset(data_dir, 'train2014', path_index, label_dir, train_transforms)
 
   info = DatasetInfo.from_metafile(dataset)
   train.info = info
@@ -111,12 +111,12 @@ def get_segmentation_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.VOC12SegmentationDataset(data_dir, 'train_aug', train_transforms, pseudo_masks_dir)
-    valid = voc12.VOC12SegmentationDataset(data_dir, 'val', valid_transforms, pseudo_masks_dir)
+    train = voc12.SegmentationDataset(data_dir, 'train_aug', train_transforms, pseudo_masks_dir)
+    valid = voc12.SegmentationDataset(data_dir, 'val', valid_transforms, pseudo_masks_dir)
   else:
     from . import coco14
-    train = coco14.COCO14SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
-    valid = coco14.COCO14SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
+    train = coco14.SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
+    valid = coco14.SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
 
   info = DatasetInfo.from_metafile(dataset)
   train.info = info
@@ -130,25 +130,25 @@ def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
 
   if dataset == 'voc12':
     from . import voc12
-    infer = voc12.VOC12InferenceDataset(data_dir, domain or 'train_aug', transform)
+    infer = voc12.InferenceDataset(data_dir, domain or 'train_aug', transform)
   else:
     from . import coco14
-    infer = coco14.COCO14InferenceDataset(data_dir, domain or 'train2014', transform)
+    infer = coco14.InferenceDataset(data_dir, domain or 'train2014', transform)
 
   infer.info = DatasetInfo.from_metafile(dataset)
 
   return infer
 
 
-def get_segmentation_evaluation_dataset(dataset, data_dir, domain=None, transform=None):
+def get_paths_dataset(dataset, data_dir, domain=None, transform=None):
   print(f'Loading {dataset} Segmentation Evaluation Dataset')
 
   if dataset == 'voc12':
     from . import voc12
-    valid = voc12.VOC12PathsDataset(data_dir, domain or 'train_aug', transform)
+    valid = voc12.PathsDataset(data_dir, domain or 'train_aug', transform)
   else:
     from . import coco14
-    valid = coco14.COCO14PathsDataset(data_dir, domain or 'train2014', transform)
+    valid = coco14.PathsDataset(data_dir, domain or 'train2014', transform)
 
   valid.info = DatasetInfo.from_metafile(dataset)
 
@@ -169,16 +169,12 @@ def get_hrcams_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.VOC12HRCAMsDataset(
-      data_dir, domain or 'train_aug', cams_dir, resize_fn, normalize_fn, train_transforms
-    )
-    valid = voc12.VOC12CAMEvaluationDataset(data_dir, 'train', valid_transforms)
+    train = voc12.HRCAMsDataset(data_dir, domain or 'train_aug', cams_dir, resize_fn, normalize_fn, train_transforms)
+    valid = voc12.CAMEvaluationDataset(data_dir, 'train', valid_transforms)
   else:
     from . import coco14
-    train = coco14.COCO14HRCAMsDataset(
-      data_dir, domain or 'train2014', cams_dir, resize_fn, normalize_fn, train_transforms
-    )
-    valid = coco14.COCO14CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
+    train = coco14.HRCAMsDataset(data_dir, domain or 'train2014', cams_dir, resize_fn, normalize_fn, train_transforms)
+    valid = coco14.CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
 
   # train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
 
@@ -301,12 +297,14 @@ def get_ccam_transforms(
   image_size,
   crop_size,
 ):
+  mean, std = imagenet_stats()
+
   resize_fn = transforms.Resize(size=[image_size] * 2)
-  normalize_fn = transforms.Compose([transforms.ToTensor(), transforms.Normalize(*imagenet_stats())])
+  normalize_fn = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
   tt = transforms.Compose([random_hflip_fn, RandomCrop_For_Segmentation(crop_size, ignore_value=0.)])
   tv = transforms.Compose(
     [
-      Normalize_For_Segmentation(*imagenet_stats()),
+      Normalize_For_Segmentation(mean, std),
       Top_Left_Crop_For_Segmentation(crop_size),
       Transpose_For_Segmentation(),
     ]

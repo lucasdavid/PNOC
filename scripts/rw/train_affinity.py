@@ -6,9 +6,9 @@ import os
 
 import numpy as np
 import torch
+import wandb
 from torch.utils.data import DataLoader
 from torchvision import transforms
-import wandb
 
 from core.datasets import *
 from core.networks import *
@@ -29,7 +29,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=4, type=int)
+parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
@@ -65,7 +65,6 @@ except KeyError:
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
-
 if __name__ == '__main__':
   # Arguments
   args = parser.parse_args()
@@ -89,7 +88,9 @@ if __name__ == '__main__':
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
   train_dataset = get_affinity_datasets(args.dataset, args.data_dir, args.label_dir, path_index, tt)
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_loader = DataLoader(
+    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
+  )
   log_dataset(args.dataset, train_dataset, tt, None)
 
   step_valid = len(train_loader)
@@ -124,10 +125,11 @@ if __name__ == '__main__':
 
   # Loss, Optimizer
   optimizer = PolyOptimizer(
-    [{'params': param_groups, 'lr': args.lr, 'weight_decay': args.wd}],
-    lr=args.lr,
-    momentum=0.9,
-    max_step=step_max
+    [{
+      'params': param_groups,
+      'lr': args.lr,
+      'weight_decay': args.wd
+    }], lr=args.lr, momentum=0.9, max_step=step_max
   )
 
   # Train
@@ -135,7 +137,12 @@ if __name__ == '__main__':
 
   train_timer = Timer()
 
-  train_metrics = MetricsContainer(['loss', 'bg_loss', 'fg_loss', 'neg_loss',])
+  train_metrics = MetricsContainer([
+    'loss',
+    'bg_loss',
+    'fg_loss',
+    'neg_loss',
+  ])
 
   train_iterator = Iterator(train_loader)
 
@@ -200,9 +207,7 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log(
-        {f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch},
-      )
+      wandb.log({f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch},)
 
       print(
         'iteration={iteration:,} '

@@ -134,7 +134,7 @@ class VOC12Dataset(torch.utils.data.Dataset):
     return entry
 
 
-class VOC12ClassificationDataset(VOC12Dataset):
+class ClassificationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_tags=True)
@@ -150,7 +150,7 @@ class VOC12ClassificationDataset(VOC12Dataset):
     return image, label
 
 
-class VOC12CAMEvaluationDataset(VOC12Dataset):
+class CAMEvaluationDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None, masks_dir=None):
     super().__init__(root_dir, domain, masks_dir=masks_dir, with_tags=True, with_mask=True)
@@ -175,14 +175,14 @@ class VOC12CAMEvaluationDataset(VOC12Dataset):
     return image, label, mask
 
 
-class VOC12SegmentationDataset(VOC12CAMEvaluationDataset):
+class SegmentationDataset(CAMEvaluationDataset):
 
   def __getitem__(self, index):
     image, _, mask = super().__getitem__(index)
     return image, mask
 
 
-class VOC12PathsDataset(VOC12Dataset):
+class PathsDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, masks_dir=None):
     super().__init__(root_dir, domain, masks_dir=masks_dir, with_id=True, with_image=False)
@@ -195,7 +195,7 @@ class VOC12PathsDataset(VOC12Dataset):
     return image_id, image_path, mask_path
 
 
-class VOC12InferenceDataset(VOC12Dataset):
+class InferenceDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, transform=None):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
@@ -211,7 +211,7 @@ class VOC12InferenceDataset(VOC12Dataset):
     return image, image_id, label
 
 
-class VOC12AffinityDataset(VOC12Dataset):
+class AffinityDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
     super().__init__(root_dir, domain, with_id=True)
@@ -237,7 +237,7 @@ class VOC12AffinityDataset(VOC12Dataset):
     return image, self.extract_aff_lab_func(label)
 
 
-class VOC12HRCAMsDataset(VOC12Dataset):
+class HRCAMsDataset(VOC12Dataset):
 
   def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
