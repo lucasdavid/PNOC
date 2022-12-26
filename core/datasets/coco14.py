@@ -51,6 +51,8 @@ class COCO14Dataset(Dataset):
     return os.path.join(self.root_dir, IMAGES_DIR, f"COCO_{self.domain}_{image_id}.jpg")
 
   def load_sample_with_labels(self, idx, ignore_bg_only=True):
+    import cv2
+    cv2.setNumThreads(0)
     label = self.label_list[idx]
 
     if ignore_bg_only and label.sum() == 0:

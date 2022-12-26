@@ -97,6 +97,8 @@ class VOC12Dataset(torch.utils.data.Dataset):
     return os.path.join(self.image_dir, image_id + '.jpg')
 
   def get_image(self, image_id):
+    import cv2
+    cv2.setNumThreads(0)
     return Image.open(self.get_image_path(image_id)).convert('RGB')
 
   def get_mask(self, image_id):

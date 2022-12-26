@@ -98,7 +98,8 @@ class Normalize:
 
   def __call__(self, image):
     x = np.array(image, dtype=np.float32)
-    # if isinstance(image, Image.Image): image.close()
+    if isinstance(image, Image.Image):
+      image.close()
 
     norm_image = np.empty_like(x, np.float32)
 
@@ -121,8 +122,10 @@ class Normalize_For_Segmentation:
     x = np.array(image, dtype=np.float32)
     y = np.array(mask, dtype=np.int64)
 
-    # if isinstance(image, Image.Image): image.close()
-    # if isinstance(mask, Image.Image): mask.close()
+    if isinstance(image, Image.Image):
+      image.close()
+    if isinstance(mask, Image.Image):
+      mask.close()
 
     z = np.empty_like(x, np.float32)
 
