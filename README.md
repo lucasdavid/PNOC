@@ -38,7 +38,7 @@ TAG_OC=$DATASET-rs269ra
 
 CUDA_VISIBLE_DEVICES=$DEVICES        \
   $PY scripts/cam/train_vanilla.py   \
-    --tag             $TAG           \
+    --tag             $TAG_OC        \
     --batch_size      32             \
     --architecture    resnest269     \
     --augment         randaugment    \
@@ -88,11 +88,12 @@ CUDA_VISIBLE_DEVICES=$DEVICES               \
   --mixed_precision true                    \
   --architecture    resnest269              \
   --stage4_out_features 1024                \
-  --cams_dir        $CAMS_DIR               \
   --fg_threshold    $FG_T                   \
+  --cams_dir ./experiments/predictions/$TAG_APOC  \
   --dataset         $DATASET                \
   --data_dir        $DATA_DIR
 ```
+
 #### 2.2 Inference with TTA
 ```shell
 CUDA_VISIBLE_DEVICES=0 $PY scripts/ccam/inference.py --tag $TAG_CCAMH --architecture resnest269 --stage4_out_features 1024 --domain train_aug --dataset $DATASET --data_dir $DATA_DIR
@@ -120,11 +121,11 @@ FG=0.4
 BG=0.1
 CRF_T=10
 CRF_GT=0.9
-TAG_AF=$DATASET-affinitynet@pn@ccamh@rs269apoc@rs269ra@fg$FG-bg$BG-crf$CRF_T-gt$CRF_GT
+TAG_RW=$DATASET-an@pn@ccamh@rs269apoc@rs269ra@fg$FG-bg$BG-crf$CRF_T-gt$CRF_GT
 
 CUDA_VISIBLE_DEVICES=""                 \
 $PY scripts/rw/make_affinity_labels.py  \
-    --tag          $TAG_AF              \
+    --tag          $TAG_RW              \
     --fg_threshold $FG                  \
     --bg_threshold $BG                  \
     --crf_t        $CRF_T               \
@@ -139,14 +140,12 @@ $PY scripts/rw/make_affinity_labels.py  \
 
 #### 3.2 Train AffinityNet
 ```shell
-TAG_RW=$DATASET-an@pn@ccamh@rs269apoc@rs269ra@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
-
 CUDA_VISIBLE_DEVICES=$DEVICES    \
 $PY scripts/rw/train_affinity.py \
     --tag          $TAG_RW       \
     --architecture resnest269    \
     --batch_size   32            \
-    --label_dir    ./experiments/predictions/$TAG_AF  \
+    --label_dir    ./experiments/predictions/$TAG_RW  \
     --dataset      $DATASET      \
     --data_dir     $DATA_DIR
 ```
