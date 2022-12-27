@@ -138,7 +138,7 @@ def train_step(train_iterator):
 
 
 def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
-  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
     # Normal
     logits, features = cgnet(images, with_cam=True)
 
@@ -192,7 +192,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
 
 def train_step_oc(step, images_mask, targets_sm, ow):
-  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
     cl_logits = ocnet(images_mask)
     ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
 
