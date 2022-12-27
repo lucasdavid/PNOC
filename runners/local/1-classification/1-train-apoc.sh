@@ -6,8 +6,9 @@ export WANDB_PROJECT=research-wsss-dev
 
 PY=python
 SOURCE=scripts/cam/train_apoc.py
-DEVICE=cuda
-WORKERS=8
+DEVICE=cpu
+WORKERS=4
+AMP=true
 
 DATASET=voc12
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
@@ -41,6 +42,7 @@ $PY $SOURCE                          \
   --tag             $TAG             \
   --device          $DEVICE          \
   --num_workers     $WORKERS         \
+  --mixed_precision $AMP             \
   --batch_size      $BATCH           \
   --architecture    $ARCHITECTURE    \
   --dilated         $DILATED         \

@@ -3,10 +3,11 @@ import os
 
 import numpy as np
 import torch
-import wandb
 # from sklearn import metrics as skmetrics
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
+import wandb
 from core import occse
 from core.datasets import *
 from core.networks import *
@@ -26,77 +27,77 @@ from tools.general.time_utils import *
 parser = argparse.ArgumentParser()
 
 # Dataset
-parser.add_argument("--device", default="cuda", type=str)
-parser.add_argument("--seed", default=0, type=int)
-parser.add_argument("--num_workers", default=8, type=int)
-parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
-parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=str)
+parser.add_argument('--device', default='cuda', type=str)
+parser.add_argument('--seed', default=0, type=int)
+parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 # Network
-parser.add_argument("--architecture", default="resnet50", type=str)
-parser.add_argument("--mode", default="normal", type=str)  # fix
-parser.add_argument("--regularization", default=None, type=str)  # orthogonal
-parser.add_argument("--trainable-stem", default=True, type=str2bool)
-parser.add_argument("--dilated", default=False, type=str2bool)
-parser.add_argument("--restore", default=None, type=str)
+parser.add_argument('--architecture', default='resnet50', type=str)
+parser.add_argument('--mode', default='normal', type=str)  # fix
+parser.add_argument('--regularization', default=None, type=str)  # orthogonal
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--dilated', default=False, type=str2bool)
+parser.add_argument('--restore', default=None, type=str)
 
-parser.add_argument("--oc-architecture", default="resnet50", type=str)
-parser.add_argument("--oc-regularization", default=None, type=str)
-parser.add_argument("--oc-pretrained", required=True, type=str)
-parser.add_argument("--oc-strategy", default="random", type=str, choices=list(occse.STRATEGIES))
-parser.add_argument("--oc-focal-momentum", default=0.9, type=float)
-parser.add_argument("--oc-focal-gamma", default=2.0, type=float)
+parser.add_argument('--oc-architecture', default='resnet50', type=str)
+parser.add_argument('--oc-regularization', default=None, type=str)
+parser.add_argument('--oc-pretrained', required=True, type=str)
+parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
+parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
+parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 
 # Hyperparameter
-parser.add_argument("--batch_size", default=32, type=int)
-parser.add_argument("--first_epoch", default=0, type=int)
-parser.add_argument("--max_epoch", default=15, type=int)
+parser.add_argument('--batch_size', default=32, type=int)
+parser.add_argument('--first_epoch', default=0, type=int)
+parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
-parser.add_argument("--mixed_precision", default=False, type=str2bool)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
 
-parser.add_argument("--lr", default=0.1, type=float)
-parser.add_argument("--wd", default=1e-4, type=float)
-parser.add_argument("--label_smoothing", default=0, type=float)
+parser.add_argument('--lr', default=0.1, type=float)
+parser.add_argument('--wd', default=1e-4, type=float)
+parser.add_argument('--label_smoothing', default=0, type=float)
 
-parser.add_argument("--image_size", default=512, type=int)
-parser.add_argument("--min_image_size", default=320, type=int)
-parser.add_argument("--max_image_size", default=640, type=int)
+parser.add_argument('--image_size', default=512, type=int)
+parser.add_argument('--min_image_size', default=320, type=int)
+parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument("--print_ratio", default=1.0, type=float)
+parser.add_argument('--print_ratio', default=1.0, type=float)
 
-parser.add_argument("--tag", default="", type=str)
-parser.add_argument("--augment", default="", type=str)
-parser.add_argument("--cutmix_prob", default=1.0, type=float)
-parser.add_argument("--mixup_prob", default=1.0, type=float)
+parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--augment', default='', type=str)
+parser.add_argument('--cutmix_prob', default=1.0, type=float)
+parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 # For Puzzle-CAM
-parser.add_argument("--num_pieces", default=4, type=int)
-parser.add_argument("--loss_option", default="cl_pcl_re", type=str)
-parser.add_argument("--re_loss", default="L1_Loss", type=str)  # 'L1_Loss', 'L2_Loss'
+parser.add_argument('--num_pieces', default=4, type=int)
+parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
+parser.add_argument('--re_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
 
-parser.add_argument("--alpha", default=1.0, type=float)
-parser.add_argument("--alpha_init", default=0.0, type=float)
-parser.add_argument("--alpha_schedule", default=0.50, type=float)
+parser.add_argument('--alpha', default=1.0, type=float)
+parser.add_argument('--alpha_init', default=0.0, type=float)
+parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
-parser.add_argument("--oc-alpha", default=1.0, type=float)
-parser.add_argument("--oc-alpha-init", default=0.3, type=float)
-parser.add_argument("--oc-alpha-schedule", default=1.0, type=float)
-parser.add_argument("--oc-k", default=1.0, type=float)
-parser.add_argument("--oc-k-init", default=1.0, type=float)
-parser.add_argument("--oc-k-schedule", default=0, type=float)
+parser.add_argument('--oc-alpha', default=1.0, type=float)
+parser.add_argument('--oc-alpha-init', default=0.3, type=float)
+parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
+parser.add_argument('--oc-k', default=1.0, type=float)
+parser.add_argument('--oc-k-init', default=1.0, type=float)
+parser.add_argument('--oc-k-schedule', default=0, type=float)
 
-parser.add_argument("--ow", default=0.5, type=float)
-parser.add_argument("--ow-init", default=0, type=float)
-parser.add_argument("--ow-schedule", default=1.0, type=float)
-parser.add_argument("--oc-train-interval-steps", default=1, type=int)
-parser.add_argument("--oc-train-masks", default="features", choices=["features", "cams"], type=str)
-parser.add_argument("--oc_train_mask_t", default=0.2, type=float)
+parser.add_argument('--ow', default=0.5, type=float)
+parser.add_argument('--ow-init', default=0, type=float)
+parser.add_argument('--ow-schedule', default=1.0, type=float)
+parser.add_argument('--oc-train-interval-steps', default=1, type=int)
+parser.add_argument('--oc-train-masks', default='features', choices=['features', 'cams'], type=str)
+parser.add_argument('--oc_train_mask_t', default=0.2, type=float)
 
 try:
-  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+  GPUS = os.environ['CUDA_VISIBLE_DEVICES']
 except KeyError:
-  GPUS = "0"
-GPUS = GPUS.split(",")
+  GPUS = '0'
+GPUS = GPUS.split(',')
 GPUS_COUNT = len(GPUS)
 THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
 
@@ -112,16 +113,23 @@ def train_step(train_iterator):
   ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
   ow = linear_schedule(step, step_max, args.ow_init, args.ow, args.ow_schedule)
   k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
-  schedules = {"alpha": ap, "oc_alpha": ao, "ot_weight": ow, "k": k}
+  schedules = {'alpha': ap, 'oc_alpha': ao, 'ot_weight': ow, 'k': k}
 
   # CAM Generator Training
   (cg_features, images_mask, labels_mask, cg_metrics) = train_step_cg(step, images, targets, targets_sm, ap, ao, k)
 
   # Ordinary Classifier Training
   if (step + 1) % args.oc_train_interval_steps == 0:
-    ocnet.train()
     oc_step = int((step + 1) // args.oc_train_interval_steps) - 1
-    oc_metrics = train_step_oc(oc_step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow)
+
+    if args.oc_train_masks == 'cams':
+      del images_mask
+      images_mask = occse.hard_mask_images(images, cg_features, labels_mask, t=args.oc_train_mask_t)
+    else:
+      images_mask = images_mask.detach()
+
+    ocnet.train()
+    oc_metrics = train_step_oc(oc_step, images_mask, targets_sm, ow)
     ocnet.eval()
   else:
     oc_metrics = {}
@@ -130,7 +138,7 @@ def train_step(train_iterator):
 
 
 def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
-  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
     # Normal
     logits, features = cgnet(images, with_cam=True)
 
@@ -174,25 +182,18 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
   return (
     features, images_mask, labels_mask, {
-      "loss": cg_loss.item(),
-      "c_loss": c_loss.item(),
-      "p_loss": p_loss.item(),
-      "re_loss": re_loss.item(),
-      "o_loss": o_loss.item(),
+      'loss': cg_loss.item(),
+      'c_loss': c_loss.item(),
+      'p_loss': p_loss.item(),
+      're_loss': re_loss.item(),
+      'o_loss': o_loss.item(),
     }
   )
 
 
-def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mask, ow):
-  if args.oc_train_masks == "cams":
-    images_mask = occse.hard_mask_images(inputs, cg_features.cpu().float(), labels_mask,
-                                         t=args.oc_train_mask_t).to(DEVICE)
-  else:
-    images_mask = images_mask.detach()
-
-  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+def train_step_oc(step, images_mask, targets_sm, ow):
+  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
     cl_logits = ocnet(images_mask)
-
     ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
 
   oc_scaler.scale(ot_loss).backward()
@@ -202,7 +203,7 @@ def train_step_oc(step, inputs, targets_sm, cg_features, images_mask, labels_mas
     oc_scaler.update()
     ocopt.zero_grad()
 
-  return {"ot_loss": ot_loss.item()}
+  return {'ot_loss': ot_loss.item()}
 
 
 def evaluate(loader, classes):
@@ -220,18 +221,18 @@ def evaluate(loader, classes):
 
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
         logits, features = cgnet(inputs, with_cam=True)
-        # oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)).float())
+        # oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)))
 
       # targets_ += [targets]
       # preds_ += [oc_preds_batch]
 
       labels_mask = targets[..., np.newaxis, np.newaxis]
-      cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
+      cams = to_numpy(make_cam(features.cpu())) * labels_mask
       cams = cams.transpose(0, 2, 3, 1)
 
       if step == 0:
         inputs = to_numpy(inputs)
-        preds = to_numpy(torch.sigmoid(logits).float())
+        preds = to_numpy(torch.sigmoid(logits))
         wandb_utils.log_cams(classes, inputs, targets, cams, preds)
 
       accumulate_batch_iou_lowres(masks, cams, iou_meters)
@@ -246,7 +247,7 @@ def evaluate(loader, classes):
   return t, miou, iou  # , rm, rw
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   import multiprocessing
   multiprocessing.set_start_method('spawn')
 
@@ -256,14 +257,14 @@ if __name__ == "__main__":
   SEED = args.seed
   DEVICE = args.device
 
-  wb_run = wandb_utils.setup(TAG, args, tags=[args.dataset, args.architecture, "apoc", f"ls:{args.label_smoothing}"])
+  wb_run = wandb_utils.setup(TAG, args, tags=[args.dataset, args.architecture, 'apoc', f'ls:{args.label_smoothing}'])
   log_config(vars(args), TAG)
 
-  data_dir = create_directory(f"./experiments/data/")
-  model_dir = create_directory("./experiments/models/")
+  data_dir = create_directory(f'./experiments/data/')
+  model_dir = create_directory('./experiments/models/')
 
-  data_path = data_dir + f"{TAG}.json"
-  model_path = model_dir + f"{TAG}.pth"
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
 
@@ -288,7 +289,7 @@ if __name__ == "__main__":
   step_log = int(step_val * args.print_ratio)
   step_init = args.first_epoch * step_val
   step_max = args.max_epoch * step_val
-  print(f"Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}")
+  print(f'Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}')
 
   # Network
   cgnet = Classifier(
@@ -300,19 +301,19 @@ if __name__ == "__main__":
     trainable_stem=args.trainable_stem,
   )
   if args.restore:
-    print(f"Restoring weights from {args.restore}")
+    print(f'Restoring weights from {args.restore}')
     cgnet.load_state_dict(torch.load(args.restore), strict=True)
-  log_model("CGNet", cgnet, args)
+  log_model('CGNet', cgnet, args)
 
   # Ordinary Classifier.
-  print(f"Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)")
+  print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
   ocnet = Classifier(
     args.oc_architecture,
     train_dataset.info.num_classes,
     mode=args.mode,
     regularization=args.oc_regularization,
   )
-  ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
+  ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=True)
 
   cg_param_groups = cgnet.get_parameter_groups()
   oc_param_groups = ocnet.get_parameter_groups()
@@ -322,7 +323,7 @@ if __name__ == "__main__":
   ocnet.eval()
 
   if GPUS_COUNT > 1:
-    print(f"GPUs={GPUS_COUNT}")
+    print(f'GPUs={GPUS_COUNT}')
     cgnet = torch.nn.DataParallel(cgnet)
     ocnet = torch.nn.DataParallel(ocnet)
 
@@ -330,29 +331,29 @@ if __name__ == "__main__":
   save_model_fn = lambda: save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
 
   # Loss, Optimizer
-  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction="none").to(DEVICE)
+  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
-  if args.re_loss == "L1_Loss":
+  if args.re_loss == 'L1_Loss':
     r_loss_fn = L1_Loss
   else:
     r_loss_fn = L2_Loss
 
   cgopt = get_optimizer(args.lr, args.wd, step_max, cg_param_groups)
   ocopt = get_optimizer(args.lr, args.wd, step_max, oc_param_groups)
-  log_opt_params("CGNet", cg_param_groups)
-  log_opt_params("OCNet", oc_param_groups)
+  log_opt_params('CGNet', cg_param_groups)
+  log_opt_params('OCNet', oc_param_groups)
 
   cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
   oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
-  data_dic = {"train": [], "validation": []}
+  data_dic = {'train': [], 'validation': []}
 
   train_timer = Timer()
   eval_timer = Timer()
 
   train_metrics = MetricsContainer(
-    ["loss", "c_loss", "p_loss", "re_loss", "o_loss", "ot_loss", "alpha", "oc_alpha", "ot_weight", "k"]
+    ['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'ot_loss', 'alpha', 'oc_alpha', 'ot_weight', 'k']
   )
 
   best_train_mIoU = -1
@@ -362,7 +363,7 @@ if __name__ == "__main__":
 
   train_iterator = Iterator(train_loader)
 
-  for step in range(step_init, step_max):
+  for step in tqdm(range(step_init, step_max), 'Training'):
     metrics_values = train_step(train_iterator)
     train_metrics.update(metrics_values)
 
@@ -378,43 +379,43 @@ if __name__ == "__main__":
       ffs = to_numpy(focal_factor).astype(float).round(2).tolist()
 
       data = {
-        "iteration": step + 1,
-        "lr": lr,
-        "alpha": ap,
-        "loss": cg_loss,
-        "c_loss": c_loss,
-        "p_loss": p_loss,
-        "re_loss": re_loss,
-        "o_loss": o_loss,
-        "ot_loss": ot_loss,
-        "oc_alpha": ao,
-        "ow": ow,
-        "k": k,
-        "choices": cs,
-        "focal_factor": ffs,
-        "time": train_timer.tok(clear=True),
+        'iteration': step + 1,
+        'lr': lr,
+        'alpha': ap,
+        'loss': cg_loss,
+        'c_loss': c_loss,
+        'p_loss': p_loss,
+        're_loss': re_loss,
+        'o_loss': o_loss,
+        'ot_loss': ot_loss,
+        'oc_alpha': ao,
+        'ow': ow,
+        'k': k,
+        'choices': cs,
+        'focal_factor': ffs,
+        'time': train_timer.tok(clear=True),
       }
-      data_dic["train"].append(data)
+      data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log({f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch}, commit=not do_validation)
+      wandb.log({f'train/{k}': v for k, v in data.items()} | {'train/epoch': epoch}, commit=not do_validation)
 
       print(
-        "iteration    = {iteration:,}\n"
-        "time         = {time:.0f} sec\n"
-        "lr           = {lr:.4f}\n"
-        "alpha        = {alpha:.2f}\n"
-        "loss         = {loss:.4f}\n"
-        "c_loss       = {c_loss:.4f}\n"
-        "p_loss       = {p_loss:.4f}\n"
-        "re_loss      = {re_loss:.4f}\n"
-        "o_loss       = {o_loss:.4f}\n"
-        "o_train_loss = {ot_loss:.4f}\n"
-        "o_train_w    = {ow:.4f}\n"
-        "oc_alpha     = {oc_alpha:.4f}\n"
-        "k            = {k}\n"
-        "focal_factor = {focal_factor}\n"
-        "choices      = {choices}\n".format(**data)
+        'iteration    = {iteration:,}\n'
+        'time         = {time:.0f} sec\n'
+        'lr           = {lr:.4f}\n'
+        'alpha        = {alpha:.2f}\n'
+        'loss         = {loss:.4f}\n'
+        'c_loss       = {c_loss:.4f}\n'
+        'p_loss       = {p_loss:.4f}\n'
+        're_loss      = {re_loss:.4f}\n'
+        'o_loss       = {o_loss:.4f}\n'
+        'o_train_loss = {ot_loss:.4f}\n'
+        'o_train_w    = {ow:.4f}\n'
+        'oc_alpha     = {oc_alpha:.4f}\n'
+        'k            = {k}\n'
+        'focal_factor = {focal_factor}\n'
+        'choices      = {choices}\n'.format(**data)
       )
 
     if do_validation:
@@ -424,42 +425,42 @@ if __name__ == "__main__":
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
         best_train_mIoU = miou
-        wandb.run.summary["train/best_t"] = threshold
-        wandb.run.summary["train/best_miou"] = miou
-        wandb.run.summary["train/best_iou"] = iou
+        wandb.run.summary['train/best_t'] = threshold
+        wandb.run.summary['train/best_miou'] = miou
+        wandb.run.summary['train/best_iou'] = iou
       # rm = dict(zip('precision_m recall_m f1_m'.split(), rm))
       # rw = dict(zip('precision_w recall_w f1_w'.split(), rw))
 
       data = {
-        "iteration": step + 1,
-        "threshold": threshold,
-        "train_mIoU": miou,
-        "train_iou": iou,
-        "best_train_mIoU": best_train_mIoU,
-        "time": eval_timer.tok(clear=True),
+        'iteration': step + 1,
+        'threshold': threshold,
+        'train_mIoU': miou,
+        'train_iou': iou,
+        'best_train_mIoU': best_train_mIoU,
+        'time': eval_timer.tok(clear=True),
       }
       # data = data | rm | rw
-      data_dic["validation"].append(data)
+      data_dic['validation'].append(data)
       write_json(data_path, data_dic)
-      wandb.log({f"val/{k}": v for k, v in data.items()})
+      wandb.log({f'val/{k}': v for k, v in data.items()})
 
       print(
-        "iteration       = {iteration:,}\n"
-        "time            = {time:.0f} sec\n"
-        "threshold       = {threshold:.2f}\n"
-        "train_mIoU      = {train_mIoU:.2f}%\n"
-        "best_train_mIoU = {best_train_mIoU:.2f}%\n"
-        "train_iou       = {train_iou}\n"
-        # "oc-precision-m  = {precision_m:.2%}\n"
-        # "oc-recall-m     = {recall_m:.2%}\n"
-        # "oc-f1-m         = {f1_m:.2%}\n"
-        # "oc-precision-w  = {precision_w:.2%}\n"
-        # "oc-recall-w     = {recall_w:.2%}\n"
-        # "oc-f1-w         = {f1_w:.2%}"
+        'iteration       = {iteration:,}\n'
+        'time            = {time:.0f} sec\n'
+        'threshold       = {threshold:.2f}\n'
+        'train_mIoU      = {train_mIoU:.2f}%\n'
+        'best_train_mIoU = {best_train_mIoU:.2f}%\n'
+        'train_iou       = {train_iou}\n'
+        # 'oc-precision-m  = {precision_m:.2%}\n'
+        # 'oc-recall-m     = {recall_m:.2%}\n'
+        # 'oc-f1-m         = {f1_m:.2%}\n'
+        # 'oc-precision-w  = {precision_w:.2%}\n'
+        # 'oc-recall-w     = {recall_w:.2%}\n'
+        # 'oc-f1-w         = {f1_w:.2%}'
         .format(**data)
       )
 
-      print(f"saving weights `{model_path}`\n")
+      print(f'saving weights `{model_path}`\n')
       save_model_fn()
 
   write_json(data_path, data_dic)
