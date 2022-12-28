@@ -8,8 +8,9 @@ import sys
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import multiprocessing
+from torch.utils.data import Subset, DataLoader
 
 from core.datasets import *
 from core.networks import *
@@ -31,7 +32,7 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
-parser.add_argument('--num_workers', default=8, type=int)
+# parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
@@ -65,9 +66,6 @@ normalize_fn = Normalize(*imagenet_stats())
 
 
 def run(args):
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
-
   model = Classifier(
     args.architecture,
     dataset.info.num_classes,
@@ -76,23 +74,26 @@ def run(args):
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
-  model = model.to(DEVICE)
-
-  print('[i] Architecture is {}'.format(args.architecture))
-  print('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  print()
-
-  if GPUS_COUNT > 1:
-    print(f"GPUS={GPUS}")
-    model = nn.DataParallel(model)
-
-  load_model(model, WEIGHTS_PATH, parallel=GPUS_COUNT > 1)
+  load_model(model, WEIGHTS_PATH)
   model.eval()
+
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+  dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  with torch.no_grad():
-    length = len(dataset)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales), join=True)
+
+
+def _work(process_id, model, dataset, scales):
+  dataset = dataset[process_id]
+  length = len(dataset)
+  # loader = DataLoader(dataset, shuffle=False, num_workers=args.num_workers // GPUS_COUNT, pin_memory=False)
+
+  with torch.no_grad(), torch.cuda.device(process_id):
+    model.cuda()
+
     for step, (image, image_id, label) in enumerate(dataset):
       W, H = image.size
 
@@ -103,39 +104,35 @@ def run(args):
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams_list = [get_cam(model, image, scale) for scale in scales]
+      cams = [forward_tta(model, image, scale) for scale in scales]
 
-      strided_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_size)[0] for cams in cams_list]
-      strided_cams = torch.sum(torch.stack(strided_cams_list), dim=0)
+      cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
+      cams_st = torch.sum(torch.stack(cams_st), dim=0)
 
-      hr_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams_list]
-      hr_cams = torch.sum(torch.stack(hr_cams_list), dim=0)[:, :H, :W]
+      cams_hr = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams]
+      cams_hr = torch.sum(torch.stack(cams_hr), dim=0)[:, :H, :W]
 
       keys = torch.nonzero(torch.from_numpy(label))[:, 0]
 
-      strided_cams = strided_cams[keys]
-      strided_cams /= F.adaptive_max_pool2d(strided_cams, (1, 1)) + 1e-5
+      cams_st = cams_st[keys]
+      cams_st /= F.adaptive_max_pool2d(cams_st, (1, 1)) + 1e-5
 
-      hr_cams = hr_cams[keys]
-      hr_cams /= F.adaptive_max_pool2d(hr_cams, (1, 1)) + 1e-5
+      cams_hr = cams_hr[keys]
+      cams_hr /= F.adaptive_max_pool2d(cams_hr, (1, 1)) + 1e-5
 
       # save cams
       keys = np.pad(keys + 1, (1, 0), mode='constant')
-      np.save(npy_path, {
-        "keys": keys,
-        "cam": strided_cams.cpu(),
-        "hr_cam": hr_cams.cpu().numpy()
-      })
+      np.save(npy_path, {"keys": keys, "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
 
       sys.stdout.write(
         f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}%, '
-        f'({(H, W)}, {tuple(hr_cams.shape)})'
+        f'({(H, W)}, {tuple(cams_hr.shape)})'
       )
       sys.stdout.flush()
     print()
 
 
-def get_cam(model, ori_image, scale):
+def forward_tta(model, ori_image, scale):
   W, H = ori_image.size
 
   # Preprocessing
