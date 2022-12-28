@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import multiprocessing
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import Subset
 
 from core.datasets import *
 from core.networks import *
@@ -74,6 +74,7 @@ def run(args):
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
+  print(f'Loading weights from {WEIGHTS_PATH}.')
   load_model(model, WEIGHTS_PATH)
   model.eval()
 
@@ -89,7 +90,6 @@ def run(args):
 def _work(process_id, model, dataset, scales):
   dataset = dataset[process_id]
   length = len(dataset)
-  # loader = DataLoader(dataset, shuffle=False, num_workers=args.num_workers // GPUS_COUNT, pin_memory=False)
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()

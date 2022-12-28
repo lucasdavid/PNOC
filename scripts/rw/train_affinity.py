@@ -186,7 +186,6 @@ if __name__ == '__main__':
       }
     )
 
-    # region logging
     epoch = step // step_valid
     do_logging = (step + 1) % step_log == 0
     do_validation = (step + 1) % step_valid == 0
@@ -218,12 +217,9 @@ if __name__ == '__main__':
         'neg_loss={neg_loss:.4f} '
         'time={time:.0f}sec'.format(**data)
       )
-    # endregion
 
-    # region validation
     if do_validation:
       save_model_fn()
-    # endregion
 
   print(f'saving weights `{model_path}`')
   save_model_fn()

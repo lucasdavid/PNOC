@@ -10,8 +10,9 @@ import sys
 import numpy as np
 import PIL
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import multiprocessing
+from torch.utils.data import Subset
 
 from core.datasets import *
 from core.networks import *
@@ -46,12 +47,104 @@ parser.add_argument('--stage4_out_features', default=1024, type=int)
 # Inference parameters
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
-parser.add_argument('--vis_dir', default='vis_cam', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--activation', default='relu', type=str, choices=['relu', 'sigmoid'])
 
 GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
 GPUS_COUNT = len(GPUS_VISIBLE.split(','))
+
+normalize_fn = Normalize(*imagenet_stats())
+
+
+def run(args):
+  # Network
+  model = CCAM(
+    args.architecture,
+    weights=args.weights,
+    mode=args.mode,
+    dilated=args.dilated,
+    stage4_out_features=args.stage4_out_features
+  )
+  print(f'Loading weights from {WEIGHTS_PATH}.')
+  load_model(model, WEIGHTS_PATH)
+  model.eval()
+
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+
+  dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
+  scales = [float(scale) for scale in args.scales.split(',')]
+
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales), join=True)
+
+
+def _work(process_id, model, dataset, scales):
+  dataset = dataset[process_id]
+  length = len(dataset)
+
+  with torch.no_grad(), torch.cuda.device(process_id):
+    model.cuda()
+
+    for step, (ori_image, image_id, _, _) in enumerate(dataset):
+      W, H = ori_image.size
+      npy_path = PRED_DIR + image_id + '.npy'
+      if os.path.isfile(npy_path):
+        continue
+      strided_size = get_strided_size((H, W), 4)
+      strided_up_size = get_strided_up_size((H, W), 16)
+
+      cams = [forward_tta(model, ori_image, scale) for scale in scales]
+
+      cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
+      cams_st = torch.mean(torch.stack(cams_st), dim=0)  # (1, 1, H, W)
+
+      cams_hr = [resize_for_tensors(c.unsqueeze(0), strided_up_size)[0] for c in cams]
+      cams_hr = torch.mean(torch.stack(cams_hr), dim=0)[:, :H, :W]  # (1, 1, H, W)
+
+      cams_st = make_cam(cams_st.unsqueeze(1)).squeeze(1)
+      cams_hr = make_cam(cams_hr.unsqueeze(1)).squeeze(1)
+
+      np.save(npy_path, {"keys": [0, 1], "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
+
+      if process_id == 0:
+        sys.stdout.write(
+          '\r# Make CAM [{}/{}] = {:.2f}%, ({}, {})'.format(
+            step + 1, length, (step + 1) / length * 100, (H, W), cams_hr.size()
+          )
+        )
+        sys.stdout.flush()
+
+    if process_id == 0:
+      print()
+
+
+def forward_tta(model, image, scale):
+  W, H = image.size
+
+  # preprocessing
+  x = copy.deepcopy(image)
+  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
+  x = normalize_fn(x)
+  x = x.transpose((2, 0, 1))
+
+  x = torch.from_numpy(x)
+  flipped_image = x.flip(-1)
+
+  images = torch.stack([x, flipped_image])
+  images = images.cuda()
+
+  # inferenece
+  _, _, cam = model(images)
+
+  if args.activation == 'relu':
+    cams = F.relu(cam)
+  else:
+    cams = torch.sigmoid(cam)
+
+  cams = cams[0] + cams[1].flip(-1)
+
+  return cams  # (1, H, W)
+
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -61,104 +154,7 @@ if __name__ == '__main__':
   TAG = f'{args.tag}@train' if 'train' in args.domain else f'{args.tag}@val'
   TAG += '@scale=%s' % args.scales
 
-  model_path = args.pretrained
-  pred_dir = create_directory(f'./experiments/predictions/{TAG}/')
-  cam_path = create_directory(f'{args.vis_dir}/{TAG}')
+  WEIGHTS_PATH = args.pretrained
+  PRED_DIR = create_directory(f'./experiments/predictions/{TAG}/')
 
   set_seed(SEED)
-
-  normalize_fn = Normalize(*imagenet_stats())
-
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-
-  # Network
-  model = CCAM(
-    args.architecture,
-    weights=args.weights,
-    mode=args.mode,
-    dilated=args.dilated,
-    stage4_out_features=args.stage4_out_features
-  )
-
-  print('[i] Architecture is {}'.format(args.architecture))
-  print('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  print()
-
-  if GPUS_COUNT > 1:
-    print('[i] the number of gpu : {}'.format(GPUS_COUNT))
-    model = nn.DataParallel(model)
-
-  model = model.to(DEVICE)
-
-  print(f'Loading weights from {model_path}.')
-  load_model(model, model_path, parallel=GPUS_COUNT > 1)
-
-  # Evaluation
-  eval_timer = Timer()
-  scales = [float(scale) for scale in args.scales.split(',')]
-
-  model.eval()
-  eval_timer.tik()
-
-  def get_cam(ori_image, scale):
-    # preprocessing
-    image = copy.deepcopy(ori_image)
-    image = image.resize((round(ori_w * scale), round(ori_h * scale)), resample=PIL.Image.CUBIC)
-
-    image = normalize_fn(image)
-    image = image.transpose((2, 0, 1))
-
-    image = torch.from_numpy(image)
-    flipped_image = image.flip(-1)
-
-    images = torch.stack([image, flipped_image])
-    images = images.cuda()
-
-    # inferenece
-    _, _, cam = model(images)
-
-    if args.activation == 'relu':
-      cams = F.relu(cam)
-    else:
-      cams = torch.sigmoid(cam)
-
-    cams = cams[0] + cams[1].flip(-1)
-
-    return cams  # (1, H, W)
-
-  vis_cam = True
-  with torch.no_grad():
-    length = len(dataset)
-    for step, (ori_image, image_id, _, _) in enumerate(dataset):
-      ori_w, ori_h = ori_image.size
-      npy_path = pred_dir + image_id + '.npy'
-      if os.path.isfile(npy_path):
-        continue
-      strided_size = get_strided_size((ori_h, ori_w), 4)
-      strided_up_size = get_strided_up_size((ori_h, ori_w), 16)
-
-      cams_list = [get_cam(ori_image, scale) for scale in scales]
-
-      strided_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_size)[0] for cams in cams_list]
-      strided_cams = torch.mean(torch.stack(strided_cams_list), dim=0)  # (1, 1, H, W)
-
-      hr_cams_list = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams_list]
-      hr_cams = torch.mean(torch.stack(hr_cams_list), dim=0)[:, :ori_h, :ori_w]  # (1, 1, H, W)
-
-      strided_cams = make_cam(strided_cams.unsqueeze(1)).squeeze(1)
-      hr_cams = make_cam(hr_cams.unsqueeze(1)).squeeze(1)
-
-      np.save(npy_path, {"keys": [0, 1], "cam": strided_cams.cpu(), "hr_cam": hr_cams.cpu().numpy()})
-
-      sys.stdout.write(
-        '\r# Make CAM [{}/{}] = {:.2f}%, ({}, {})'.format(
-          step + 1, length, (step + 1) / length * 100, (ori_h, ori_w), hr_cams.size()
-        )
-      )
-      sys.stdout.flush()
-    print()
-
-  if args.domain == 'train_aug':
-    args.domain = 'train'
-
-  print("python3 inference_crf.py --experiment_name {} --domain {}".format(TAG, args.domain))

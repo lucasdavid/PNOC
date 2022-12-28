@@ -48,18 +48,17 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 # DATA_DIR=$SCRATCH/datasets/coco14/
 
 LOGS_DIR=$SCRATCH/logs/ccam
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 
 WORKERS=8
 
 IMAGE_SIZE=448
 EPOCHS=10
-BATCH_SIZE=32
-ACCUMULATE_STEPS=4
+BATCH_SIZE=128
+ACCUMULATE_STEPS=1
 MIXED_PRECISION=true
 
 ARCHITECTURE=resnest269
+ARCH=rs269
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
@@ -72,7 +71,11 @@ LR=0.001
 FG_T=0.4
 # BG_T=0.1
 
-TAG=ccam-fg-hints@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+
+# TAG=ccam-fg-hints@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+TAG=$DATASET-ccamh-$ARCH@rs269poc@rs269ra@b$BATCH_SIZE-fg$FG_T
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
   --tag             $TAG                  \

@@ -230,7 +230,7 @@ if __name__ == '__main__':
         # target = torch.zeros_like(cam_hints)
         # target[fg_likely] = 1.
         # loss_h = hint_loss_fn(target, output)
-        # loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum()
+        # loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum().detach()
 
         # Back-propagation
         loss = args.hint_w * loss_h + (loss1 + loss2 + loss3)
