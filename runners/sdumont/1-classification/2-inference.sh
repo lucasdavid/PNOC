@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J inf-rs269-rand
+#SBATCH -J inf-coco-rs101
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/inf-%j.out
-#SBATCH --time=4:00:00
+#SBATCH --time=2:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -42,12 +42,12 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/cam/inference.py
 
-DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DOMAIN=train
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
+# DATASET=voc12
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DOMAIN=train
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+DOMAIN=train2014
 
 ARCHITECTURE=resnest269
 DILATED=false
@@ -68,19 +68,27 @@ run_experiment () {
     --data_dir       $DATA_DIR              &
 }
 
-WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra
-TAG=poc/$WEIGHTS
-DEVICES=0
-run_experiment
+# WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra
+# TAG=poc/$WEIGHTS
+# DEVICES=0
+# run_experiment
 
-WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r2
-TAG=poc/$WEIGHTS
-DEVICES=1
-run_experiment
+# WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r2
+# TAG=poc/$WEIGHTS
+# DEVICES=1
+# run_experiment
 
 WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r3
 TAG=poc/$WEIGHTS
-DEVICES=2
+DEVICES=0,1,2,3
 run_experiment
+
+DOMAIN=val
+run_experiment
+
+# WEIGHTS=coco14-rs101-poc@rs101
+# TAG=poc/$WEIGHTS
+# DEVICES=0,1,2,3
+# run_experiment
 
 wait
