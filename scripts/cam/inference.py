@@ -84,10 +84,10 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales), join=True)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR), join=True)
 
 
-def _work(process_id, model, dataset, scales):
+def _work(process_id, model, dataset, scales, saving_dir):
   dataset = dataset[process_id]
   length = len(dataset)
 
@@ -97,7 +97,7 @@ def _work(process_id, model, dataset, scales):
     for step, (image, image_id, label) in enumerate(dataset):
       W, H = image.size
 
-      npy_path = PREDICTIONS_DIR + image_id + '.npy'
+      npy_path = os.path.join(saving_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue
 
