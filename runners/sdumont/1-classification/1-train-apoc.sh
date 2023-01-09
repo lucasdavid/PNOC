@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-apoc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/apoc-%j.out
-#SBATCH --time=72:00:00
+#SBATCH --time=14:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -147,7 +147,7 @@ run_inference () {
     --mode              $MODE            \
     --tag               $TAG             \
     --domain            $DOMAIN          \
-    --data_dir          $DATA_DIR        &
+    --data_dir          $DATA_DIR
 }
 
 
@@ -195,36 +195,35 @@ run_inference () {
 
 
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
 OC_ARCHITECTURE=resnest269
 LABELSMOOTHING=0.1
-OW=0.5
+OW=1.0
 OW_INIT=0.0
 OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
+TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
 run_training
-OW=1.0
-OC_TRAIN_MASK_T=0.2
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-run_training
-OC_TRAIN_INT_STEPS=5
-OC_TRAIN_MASK_T=0.2
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-run_training
+run_inference
 
-# DEVICES=0
+# OW=1.0
 # OC_TRAIN_MASK_T=0.2
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
+# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
+# run_training
+# OW=1.0
+# OC_TRAIN_INT_STEPS=5
+# OC_TRAIN_MASK_T=0.2
+# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
+# run_training
 # run_inference
-# DEVICES=1
+
+
 # OC_TRAIN_MASK_T=0.3
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
 # run_inference
-# DEVICES=2
 # OC_TRAIN_MASK_T=0.4
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
 # run_inference
-# wait
+# run_inference

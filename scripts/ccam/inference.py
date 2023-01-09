@@ -31,7 +31,6 @@ parser = argparse.ArgumentParser()
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
-parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
@@ -57,7 +56,9 @@ normalize_fn = Normalize(*imagenet_stats())
 
 
 def run(args):
-  # Network
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+
   model = CCAM(
     args.architecture,
     weights=args.weights,
@@ -69,16 +70,13 @@ def run(args):
   load_model(model, WEIGHTS_PATH)
   model.eval()
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
-
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales), join=True)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE), join=True)
 
 
-def _work(process_id, model, dataset, scales):
+def _work(process_id, model, dataset, scales, preds_dir, device):
   dataset = dataset[process_id]
   length = len(dataset)
 
@@ -87,13 +85,13 @@ def _work(process_id, model, dataset, scales):
 
     for step, (ori_image, image_id, _, _) in enumerate(dataset):
       W, H = ori_image.size
-      npy_path = PRED_DIR + image_id + '.npy'
+      npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams = [forward_tta(model, ori_image, scale) for scale in scales]
+      cams = [forward_tta(model, ori_image, scale, device) for scale in scales]
 
       cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
       cams_st = torch.mean(torch.stack(cams_st), dim=0)  # (1, 1, H, W)
@@ -107,18 +105,13 @@ def _work(process_id, model, dataset, scales):
       np.save(npy_path, {"keys": [0, 1], "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
 
       if process_id == 0:
-        sys.stdout.write(
-          '\r# Make CAM [{}/{}] = {:.2f}%, ({}, {})'.format(
-            step + 1, length, (step + 1) / length * 100, (H, W), cams_hr.size()
-          )
-        )
+        sys.stdout.write(f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}, ({(H, W)}, {tuple(cams_hr.shape)})')
         sys.stdout.flush()
 
-    if process_id == 0:
-      print()
+    if process_id == 0: print()
 
 
-def forward_tta(model, image, scale):
+def forward_tta(model, image, scale, device):
   W, H = image.size
 
   # preprocessing
@@ -131,7 +124,7 @@ def forward_tta(model, image, scale):
   flipped_image = x.flip(-1)
 
   images = torch.stack([x, flipped_image])
-  images = images.cuda()
+  images = images.to(device)
 
   # inferenece
   _, _, cam = model(images)
@@ -155,6 +148,8 @@ if __name__ == '__main__':
   TAG += '@scale=%s' % args.scales
 
   WEIGHTS_PATH = args.pretrained
-  PRED_DIR = create_directory(f'./experiments/predictions/{TAG}/')
+  PREDICTIONS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
 
   set_seed(SEED)
+  run(args)
+

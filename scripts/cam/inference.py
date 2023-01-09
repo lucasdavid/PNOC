@@ -66,6 +66,9 @@ normalize_fn = Normalize(*imagenet_stats())
 
 
 def run(args):
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+
   model = Classifier(
     args.architecture,
     dataset.info.num_classes,
@@ -78,16 +81,14 @@ def run(args):
   load_model(model, WEIGHTS_PATH)
   model.eval()
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR), join=True)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE), join=True)
 
 
-def _work(process_id, model, dataset, scales, saving_dir):
+def _work(process_id, model, dataset, scales, preds_dir, device):
   dataset = dataset[process_id]
   length = len(dataset)
 
@@ -97,14 +98,14 @@ def _work(process_id, model, dataset, scales, saving_dir):
     for step, (image, image_id, label) in enumerate(dataset):
       W, H = image.size
 
-      npy_path = os.path.join(saving_dir, image_id + '.npy')
+      npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue
 
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams = [forward_tta(model, image, scale) for scale in scales]
+      cams = [forward_tta(model, image, scale, device) for scale in scales]
 
       cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
       cams_st = torch.sum(torch.stack(cams_st), dim=0)
@@ -124,15 +125,13 @@ def _work(process_id, model, dataset, scales, saving_dir):
       keys = np.pad(keys + 1, (1, 0), mode='constant')
       np.save(npy_path, {"keys": keys, "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
 
-      sys.stdout.write(
-        f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}%, '
-        f'({(H, W)}, {tuple(cams_hr.shape)})'
-      )
-      sys.stdout.flush()
-    print()
+      if process_id == 0:
+        sys.stdout.write(f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}, ({(H, W)}, {tuple(cams_hr.shape)})')
+        sys.stdout.flush()
+    if process_id == 0: print()
 
 
-def forward_tta(model, ori_image, scale):
+def forward_tta(model, ori_image, scale, DEVICE):
   W, H = ori_image.size
 
   # Preprocessing

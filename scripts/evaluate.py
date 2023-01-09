@@ -9,7 +9,7 @@ from PIL import Image
 
 from core.datasets import get_paths_dataset
 from tools.ai.demo_utils import crf_inference_label
-from tools.general.io_utils import load_saliency_file
+from tools.general.io_utils import load_saliency_file, load_background_file
 
 SAL_MODES = ('saliency', 'segmentation')
 

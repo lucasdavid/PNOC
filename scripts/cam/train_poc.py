@@ -208,7 +208,7 @@ if __name__ == '__main__':
         _, features = cgnet(images_batch, with_cam=True)
 
         labels_mask = targets_batch[..., np.newaxis, np.newaxis]
-        cams_batch = to_numpy(make_cam(features.cpu())) * labels_mask
+        cams_batch = to_numpy(make_cam(features.cpu().float())) * labels_mask
         cams_batch = cams_batch.transpose(0, 2, 3, 1)
 
         if step == 0:

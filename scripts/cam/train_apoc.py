@@ -102,7 +102,7 @@ GPUS_COUNT = len(GPUS)
 THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
 
 
-def train_step(train_iterator):
+def train_step(train_iterator, step):
   inputs, targets = train_iterator.get()
 
   images = inputs.to(DEVICE)
@@ -227,7 +227,7 @@ def evaluate(loader, classes):
       # preds_ += [oc_preds_batch]
 
       labels_mask = targets[..., np.newaxis, np.newaxis]
-      cams = to_numpy(make_cam(features.cpu())) * labels_mask
+      cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
       cams = cams.transpose(0, 2, 3, 1)
 
       if step == 0:
@@ -364,7 +364,7 @@ if __name__ == '__main__':
   train_iterator = Iterator(train_loader)
 
   for step in tqdm(range(step_init, step_max), 'Training'):
-    metrics_values = train_step(train_iterator)
+    metrics_values = train_step(train_iterator, step)
     train_metrics.update(metrics_values)
 
     epoch = step // step_val
@@ -401,7 +401,7 @@ if __name__ == '__main__':
       wandb.log({f'train/{k}': v for k, v in data.items()} | {'train/epoch': epoch}, commit=not do_validation)
 
       print(
-        'iteration    = {iteration:,}\n'
+        '\niteration    = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
         'alpha        = {alpha:.2f}\n'

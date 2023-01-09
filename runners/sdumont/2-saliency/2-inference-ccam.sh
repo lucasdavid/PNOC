@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J mk-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-%j.out
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -39,7 +39,8 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=ccam_inference.py
+SOURCE=scripts/ccam/inference.py
+DEVICES=0,1,2,3
 
 LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -48,42 +49,18 @@ WORKERS=8
 
 DOMAIN=train
 
-# ARCHITECTURE=resnest269
-# TRAINABLE_STEM=true
-# DILATED=false
-# MODE=normal
-# TAG=ccam-rs269-e10-b64-lr0.001
-# S4_OUT_FEATURES=1024
-# WEIGHTS=imagenet
-# PRETRAINED=./experiments/models/ccam-rs269-e10-b64-lr0.001.pth
-
-# CUDA_VISIBLE_DEVICES=0 $PY $SOURCE       \
-#   --tag             $TAG                 \
-#   --domain          $DOMAIN              \
-#   --num_workers     $WORKERS             \
-#   --architecture    $ARCHITECTURE        \
-#   --dilated         $DILATED             \
-#   --stage4_out_features $S4_OUT_FEATURES \
-#   --mode            $MODE                \
-#   --weights         $WEIGHTS             \
-#   --trainable-stem  $TRAINABLE_STEM      \
-#   --pretrained      $PRETRAINED          \
-#   --data_dir        $DATA_DIR
-
-
-ARCHITECTURE=resnet50
+ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
 DILATED=false
 MODE=normal
-TAG=ccam-rn50-moco-e10-b64-lr0.0001-r2
+TAG=ccam-h-rs269@rs269-poc-fg0.4-b32-lr0.001
 S4_OUT_FEATURES=1024
 WEIGHTS=imagenet
-PRETRAINED=./experiments/models/ccam-rn50-moco-e10-b64-lr0.0001-r2.pth
+PRETRAINED=./experiments/models/saliency/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
 
-CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
+CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --tag             $TAG                 \
   --domain          $DOMAIN              \
-  --num_workers     $WORKERS             \
   --architecture    $ARCHITECTURE        \
   --dilated         $DILATED             \
   --stage4_out_features $S4_OUT_FEATURES \
@@ -92,6 +69,37 @@ CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
   --trainable-stem  $TRAINABLE_STEM      \
   --pretrained      $PRETRAINED          \
   --data_dir        $DATA_DIR
+
+# EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
+# T=0.5
+# CRF=10
+# $PY scripts/ccam/inference_crf.py       \
+#   --experiment_name $EXP        \
+#   --domain          train_aug   \
+#   --threshold       $T          \
+#   --crf_iteration   $CRF        \
+#   --data_dir        $DATA_DIR
+
+# ARCHITECTURE=resnet50
+# TRAINABLE_STEM=true
+# DILATED=false
+# MODE=normal
+# TAG=ccam-rn50-moco-e10-b64-lr0.0001-r2
+# S4_OUT_FEATURES=1024
+# WEIGHTS=imagenet
+# PRETRAINED=./experiments/models/ccam-rn50-moco-e10-b64-lr0.0001-r2.pth
+
+# CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
+#   --tag             $TAG                 \
+#   --domain          $DOMAIN              \
+#   --architecture    $ARCHITECTURE        \
+#   --dilated         $DILATED             \
+#   --stage4_out_features $S4_OUT_FEATURES \
+#   --mode            $MODE                \
+#   --weights         $WEIGHTS             \
+#   --trainable-stem  $TRAINABLE_STEM      \
+#   --pretrained      $PRETRAINED          \
+#   --data_dir        $DATA_DIR
 
 
 # EXP=$TAG@train@scale=0.5,1.0,1.5,2.0

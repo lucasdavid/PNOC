@@ -48,7 +48,7 @@ def _work(process_id, dataset, args):
   ccam_dir = f'./experiments/predictions/{args.experiment_name}/'
   pred_dir = f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_iteration}/'
 
-  for step, (image, _id, _, _) in enumerate(subset):
+  for step, (image, _id, _) in enumerate(subset):
     png_path = pred_dir + _id + '.png'
     if os.path.isfile(png_path):
       continue
