@@ -15,7 +15,7 @@ SAL_MODES = ('saliency', 'segmentation')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--experiment_name', type=str, required=True)
-parser.add_argument('--num_workers', default=24, type=int)
+parser.add_argument('--num_workers', default=48, type=int)
 parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
@@ -102,7 +102,7 @@ def compare(dataset, classes, start, step, TP, P, T):
       TP[i].value += np.sum((y_true == i) * mask)
       TP[i].release()
 
-  if skipped:
+  if start == 0 and skipped:
     print(f"  {skipped} files were skipped because their predictions were not found")
 
 
@@ -164,7 +164,7 @@ def run(args, dataset):
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and SAL_DIR is None and args.mode != 'png' else [args.threshold]
+    if args.threshold is None and SAL_DIR is None and args.mode != "png" else [args.threshold]
   )
 
   for t in thresholds:

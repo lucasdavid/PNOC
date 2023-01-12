@@ -73,17 +73,17 @@ def run(args):
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE), join=True)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE, args), join=True)
 
 
-def _work(process_id, model, dataset, scales, preds_dir, device):
+def _work(process_id, model, dataset, scales, preds_dir, device, args):
   dataset = dataset[process_id]
   length = len(dataset)
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for step, (ori_image, image_id, _, _) in enumerate(dataset):
+    for step, (ori_image, image_id, _) in enumerate(dataset):
       W, H = ori_image.size
       npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
@@ -91,7 +91,7 @@ def _work(process_id, model, dataset, scales, preds_dir, device):
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams = [forward_tta(model, ori_image, scale, device) for scale in scales]
+      cams = [forward_tta(model, ori_image, scale, device, args) for scale in scales]
 
       cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
       cams_st = torch.mean(torch.stack(cams_st), dim=0)  # (1, 1, H, W)
@@ -111,7 +111,7 @@ def _work(process_id, model, dataset, scales, preds_dir, device):
     if process_id == 0: print()
 
 
-def forward_tta(model, image, scale, device):
+def forward_tta(model, image, scale, device, args):
   W, H = image.size
 
   # preprocessing
