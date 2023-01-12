@@ -41,6 +41,7 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/ccam/train_with_cam_hints.py
+DEVICES=0,1,2,3
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -53,8 +54,8 @@ WORKERS=8
 
 IMAGE_SIZE=448
 EPOCHS=10
-BATCH_SIZE=128
-ACCUMULATE_STEPS=1
+BATCH_SIZE=64
+ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
 
 ARCHITECTURE=resnest269
@@ -72,12 +73,16 @@ FG_T=0.4
 # BG_T=0.1
 
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+# TAG=$DATASET-ccamh-$ARCH@rs269poc@rs101ra@b$BATCH_SIZE-fg$FG_T
 
-# TAG=ccam-fg-hints@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-TAG=$DATASET-ccamh-$ARCH@rs269poc@rs269ra@b$BATCH_SIZE-fg$FG_T
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+# TAG=ccam-fgh@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+TAG=$DATASET-ccamh-$ARCH@rs269-apoc@fg$FG_T-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR
+
+WANDB_TAGS="ccamh,amp,$DATASET,$ARCH"     \
+CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --tag             $TAG                  \
   --alpha           $ALPHA                \
   --hint_w          $HINT_W               \

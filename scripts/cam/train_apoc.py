@@ -124,9 +124,14 @@ def train_step(train_iterator, step):
 
     if args.oc_train_masks == 'cams':
       del images_mask
-      images_mask = occse.hard_mask_images(images, cg_features, labels_mask, t=args.oc_train_mask_t)
-    
-    images_mask = images_mask.detach()
+      images_mask = occse.hard_mask_images(
+        inputs, cg_features.detach().cpu(), labels_mask,
+        t=args.oc_train_mask_t
+      ).detach().to(DEVICE)
+    else:
+      images_mask = images_mask.detach()
+
+    del images, targets, cg_features
 
     ocnet.train()
     oc_metrics = train_step_oc(oc_step, images_mask, targets_sm, ow)

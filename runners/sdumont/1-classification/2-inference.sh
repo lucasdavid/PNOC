@@ -74,11 +74,23 @@ run_experiment () {
 # TAG=poc/$WEIGHTS
 # DOMAIN=train_aug
 # run_experiment
-
 # DOMAIN=val
 # run_experiment
 
+## RA
+#
+# ARCHITECTURE=resnest269
+# WEIGHTS=cam/resnest269@randaug
+# TAG=vanilla/rs269ra
+# run_experiment
+
+
+## A-P-OC
+#
 ARCHITECTURE=resnest269
-WEIGHTS=cam/resnest269@puzzlerep2
-TAG=puzzle/resnest269@puzzlerep2
+WEIGHTS=voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3
+TAG=apoc/$WEIGHTS
+DOMAIN=train_aug
+run_experiment
+DOMAIN=val
 run_experiment
