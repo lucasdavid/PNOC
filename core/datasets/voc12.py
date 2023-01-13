@@ -261,7 +261,7 @@ class HRCAMsDataset(VOC12Dataset):
 
     cams = self.resize_fn(cams)
 
-    data = self.transform({'image': image, 'masks': cams})
-    image, cams = data['image'], data['masks']
+    data = self.transform({'image': image, 'mask': cams})
+    image, cams = data['image'], data['mask']
 
     return image, label, cams

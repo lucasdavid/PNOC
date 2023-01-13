@@ -32,7 +32,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--data_dir', default='/datasets/VOCdevkit/VOC2012/', type=str)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--cams_dir', default='/experiments/predictions/resnest101@ra/', type=str)
 
 # Network
@@ -43,6 +44,7 @@ parser.add_argument("--regularization", default=None, type=str)  # orthogonal
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--stage4_out_features', default=1024, type=int)
+parser.add_argument('--restore', default=None, type=str)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)

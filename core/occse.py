@@ -136,11 +136,11 @@ def _class_specific_mask(features, label_mask, sizes, eps=1e-5, globalnorm=True)
 
   if globalnorm:
     # Normalize considering all samples/channels because that's OC-CSE's default policy.
-    return mask / (mask.max().detach() + eps)
+    return mask / (mask.max() + eps)
 
   b, c = mask.size()[:2]
   mask_max = mask.view(b, c, -1).max(dim=-1)[0].view(b, c, 1, 1)
-  return mask / (mask_max.detach() + eps)
+  return mask / (mask_max + eps)
 
 
 def soft_mask_images(images, features, label_mask, eps=1e-5, globalnorm=True):
@@ -151,14 +151,7 @@ def soft_mask_images(images, features, label_mask, eps=1e-5, globalnorm=True):
 
 
 def hard_mask_images(images, features, label_mask, t=0.3, eps=1e-5, globalnorm=False):
-  # sizes = images.size()[2:]
-  # mask = _class_specific_mask(features, label_mask, sizes, eps, globalnorm)
-
-  # return images * (mask <= t)
-
-  mask = features[label_mask == 1, :, :].unsqueeze(1)
-  mask = F.relu_(mask)
-  mask = F.interpolate(mask, images.size()[2:], mode='bilinear', align_corners=False)
-  mask /= F.adaptive_max_pool2d(mask, (1, 1)) + eps
+  sizes = images.size()[2:]
+  mask = _class_specific_mask(features, label_mask, sizes, eps, globalnorm)
 
   return images * (mask <= t)
