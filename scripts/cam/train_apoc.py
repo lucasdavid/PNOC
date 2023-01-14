@@ -3,7 +3,6 @@ import os
 
 import numpy as np
 import torch
-# from sklearn import metrics as skmetrics
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -27,8 +26,8 @@ from tools.general.time_utils import *
 parser = argparse.ArgumentParser()
 
 # Dataset
-parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
+parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)

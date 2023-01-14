@@ -392,7 +392,6 @@ class AffinityNet(Backbone):
 class DeepLabV3Plus(Backbone):
 
   def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=None, use_group_norm=False):
-    # model_name, num_classes, mode=mode, dilated=dilated, strides=strides, regularization=regularization
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     if use_group_norm:

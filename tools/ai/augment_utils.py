@@ -297,11 +297,11 @@ class RandomCrop_For_Segmentation(RandomCrop):
     rank = len(mask.shape)
     if self.labels_last:
       l = mask.shape[2:]
-      cm = np.ones([*self.mask_crop_shape, *l]) * self.ignore_value
+      cm = np.ones([*self.mask_crop_shape, *l], dtype=mask.dtype) * self.ignore_value
       cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[a['ymin']:a['ymax'], a['xmin']:a['xmax']]
     else:
       l = mask.shape[:rank-2]
-      cm = np.ones([*l, *self.mask_crop_shape]) * self.ignore_value
+      cm = np.ones([*l, *self.mask_crop_shape], dtype=mask.dtype) * self.ignore_value
       cm[..., b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[..., a['ymin']:a['ymax'], a['xmin']:a['xmax']]
 
     data['image'] = ci

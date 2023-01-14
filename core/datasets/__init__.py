@@ -104,6 +104,7 @@ def get_segmentation_datasets(
   pseudo_masks_dir=None,
   cutmix_prob=1.,
   mixup_prob=1.,
+  train_domain=None,
   train_transforms=None,
   valid_transforms=None,
 ):
@@ -111,11 +112,11 @@ def get_segmentation_datasets(
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.SegmentationDataset(data_dir, 'train_aug', train_transforms, pseudo_masks_dir)
+    train = voc12.SegmentationDataset(data_dir, train_domain or 'train_aug', train_transforms, pseudo_masks_dir)
     valid = voc12.SegmentationDataset(data_dir, 'val', valid_transforms, pseudo_masks_dir)
   else:
     from . import coco14
-    train = coco14.SegmentationDataset(data_dir, 'train2014', train_transforms, pseudo_masks_dir)
+    train = coco14.SegmentationDataset(data_dir, train_domain or 'train2014', train_transforms, pseudo_masks_dir)
     valid = coco14.SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
 
   info = DatasetInfo.from_metafile(dataset)
