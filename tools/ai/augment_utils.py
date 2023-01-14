@@ -101,8 +101,8 @@ class RandomHorizontalFlip_For_Segmentation:
 
 def random_hflip_fn(data):
   if bool(random.getrandbits(1)):
-    data['image'] = np.flip(data['image'], axis=-1)
-    data['mask'] = np.flip(data['mask'], axis=-1)
+    data['image'] = np.flip(data['image'], axis=-1).copy()
+    data['mask'] = np.flip(data['mask'], axis=-1).copy()
   return data
 
 

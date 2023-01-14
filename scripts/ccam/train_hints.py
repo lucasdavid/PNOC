@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import wandb
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from core.ccam import SimMaxLoss, SimMinLoss
 from core.datasets import *
@@ -204,7 +205,7 @@ if __name__ == '__main__':
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, labels, cam_hints) in enumerate(train_loader):
+    for step, (images, labels, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}")):
 
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
