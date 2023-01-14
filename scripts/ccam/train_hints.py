@@ -258,7 +258,7 @@ if __name__ == '__main__':
       )
 
       if do_logging:
-        ccams = torch.sigmoid(ccams)
+        ccams = torch.sigmoid(ccams).cpu().float()
         visualize_heatmap(TAG, images.clone().detach(), ccams, 0, step)
         loss, positive_loss, negative_loss, loss_h = train_metrics.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
