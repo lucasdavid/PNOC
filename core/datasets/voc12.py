@@ -257,9 +257,9 @@ class HRCAMsDataset(VOC12Dataset):
     cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
 
     image = self.resize_fn(image)
-    image = self.normalize_fn(image)
-
     cams = self.resize_fn(cams)
+    
+    image = self.normalize_fn(image)
 
     data = self.transform({'image': image, 'mask': cams})
     image, cams = data['image'], data['mask']

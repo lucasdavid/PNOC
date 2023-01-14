@@ -300,11 +300,17 @@ def get_ccam_transforms(
   mean, std = imagenet_stats()
 
   resize_fn = transforms.Resize(size=[image_size] * 2)
-  normalize_fn = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
-  tt = transforms.Compose([random_hflip_fn, RandomCrop_For_Segmentation(crop_size, ignore_value=0.)])
+  normalize_fn = Normalize_For_Segmentation(mean, std)
+
+  tt = transforms.Compose([
+    normalize_fn,
+    random_hflip_fn,
+    RandomCrop_For_Segmentation(crop_size, ignore_value=0.),
+    Transpose_For_Segmentation(),
+  ])
   tv = transforms.Compose(
     [
-      Normalize_For_Segmentation(mean, std),
+      normalize_fn,
       Top_Left_Crop_For_Segmentation(crop_size),
       Transpose_For_Segmentation(),
     ]

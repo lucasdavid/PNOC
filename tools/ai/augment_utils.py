@@ -86,7 +86,7 @@ class RandomHorizontalFlip_For_Segmentation:
 def random_hflip_fn(data):
   if bool(random.getrandbits(1)):
     data['image'] = data['image'].flip(-1)
-    data['masks'] = data['masks'].flip(-1)
+    data['mask'] = data['mask'].flip(-1)
   return data
 
 
@@ -266,22 +266,6 @@ class RandomCrop_For_Segmentation(RandomCrop):
 
     data['image'] = ci
     data['mask'] = cm
-
-    return data
-
-
-class RandomCropForCAMs(RandomCrop):
-
-  def __init__(self, crop_size):
-    super().__init__(crop_size, channels_last=False)
-    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
-
-  def __call__(self, data):
-    _, src = random_crop_box(self.crop_size, *data['image'].shape[1:])
-    ymin, ymax, xmin, xmax = src['ymin'], src['ymax'], src['xmin'], src['xmax']
-
-    data['image'] = data['image'][:, ymin:ymax, xmin:xmax]
-    data['cams'] = data['cams'][:, ymin:ymax, xmin:xmax]
 
     return data
 
