@@ -154,11 +154,9 @@ class AffinityDataset(COCO14Dataset):
 
 class HRCAMsDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
+  def __init__(self, root_dir, domain, cams_dir, transform):
     super().__init__(root_dir, domain, transform)
     self.cams_dir = cams_dir
-    self.resize_fn = resize_fn
-    self.normalize_fn = normalize_fn
 
   def __getitem__(self, index):
     image_id, image, label = super().__getitem__(index)
@@ -166,11 +164,6 @@ class HRCAMsDataset(COCO14Dataset):
     mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
     mask_pack = np.load(mask_path, allow_pickle=True).item()
     cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
-
-    image = self.resize_fn(image)
-    image = self.normalize_fn(image)
-
-    cams = self.resize_fn(cams)
 
     data = self.transform({'image': image, 'mask': cams})
     image, cams = data['image'], data['mask']

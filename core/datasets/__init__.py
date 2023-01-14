@@ -162,18 +162,16 @@ def get_hrcams_datasets(
   domain=None,
   train_transforms=None,
   valid_transforms=None,
-  resize_fn=None,
-  normalize_fn=None,
 ):
   print(f'Loading {dataset} Classification Dataset')
 
   if dataset == 'voc12':
     from . import voc12
-    train = voc12.HRCAMsDataset(data_dir, domain or 'train_aug', cams_dir, resize_fn, normalize_fn, train_transforms)
+    train = voc12.HRCAMsDataset(data_dir, domain or 'train_aug', cams_dir, train_transforms)
     valid = voc12.CAMEvaluationDataset(data_dir, 'train', valid_transforms)
   else:
     from . import coco14
-    train = coco14.HRCAMsDataset(data_dir, domain or 'train2014', cams_dir, resize_fn, normalize_fn, train_transforms)
+    train = coco14.HRCAMsDataset(data_dir, domain or 'train2014', cams_dir, train_transforms)
     valid = coco14.CAMEvaluationDataset(data_dir, 'train2014', valid_transforms)
 
   # train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob)
@@ -258,7 +256,7 @@ def get_affinity_transforms(
       Normalize_For_Segmentation(mean, std),
       RandomCrop_For_Segmentation(crop_size),
       Transpose_For_Segmentation(),
-      Resize_For_Mask(crop_size // 4),
+      ResizeMask(crop_size // 4),
     ]
   )
 
@@ -284,11 +282,11 @@ def get_segmentation_transforms(
     ]
   )
 
-  tv = transforms.Compose(
-    [Normalize_For_Segmentation(mean, std),
-     Top_Left_Crop_For_Segmentation(crop_size),
-     Transpose_For_Segmentation()]
-  )
+  tv = transforms.Compose([
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(crop_size),
+    Transpose_For_Segmentation()
+  ])
 
   return tt, tv
 
@@ -299,21 +297,20 @@ def get_ccam_transforms(
 ):
   mean, std = imagenet_stats()
 
-  resize_fn = transforms.Resize(size=[image_size] * 2)
-  normalize_fn = Normalize_For_Segmentation(mean, std)
+  resize = Resize_For_Segmentation(image_size)
 
   tt = transforms.Compose([
-    normalize_fn,
+    resize,
+    Normalize_For_Segmentation(mean, std, mdtype=np.float32),
+    RandomCrop_For_Segmentation(crop_size, ignore_value=0., labels_last=False),
+    Transpose_For_Segmentation(),
     random_hflip_fn,
-    RandomCrop_For_Segmentation(crop_size, ignore_value=0.),
+  ])
+
+  tv = transforms.Compose([
+    resize,
+    Normalize_For_Segmentation(mean, std),
     Transpose_For_Segmentation(),
   ])
-  tv = transforms.Compose(
-    [
-      normalize_fn,
-      Top_Left_Crop_For_Segmentation(crop_size),
-      Transpose_For_Segmentation(),
-    ]
-  )
 
-  return tt, tv, resize_fn, normalize_fn
+  return tt, tv

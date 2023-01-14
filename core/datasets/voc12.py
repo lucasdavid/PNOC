@@ -167,11 +167,8 @@ class CAMEvaluationDataset(VOC12Dataset):
     image, tags, mask = super().__getitem__(index)
 
     if self.transform is not None:
-      input_dic = {'image': image, 'mask': mask}
-      output_dic = self.transform(input_dic)
-
-      image = output_dic['image']
-      mask = output_dic['mask']
+      data = self.transform({'image': image, 'mask': mask})
+      image, mask = data['image'], data['mask']
 
     label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
     return image, label, mask
@@ -241,11 +238,9 @@ class AffinityDataset(VOC12Dataset):
 
 class HRCAMsDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, cams_dir, resize_fn, normalize_fn, transform):
+  def __init__(self, root_dir, domain, cams_dir, transform):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.cams_dir = cams_dir
-    self.resize_fn = resize_fn
-    self.normalize_fn = normalize_fn
     self.transform = transform
 
   def __getitem__(self, index):
@@ -255,11 +250,6 @@ class HRCAMsDataset(VOC12Dataset):
     mask_path = os.path.join(self.cams_dir, f'{image_id}.npy')
     mask_pack = np.load(mask_path, allow_pickle=True).item()
     cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
-
-    image = self.resize_fn(image)
-    cams = self.resize_fn(cams)
-    
-    image = self.normalize_fn(image)
 
     data = self.transform({'image': image, 'mask': cams})
     image, cams = data['image'], data['mask']

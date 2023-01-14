@@ -40,7 +40,7 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 export PYTHONPATH=$(pwd)
 
 PY=python3.9
-SOURCE=scripts/ccam/train_with_cam_hints.py
+SOURCE=scripts/ccam/train_hints.py
 DEVICES=0,1,2,3
 
 DATASET=voc12

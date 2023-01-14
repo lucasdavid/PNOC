@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from PIL import Image
 
+from torchvision import transforms
+
 
 def convert_OpenCV_to_PIL(image):
   return Image.fromarray(image[..., ::-1])
@@ -57,6 +59,20 @@ class RandomResize_For_Segmentation:
     return data
 
 
+class Resize_For_Segmentation:
+
+  def __init__(self, image_size):
+    self.image_size = [image_size] * 2 if isinstance(image_size, int) else image_size
+    self.resize = transforms.Resize(self.image_size)
+  
+  def __call__(self, data):
+    image, mask = data['image'], data['mask']
+    return {
+      "image": self.resize(image),
+      "mask": self.resize(mask),
+    }
+
+
 class RandomHorizontalFlip:
 
   def __init__(self):
@@ -85,8 +101,8 @@ class RandomHorizontalFlip_For_Segmentation:
 
 def random_hflip_fn(data):
   if bool(random.getrandbits(1)):
-    data['image'] = data['image'].flip(-1)
-    data['mask'] = data['mask'].flip(-1)
+    data['image'] = np.flip(data['image'], axis=-1)
+    data['mask'] = np.flip(data['mask'], axis=-1)
   return data
 
 
@@ -112,22 +128,30 @@ class Normalize:
 
 class Normalize_For_Segmentation:
 
-  def __init__(self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+  def __init__(
+      self,
+      mean=(0.485, 0.456, 0.406),
+      std=(0.229, 0.224, 0.225),
+      idtype=np.float32,
+      mdtype=np.int64,
+  ):
     self.mean = mean
     self.std = std
+    self.idtype = idtype
+    self.mdtype = mdtype
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
-    x = np.array(image, dtype=np.float32)
-    y = np.array(mask, dtype=np.int64)
+    x = np.array(image, dtype=self.idtype)
+    y = np.array(mask, dtype=self.mdtype)
 
     if isinstance(image, Image.Image):
       image.close()
     if isinstance(mask, Image.Image):
       mask.close()
 
-    z = np.empty_like(x, np.float32)
+    z = np.empty_like(x)
 
     z[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
     z[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
@@ -250,9 +274,18 @@ class RandomCrop:
 
 class RandomCrop_For_Segmentation(RandomCrop):
 
-  def __init__(self, crop_size, channels=3, channels_last=True, with_bbox=False, bg_value=0, ignore_value=255):
+  def __init__(
+      self,
+      crop_size,
+      channels=3,
+      channels_last=True,
+      labels_last=True,
+      bg_value=0,
+      ignore_value=255,
+  ):
     super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
 
+    self.labels_last = labels_last
     self.ignore_value = ignore_value
     self.mask_crop_shape = (self.crop_size, self.crop_size)
 
@@ -261,8 +294,15 @@ class RandomCrop_For_Segmentation(RandomCrop):
 
     ci, (b, a) = super().__call__(image)
 
-    cm = np.ones(self.mask_crop_shape, mask.dtype) * self.ignore_value
-    cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[a['ymin']:a['ymax'], a['xmin']:a['xmax'],]
+    rank = len(mask.shape)
+    if self.labels_last:
+      l = mask.shape[2:]
+      cm = np.ones([*self.mask_crop_shape, *l]) * self.ignore_value
+      cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[a['ymin']:a['ymax'], a['xmin']:a['xmax']]
+    else:
+      l = mask.shape[rank-2:]
+      cm = np.ones([*l, *self.mask_crop_shape]) * self.ignore_value
+      cm[..., b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[..., a['ymin']:a['ymax'], a['xmin']:a['xmax']]
 
     data['image'] = ci
     data['mask'] = cm
@@ -281,16 +321,13 @@ class Transpose:
 
 class Transpose_For_Segmentation:
 
-  def __init__(self):
-    pass
-
   def __call__(self, data):
     # h, w, c -> c, h, w
     data['image'] = data['image'].transpose((2, 0, 1))
     return data
 
 
-class Resize_For_Mask:
+class ResizeMask:
 
   def __init__(self, size):
     self.size = (size, size)

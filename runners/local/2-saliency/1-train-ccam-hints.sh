@@ -3,7 +3,7 @@ export OMP_NUM_THREADS=8
 export WANDB_PROJECT=research-wsss-dev
 
 PY=python
-SOURCE=scripts/ccam/train_with_cam_hints.py
+SOURCE=scripts/ccam/train_hints.py
 DEVICE=cuda
 DEVICES=0
 WORKERS=8
@@ -31,6 +31,7 @@ ALPHA=0.25
 LR=0.0001
 
 TAG=ccam-$ARCH-moco-e$EPOCHS-b$BATCH_SIZE-lr$LR
+CAMS_DIR=./experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
 
 WANDB_PROJECT=research-wsss-dev           \
 WANDB_TAGS="$DATASET,$ARCH,ccam"          \
@@ -50,4 +51,5 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --weights         $WEIGHTS              \
   --trainable-stem  $TRAINABLE_STEM       \
   --image_size      $IMAGE_SIZE           \
-  --data_dir        $DATA_DIR
+  --data_dir        $DATA_DIR             \
+  --cams_dir        $CAMS_DIR

@@ -110,15 +110,13 @@ if __name__ == '__main__':
   print('[i] {}'.format(TAG))
   print()
 
-  tt, tv, resize_fn, normalize_fn = get_ccam_transforms(image_size=512, crop_size=args.image_size)
+  tt, tv = get_ccam_transforms(image_size=512, crop_size=args.image_size)
   train_dataset, valid_dataset = get_hrcams_datasets(
     args.dataset,
     args.data_dir,
     args.cams_dir,
     train_transforms=tt,
     valid_transforms=tv,
-    resize_fn=resize_fn,
-    normalize_fn=normalize_fn,
   )
 
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
