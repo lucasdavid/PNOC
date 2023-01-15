@@ -174,7 +174,7 @@ if __name__ == '__main__':
   else:
     r_loss_fn = L2_Loss
 
-  optimizer = get_optimizer(args.lr, args.wd, step_max, cg_param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups)
 
   log_opt_params("CGNet", cg_param_groups)
 

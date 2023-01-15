@@ -51,7 +51,7 @@ parser.add_argument('--batch_size_val', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=10, type=int)
 parser.add_argument('--depth', default=50, type=int)
-parser.add_argument('--accumule_steps', default=1, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument("--mixed_precision", default=False, type=str2bool)
 
 parser.add_argument('--lr', default=0.001, type=float)
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
   ]
 
-  optimizer = get_optimizer(args.lr, args.wd, step_max, ccam_param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), ccam_param_groups)
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 
       scaler.scale(loss).backward()
 
-      if (step + 1) % args.accumule_steps == 0:
+      if (step + 1) % args.accumulate_steps == 0:
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()

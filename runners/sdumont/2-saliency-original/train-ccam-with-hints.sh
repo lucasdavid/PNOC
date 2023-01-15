@@ -42,13 +42,19 @@ LOGS_DIR=$SCRATCH/logs/ccam
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 WORKERS=8
 
-ARCH=resnet50
+ARCH=resnest269
 PRE=supervised
-LR=0.0001
-BATCH=64
+LR=0.001
+BATCH=32
 FG_T=0.4
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
-TAG=ccamfgh-rs50-rs269poc-fgt$FG_T-lr$LR-bs$BATCH
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+# TAG=$ARCH-ccamfgh@rs269poc-fgt$FG_T-lr$LR-bs$BATCH
+
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=$ARCH-ccamfgh@rs269poc-ls0.1-fgt$FG_T-lr$LR-bs$BATCH
+
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
+TAG=$ARCH-ccamfgh@rs269apoc-ls0.1-fgt$FG_T-lr$LR-bs$BATCH
 
 # OMP_NUM_THREADS=16         \
 CUDA_VISIBLE_DEVICES=0,1,2,3 \

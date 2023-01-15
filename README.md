@@ -84,7 +84,7 @@ CUDA_VISIBLE_DEVICES=$DEVICES               \
   $PY scripts/ccam/train_with_cam_hints.py  \
   --tag             $TAG_CCAMH              \
   --batch_size      128                     \
-  --accumule_steps  1                       \
+  --accumulate_steps  1                       \
   --mixed_precision true                    \
   --architecture    resnest269              \
   --stage4_out_features 1024                \

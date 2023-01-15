@@ -64,7 +64,7 @@ MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=16
-ACCUMULATE_STEPS=1
+ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
 
 OC_NAME=rs269poc
@@ -96,6 +96,7 @@ run_training () {
     echo "Experiment $TAG"
     echo "============================================================"
     CUDA_VISIBLE_DEVICES=$DEVICES            \
+    WANDB_RUN_GROUP="$W_GROUP"               \
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
@@ -204,7 +205,8 @@ OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r5
+TAG=$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r2
+W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
 run_training
 run_inference
 

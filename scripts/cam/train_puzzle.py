@@ -179,7 +179,7 @@ if __name__ == '__main__':
   log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
   log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
-  optimizer = get_optimizer(args.lr, args.wd, max_iteration, param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, int(max_iteration // args.accumulate_steps), param_groups)
 
   #################################################################################################
   # Train

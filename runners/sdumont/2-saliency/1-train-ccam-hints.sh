@@ -56,7 +56,7 @@ IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
-MIXED_PRECISION=true
+MIXED_PRECISION=false
 
 ARCHITECTURE=resnest269
 ARCH=rs269
@@ -75,11 +75,11 @@ FG_T=0.4
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
 # TAG=$DATASET-ccamh-$ARCH@rs269poc@rs101ra@b$BATCH_SIZE-fg$FG_T
 
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
-# TAG=ccam-fgh@$ARCHITECTURE@rs269-poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+TAG=ccam-fgh@$ARCHITECTURE@rs269poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-r2
 
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-TAG=$DATASET-ccamh-$ARCH@rs269-apoc@fg$FG_T-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=$DATASET-ccamh-$ARCH@rs269-apoc@fg$FG_T-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-noamp
 
 WANDB_TAGS="ccamh,amp,$DATASET,$ARCH"     \
 CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
@@ -89,7 +89,7 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
   --max_epoch       $EPOCHS               \
   --batch_size      $BATCH_SIZE           \
   --lr              $LR                   \
-  --accumule_steps  $ACCUMULATE_STEPS     \
+  --accumulate_steps $ACCUMULATE_STEPS     \
   --mixed_precision $MIXED_PRECISION      \
   --num_workers     $WORKERS              \
   --architecture    $ARCHITECTURE         \

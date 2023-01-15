@@ -73,7 +73,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 $PY $SOURCE  \
   --max_epoch       $EPOCHS               \
   --batch_size      $BATCH_SIZE           \
   --lr              $LR                   \
-  --accumule_steps  $ACCUMULATE_STEPS     \
+  --accumulate_steps  $ACCUMULATE_STEPS     \
   --mixed_precision $MIXED_PRECISION      \
   --num_workers     $WORKERS              \
   --architecture    $ARCHITECTURE         \
