@@ -29,7 +29,7 @@ def accumulate_batch_iou_saliency(masks, ccams, meters):
     ccam_i = ccams[i]
 
     for t, meter in meters.items():
-      ccam_b = (ccam_i <= t).astype(y_i.dtype)
+      ccam_b = (ccam_i > t).astype(y_i.dtype)
       meter.add(ccam_b, y_i)
 
 

@@ -33,7 +33,8 @@ parser.add_argument('--experiment_name', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
 
 parser.add_argument('--threshold', default=0.3, type=float)
-parser.add_argument('--crf_iteration', default=10, type=int)
+parser.add_argument('--crf_t', default=0, type=int)
+parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 parser.add_argument('--activation', default='relu', type=str, choices=['relu', 'sigmoid'])
 
 
@@ -46,7 +47,7 @@ def _work(process_id, dataset, args):
   length = len(subset)
 
   ccam_dir = f'./experiments/predictions/{args.experiment_name}/'
-  pred_dir = f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_iteration}/'
+  pred_dir = f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_t}/'
 
   for step, (image, _id, _) in enumerate(subset):
     png_path = pred_dir + _id + '.png'
@@ -60,13 +61,13 @@ def _work(process_id, dataset, args):
       cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
       cams = np.argmax(cams, axis=0)
 
-      if args.crf_iteration > 0:
-        cams = crf_inference_label(np.asarray(image), cams, n_labels=2, t=args.crf_iteration)
+      if args.crf_t > 0:
+        cams = crf_inference_label(np.asarray(image), cams, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
     else:
       cams = np.concatenate((1 - cams, cams))
 
-      if args.crf_iteration > 0:
-        cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_iteration, labels=2), axis=0)
+      if args.crf_t > 0:
+        cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_t, labels=2, gt_prob=args.crf_gt_prob), axis=0)
 
     imageio.imwrite(png_path, (cams * 255).clip(0, 255).astype(np.uint8))
 
@@ -84,7 +85,7 @@ if __name__ == '__main__':
 
   set_seed(args.seed)
 
-  create_directory(f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_iteration}/')
+  create_directory(f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_t}/')
 
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)

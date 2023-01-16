@@ -56,6 +56,7 @@ parser.add_argument("--mixed_precision", default=False, type=str2bool)
 
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
+parser.add_argument('--label_smoothing', default=0, type=float)
 
 parser.add_argument('--image_size', default=448, type=int)
 parser.add_argument('--print_ratio', default=0.2, type=float)
@@ -77,7 +78,7 @@ GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
 IS_POSITIVE = True
-IOU_THRESHOLDS = np.arange(0., 0.50, 0.05).astype(float).tolist()
+IOU_THRESHOLDS = np.arange(0.05, 0.51, 0.05).astype(float).tolist()
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -205,9 +206,9 @@ if __name__ == '__main__':
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, labels, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}")):
-
+    for step, (images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}")):
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
         loss1 = criterion[0](fg_feats)
@@ -221,8 +222,11 @@ if __name__ == '__main__':
         fg_likely = (cam_hints >= args.fg_threshold).to(DEVICE)
         # loss_h := -log(sigmoid(output[fg_likely]))
         output_fg = ccams[fg_likely]
+
         target_fg = torch.ones_like(output_fg)
-        loss_h = hint_loss_fn(target_fg, output_fg).mean()
+        target_fg = label_smoothing(target_fg, args.label_smoothing).to(DEVICE)
+
+        loss_h = hint_loss_fn(output_fg, target_fg).mean()
 
         # Using both foreground and background cues:
         # bg_likely = cam_hints < args.bg_threshold
@@ -230,7 +234,7 @@ if __name__ == '__main__':
         # mk_likely = (bg_likely | fg_likely).to(DEVICE)
         # target = torch.zeros_like(cam_hints)
         # target[fg_likely] = 1.
-        # loss_h = hint_loss_fn(target, output)
+        # loss_h = hint_loss_fn(output, target)
         # loss_h = loss_h[mk_likely].sum() / mk_likely.float().sum().detach()
 
         # Back-propagation

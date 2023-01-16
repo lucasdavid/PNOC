@@ -53,22 +53,34 @@ ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
 DILATED=false
 MODE=normal
-TAG=ccam-h-rs269@rs269-poc-fg0.4-b32-lr0.001
 S4_OUT_FEATURES=1024
 WEIGHTS=imagenet
-PRETRAINED=./experiments/models/saliency/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
 
-CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
-  --tag             $TAG                 \
-  --domain          $DOMAIN              \
-  --architecture    $ARCHITECTURE        \
-  --dilated         $DILATED             \
-  --stage4_out_features $S4_OUT_FEATURES \
-  --mode            $MODE                \
-  --weights         $WEIGHTS             \
-  --trainable-stem  $TRAINABLE_STEM      \
-  --pretrained      $PRETRAINED          \
-  --data_dir        $DATA_DIR
+run_inference() {
+  CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
+    --tag             $TAG                 \
+    --domain          $DOMAIN              \
+    --architecture    $ARCHITECTURE        \
+    --dilated         $DILATED             \
+    --stage4_out_features $S4_OUT_FEATURES \
+    --mode            $MODE                \
+    --weights         $WEIGHTS             \
+    --trainable-stem  $TRAINABLE_STEM      \
+    --pretrained      $PRETRAINED          \
+    --data_dir        $DATA_DIR
+}
+
+# TAG=ccam-h-rs269@rs269-poc-fg0.4-b32-lr0.001
+# PRETRAINED=./experiments/models/saliency/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
+# run_inference
+
+TAG=voc12-ccamh-rs269@rs269-apoc@fg0.4-b32-a1-lr0.001
+PRETRAINED=./experiments/models/saliency/voc12-ccamh-rs269@rs269-apoc@fg0.4-b32-a1-lr0.001.pth
+run_inference
+
+TAG=ccam-fgh@resnest269@rs269poc@0.4@h1.0-e10-b32-lr0.001-r2
+PRETRAINED=./experiments/models/saliency/ccam-fgh@resnest269@rs269poc@0.4@h1.0-e10-b32-lr0.001-r2.pth
+run_inference
 
 # EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
 # T=0.5

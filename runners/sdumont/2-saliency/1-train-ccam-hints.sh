@@ -45,8 +45,10 @@ DEVICES=0,1,2,3
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train
 # DATASET=coco14
 # DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
 
 LOGS_DIR=$SCRATCH/logs/ccam
 
@@ -69,37 +71,88 @@ ALPHA=0.25
 HINT_W=1.0
 LR=0.001
 
+run_training() {
+  WANDB_TAGS="ccamh,amp,$DATASET,$ARCH"     \
+  CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
+    --tag             $TAG                  \
+    --alpha           $ALPHA                \
+    --hint_w          $HINT_W               \
+    --max_epoch       $EPOCHS               \
+    --batch_size      $BATCH_SIZE           \
+    --lr              $LR                   \
+    --accumulate_steps $ACCUMULATE_STEPS     \
+    --mixed_precision $MIXED_PRECISION      \
+    --num_workers     $WORKERS              \
+    --architecture    $ARCHITECTURE         \
+    --stage4_out_features $S4_OUT_FEATURES  \
+    --dilated         $DILATED              \
+    --mode            $MODE                 \
+    --trainable-stem  $TRAINABLE_STEM       \
+    --image_size      $IMAGE_SIZE           \
+    --cams_dir        $CAMS_DIR             \
+    --fg_threshold    $FG_T                 \
+    --dataset         $DATASET              \
+    --data_dir        $DATA_DIR
+    # --bg_threshold    $BG_T                \
+}
+
+
+run_inference() {
+  WEIGHTS=imagenet
+  PRETRAINED=./experiments/models/$TAG.pth
+
+  CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/inference.py \
+    --tag             $TAG                 \
+    --domain          $DOMAIN              \
+    --architecture    $ARCHITECTURE        \
+    --dilated         $DILATED             \
+    --stage4_out_features $S4_OUT_FEATURES \
+    --mode            $MODE                \
+    --weights         $WEIGHTS             \
+    --trainable-stem  $TRAINABLE_STEM      \
+    --pretrained      $PRETRAINED          \
+    --data_dir        $DATA_DIR
+}
+
 FG_T=0.4
 # BG_T=0.1
 
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
-# TAG=$DATASET-ccamh-$ARCH@rs269poc@rs101ra@b$BATCH_SIZE-fg$FG_T
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@rs101ra@b$BATCH_SIZE-fg$FG_T
+# run_training
+# run_inference
 
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
-TAG=ccam-fgh@$ARCHITECTURE@rs269poc@$FG_T@h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-r2
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+# run_inference
+
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+# run_inference
+
+# MIXED_PRECISION=true
+# BATCH_SIZE=64
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
+# run_training
+# run_inference
 
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=$DATASET-ccamh-$ARCH@rs269-apoc@fg$FG_T-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-noamp
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+# run_inference
 
-WANDB_TAGS="ccamh,amp,$DATASET,$ARCH"     \
-CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
-  --tag             $TAG                  \
-  --alpha           $ALPHA                \
-  --hint_w          $HINT_W               \
-  --max_epoch       $EPOCHS               \
-  --batch_size      $BATCH_SIZE           \
-  --lr              $LR                   \
-  --accumulate_steps $ACCUMULATE_STEPS     \
-  --mixed_precision $MIXED_PRECISION      \
-  --num_workers     $WORKERS              \
-  --architecture    $ARCHITECTURE         \
-  --stage4_out_features $S4_OUT_FEATURES  \
-  --dilated         $DILATED              \
-  --mode            $MODE                 \
-  --trainable-stem  $TRAINABLE_STEM       \
-  --image_size      $IMAGE_SIZE           \
-  --cams_dir        $CAMS_DIR             \
-  --fg_threshold    $FG_T                 \
-  --dataset         $DATASET              \
-  --data_dir        $DATA_DIR
-  # --bg_threshold    $BG_T                \
+# FG_T=0.3
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+# run_inference
+
+MIXED_PRECISION=true
+FG_T=0.2
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
+run_training
+run_inference
