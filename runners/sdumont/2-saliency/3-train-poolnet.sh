@@ -33,27 +33,32 @@ cd $SCRATCH/PuzzleCAM/poolnet
 module load sequana/current
 module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
-
-
-export PYTHONPATH=$(pwd)
+# export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=main_voc.py
 
-
-LOGS_DIR=$SCRATCH/logs/ccam
+DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
+LOGS_DIR=$SCRATCH/logs/ccam
+
 ARCHITECTURE=resnet  # resnet vgg
-PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/ccam-fgh@rs269@rs269-poc@train@scale=0.5,1.0,1.5,2.0@t=0.5@crf=10/
 
-TAG=poolnet@ccam-fgh@rs269@rs269-poc
+# TAG=pn@ccamh-rs269@rs269poc
+# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-# CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
-#   --arch $ARCHITECTURE             \
-#   --mode "train"                   \
-#   --train_root $DATA_DIR           \
-#   --pseudo_root $PSEUDO_CUES
+# TAG=pn@ccamh-rs269@rs269poc-ls0.1
+# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+
+TAG=pn@ccamh-rs269@rs269apoc-ls0.1
+PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+
+CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
+  --arch $ARCHITECTURE             \
+  --mode "train"                   \
+  --train_root $DATA_DIR           \
+  --pseudo_root $PSEUDO_CUES
 
 CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
   --arch $ARCHITECTURE             \

@@ -43,11 +43,12 @@ SOURCE=scripts/ccam/inference.py
 DEVICES=0,1,2,3
 
 LOGS_DIR=$SCRATCH/logs/ccam
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 WORKERS=8
 
+DATASET=voc12
 DOMAIN=train
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 
 ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
@@ -59,6 +60,7 @@ WEIGHTS=imagenet
 run_inference() {
   CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
     --tag             $TAG                 \
+    --dataset         $DATASET             \
     --domain          $DOMAIN              \
     --architecture    $ARCHITECTURE        \
     --dilated         $DILATED             \
@@ -70,76 +72,40 @@ run_inference() {
     --data_dir        $DATA_DIR
 }
 
+run_crf() {
+  $PY scripts/ccam/inference_crf.py                    \
+    --experiment_name $TAG@train@scale=0.5,1.0,1.5,2.0 \
+    --dataset         $DATASET                         \
+    --domain          $DOMAIN                          \
+    --threshold       $T                               \
+    --crf_t           $CRF_T                           \
+    --crf_gt_prob     $CRF_GT_PROB                     \
+    --data_dir        $DATA_DIR
+}
+
+DOMAIN=train_aug
+
+CRF_T=10
+CRF_GT_PROB=0.9
+
 # TAG=ccam-h-rs269@rs269-poc-fg0.4-b32-lr0.001
 # PRETRAINED=./experiments/models/saliency/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
 # run_inference
 
-TAG=voc12-ccamh-rs269@rs269-apoc@fg0.4-b32-a1-lr0.001
-PRETRAINED=./experiments/models/saliency/voc12-ccamh-rs269@rs269-apoc@fg0.4-b32-a1-lr0.001.pth
+# TAG=saliency/voc12-ccamh-rs269@rs269poc@fg0.4-h1.0-e10-b32-lr0.001
+# PRETRAINED=./experiments/models/$TAG.pth
+# T=0.2
+# run_inference
+# run_crf
+
+TAG=saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001
+PRETRAINED=./experiments/models/$TAG.pth
+T=0.2
 run_inference
+run_crf
 
-TAG=ccam-fgh@resnest269@rs269poc@0.4@h1.0-e10-b32-lr0.001-r2
-PRETRAINED=./experiments/models/saliency/ccam-fgh@resnest269@rs269poc@0.4@h1.0-e10-b32-lr0.001-r2.pth
+TAG=saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001
+PRETRAINED=./experiments/models/$TAG.pth
+T=0.2
 run_inference
-
-# EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
-# T=0.5
-# CRF=10
-# $PY scripts/ccam/inference_crf.py       \
-#   --experiment_name $EXP        \
-#   --domain          train_aug   \
-#   --threshold       $T          \
-#   --crf_iteration   $CRF        \
-#   --data_dir        $DATA_DIR
-
-# ARCHITECTURE=resnet50
-# TRAINABLE_STEM=true
-# DILATED=false
-# MODE=normal
-# TAG=ccam-rn50-moco-e10-b64-lr0.0001-r2
-# S4_OUT_FEATURES=1024
-# WEIGHTS=imagenet
-# PRETRAINED=./experiments/models/ccam-rn50-moco-e10-b64-lr0.0001-r2.pth
-
-# CUDA_VISIBLE_DEVICES=1 $PY $SOURCE       \
-#   --tag             $TAG                 \
-#   --domain          $DOMAIN              \
-#   --architecture    $ARCHITECTURE        \
-#   --dilated         $DILATED             \
-#   --stage4_out_features $S4_OUT_FEATURES \
-#   --mode            $MODE                \
-#   --weights         $WEIGHTS             \
-#   --trainable-stem  $TRAINABLE_STEM      \
-#   --pretrained      $PRETRAINED          \
-#   --data_dir        $DATA_DIR
-
-
-# EXP=$TAG@train@scale=0.5,1.0,1.5,2.0
-# T=0.05
-# CRF=10
-
-# $PY ccam_inference_crf.py       \
-#   --experiment_name $EXP        \
-#   --domain          train_aug   \
-#   --threshold       $T          \
-#   --crf_iteration   $CRF        \
-#   --data_dir        $DATA_DIR
-
-# echo "==================="
-# echo "C²AM Evaluation"
-
-# $PY ccam_evaluate.py       \
-#   --experiment_name $EXP   \
-#   --domain train           \
-#   --eval_mode segmentation \
-#   --data_dir $DATA_DIR
-
-# echo "==================="
-# echo "C²AM+CRF Evaluation"
-
-# $PY ccam_evaluate.py                    \
-#   --experiment_name $EXP@t=$T@crf=$CRF  \
-#   --domain train                        \
-#   --eval_mode segmentation \
-#   --mode png               \
-#   --data_dir $DATA_DIR
+run_crf

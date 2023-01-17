@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
-#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/tr-ccamh-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-ccamh-%j.out
 #SBATCH --time=04:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -59,6 +59,7 @@ EPOCHS=10
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
 MIXED_PRECISION=false
+LABELSMOOTHING=0
 
 ARCHITECTURE=resnest269
 ARCH=rs269
@@ -80,7 +81,8 @@ run_training() {
     --max_epoch       $EPOCHS               \
     --batch_size      $BATCH_SIZE           \
     --lr              $LR                   \
-    --accumulate_steps $ACCUMULATE_STEPS     \
+    --label_smoothing $LABELSMOOTHING       \
+    --accumulate_steps $ACCUMULATE_STEPS    \
     --mixed_precision $MIXED_PRECISION      \
     --num_workers     $WORKERS              \
     --architecture    $ARCHITECTURE         \
@@ -122,13 +124,19 @@ FG_T=0.4
 # run_training
 # run_inference
 
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
+TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+run_inference
+
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 # run_training
 # run_inference
 
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# LABELSMOOTHING=0.1
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-ls$LABELSMOOTHING-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 # run_training
 # run_inference
 
@@ -150,9 +158,15 @@ FG_T=0.4
 # run_training
 # run_inference
 
-MIXED_PRECISION=true
-FG_T=0.2
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
-run_training
-run_inference
+# FG_T=0.25
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# run_training
+# run_inference
+
+# MIXED_PRECISION=true
+# FG_T=0.2
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
+# run_training
+# run_inference

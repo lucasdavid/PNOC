@@ -20,5 +20,5 @@ experiments
 
 notebooks/
 
-CCAM/
+# CCAM/
 wandb/
