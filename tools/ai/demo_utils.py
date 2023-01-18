@@ -55,7 +55,7 @@ def decode_from_colormap(data, colors):
     image = colors[data.reshape((h * w))].reshape((h, w, 3))
 
     ignore = np.concatenate([ignore[..., np.newaxis], ignore[..., np.newaxis], ignore[..., np.newaxis]], axis=-1)
-    image[ignore.astype(np.bool)] = 255
+    image[ignore.astype('bool')] = 255
     return image
 
 def normalize(cam, epsilon=1e-5):

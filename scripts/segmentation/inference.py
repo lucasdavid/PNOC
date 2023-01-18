@@ -30,7 +30,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--device", default="cuda", type=str)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 
 # Network
 parser.add_argument('--architecture', default='DeepLabv3+', type=str)
@@ -41,6 +40,8 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 
 # Inference parameters
 parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='val', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--iteration', default=0, type=int)
@@ -51,19 +52,15 @@ if __name__ == '__main__':
   TAG = args.tag
   DEVICE = args.device
 
-  pred_dir = create_directory(f'./experiments/predictions/{args.tag}/')
-  model_dir = create_directory('./experiments/models/')
-  model_path = model_dir + f'{args.tag}.pth'
-
-  if 'train' in args.domain:
-    args.tag += '@train'
-  else:
-    args.tag += '@' + args.domain
-
-  args.tag += '@scale=%s' % args.scales
-  args.tag += '@iteration=%d' % args.iteration
-
   set_seed(args.seed)
+
+  pred_dir = TAG
+  pred_dir += '@train' if 'train' in args.domain else f'@{args.domain}'
+  pred_dir += f'@scale={args.scales}@iteration={args.iteration}'
+  pred_dir = create_directory(f'./experiments/predictions/{pred_dir}/')
+  model_dir = create_directory('./experiments/models/')
+  model_path = model_dir + f'{TAG}.pth'
+  print(f"Saving to '{pred_dir}'")
 
   # Transform, Dataset, DataLoader
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
@@ -136,11 +133,11 @@ if __name__ == '__main__':
       if args.domain == 'test':
         pred_mask = decode_from_colormap(pred_mask, dataset.colors)[..., ::-1]
 
-      imageio.imwrite(pred_dir + image_id + '.png', pred_mask.astype(np.uint8))
+      imageio.imwrite(os.path.join(pred_dir, image_id + '.png'), pred_mask.astype(np.uint8))
 
       sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
       sys.stdout.flush()
     print()
 
   if args.domain == 'val':
-    print("python3 evaluate.py --experiment_name {} --domain {} --mode png".format(args.tag, args.domain))
+    print("python3 evaluate.py --experiment_name {} --domain {} --mode png".format(pred_dir, args.domain))

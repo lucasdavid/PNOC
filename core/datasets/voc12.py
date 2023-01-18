@@ -117,7 +117,11 @@ class VOC12Dataset(torch.utils.data.Dataset):
     return mask
 
   def get_tags(self, image_id):
-    _, tags = read_xml(self.xml_dir + image_id + '.xml')
+    try:
+      _, tags = read_xml(self.xml_dir + image_id + '.xml')
+    except FileNotFoundError:
+      tags = None
+
     return tags
 
   def __getitem__(self, index):
@@ -200,13 +204,20 @@ class InferenceDataset(VOC12Dataset):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.transform = transform
 
+    cmap_dic, _, class_names = get_color_map_dic()
+    self.colors = np.asarray([cmap_dic[class_name] for class_name in class_names])
+
   def __getitem__(self, index):
     image, image_id, tags = super().__getitem__(index)
 
     if self.transform is not None:
       image = self.transform(image)
 
-    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    try:
+      label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    except TypeError:
+      label = None
+
     return image, image_id, label
 
 
