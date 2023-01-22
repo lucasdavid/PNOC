@@ -119,7 +119,7 @@ cd ..
 ```shell
 FG=0.4
 BG=0.1
-CRF_T=10
+CRF_T=1
 CRF_GT=0.9
 TAG_RW=$DATASET-an@pn@ccamh@rs269apoc@rs269ra@fg$FG-bg$BG-crf$CRF_T-gt$CRF_GT
 
