@@ -395,11 +395,12 @@ def rand_bbox(h, w, lam):
 
 class CutMix(torch.utils.data.Dataset):
 
-  def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0):
+  def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0, segmentation=False):
     self.dataset = dataset
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
+    self.segmentation_mode = segmentation
     self.random_crop = RandomCrop(crop, channels_last=False)
 
   def __len__(self):
@@ -423,8 +424,12 @@ class CutMix(torch.utils.data.Dataset):
     bhs, bws = random.randint(0, aH - bH), random.randint(0, aW - bW)
     image_a[:, bhs:bhs + bH, bws:bws + bW] = image_b
 
-    alpha = 1 - ((bH * bW) / (aH * aW))
-    target_a = target_a * alpha + target_b * (1. - alpha)
+    if self.segmentation_mode:
+      target_b = target_b[bh1:bh2, bw1:bw2]
+      target_a[bhs:bhs + bH, bws:bws + bW]  = target_b
+    else:  # Classification mode.
+      alpha = 1 - ((bH * bW) / (aH * aW))
+      target_a = target_a * alpha + target_b * (1. - alpha)
 
     return image_a, target_a
 

@@ -65,12 +65,21 @@ run_make_affinity_labels() {
 }
 
 
-CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
-SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
-FG=0.4
+# CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
+# SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
+# FG=0.4
+# BG=0.1
+# CRF_T=10
+# CRF_GT=0.9
+# TAG=affnet@rs269-poc@pn-fgh@crf-$CRF_T-gt-$CRF_GT
+# run_make_affinity_labels
+
+
+CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+SAL_DIR=./experiments/predictions/saliency/pn@ccamh-rs269@rs269apoc-ls0.1
+FG=0.3
 BG=0.1
 CRF_T=10
-CRF_GT=0.9
-TAG=affnet@rs269-poc@pn-fgh@crf-$CRF_T-gt-$CRF_GT
-
+CRF_GT=0.7
+TAG=$DATASET-an@ccamh@rs269apoc-ls0.1@crf$CRF_T-gt$CRF_GT
 run_make_affinity_labels

@@ -46,19 +46,24 @@ DOMAIN=train_aug
 CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
 # SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
 
-THRESHOLD=0.3
+THRESHOLD=0.25
 CRF_T=1
 CRF_GT=0.9
 
-TAG=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10@train@beta=10@exp_times=8@rw
+run_inference() {
+  $PY $SOURCE                      \
+      --experiment_name $TAG       \
+      --domain          $DOMAIN    \
+      --threshold       $THRESHOLD \
+      --crf_t           $CRF_T     \
+      --crf_gt_prob     $CRF_GT    \
+      --data_dir        $DATA_DIR
+}
 
-$PY $SOURCE                      \
-    --experiment_name $TAG       \
-    --domain          $DOMAIN    \
-    --threshold       $THRESHOLD \
-    --crf_t           $CRF_T     \
-    --crf_gt_prob     $CRF_GT    \
-    --data_dir        $DATA_DIR  &
-    # --sal_dir  $SAL_DIR   \
+TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@train@beta=10@exp_times=8@rw
+DOMAIN=train_aug
+run_inference
 
-wait
+TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw
+DOMAIN=val
+run_inference

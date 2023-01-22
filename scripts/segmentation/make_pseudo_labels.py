@@ -38,7 +38,7 @@ def split_dataset(dataset, n_splits):
   return [Subset(dataset, np.arange(i, len(dataset), n_splits)) for i in range(n_splits)]
 
 
-def _work(process_id, dataset, args):
+def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
   subset = dataset[process_id]
   length = len(subset)
 
@@ -68,7 +68,7 @@ def _work(process_id, dataset, args):
       conf = keys[cam]
       imageio.imwrite(png_path, conf.astype(np.uint8))
 
-      if process_id == args.num_workers - 1 and step % max(1, length // 20) == 0:
+      if process_id == 0 and step % max(1, length // 20) == 0:
         sys.stdout.write(
           f'\r# Make pseudo labels [{step + 1}/{length}] = {(step + 1) / length * 100:.2f}%, ({(H, W)}, {cam.shape})'
         )
@@ -87,4 +87,9 @@ if __name__ == '__main__':
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   dataset = split_dataset(dataset, args.num_workers)
 
-  multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)
+  multiprocessing.spawn(
+    _work,
+    nprocs=args.num_workers,
+    args=(dataset, args, CAM_DIR, SAL_DIR, PRED_DIR),
+    join=True
+  )

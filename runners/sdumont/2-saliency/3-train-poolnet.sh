@@ -3,8 +3,8 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
-#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/tr-%j.out
-#SBATCH --time=04:00:00
+#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-pn-%j.out
+#SBATCH --time=01:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -48,17 +48,17 @@ ARCHITECTURE=resnet  # resnet vgg
 # TAG=pn@ccamh-rs269@rs269poc
 # PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-# TAG=pn@ccamh-rs269@rs269poc-ls0.1
-# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+TAG=pn@ccamh-rs269@rs269poc-ls0.1
+PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-TAG=pn@ccamh-rs269@rs269apoc-ls0.1
-PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+# TAG=pn@ccamh-rs269@rs269apoc-ls0.1
+# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
-  --arch $ARCHITECTURE             \
-  --mode "train"                   \
-  --train_root $DATA_DIR           \
-  --pseudo_root $PSEUDO_CUES
+# CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
+#   --arch $ARCHITECTURE             \
+#   --mode "train"                   \
+#   --train_root $DATA_DIR           \
+#   --pseudo_root $PSEUDO_CUES
 
 CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
   --arch $ARCHITECTURE             \
@@ -67,3 +67,6 @@ CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
   --train_root $DATA_DIR           \
   --pseudo_root $PSEUDO_CUES       \
   --sal_folder ./results/$TAG
+
+# cp ./results/run-1/models/epoch_9.pth ../experiments/models/saliency/$TAG.pth
+mv ./results/$TAG ../experiments/predictions/saliency/

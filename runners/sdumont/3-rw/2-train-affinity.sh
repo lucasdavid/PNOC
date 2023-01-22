@@ -47,11 +47,12 @@ MAX_IMAGE_SIZE=640
 
 # Architecture
 ARCHITECTURE=resnest269
+ARCH=rs269
 BATCH_SIZE=32
 LR=0.1
 
 
-run() {
+run_training() {
     echo "============================================================"
     echo "Experiment $TAG"
     echo "============================================================"
@@ -60,7 +61,7 @@ run() {
     WANDB_TAGS="$DATASET,$ARCH,rw"   \
     $PY $SOURCE                      \
         --architecture $ARCHITECTURE \
-        --tag          $TAG          \
+        --tag          $TAG       \
         --batch_size   $BATCH_SIZE   \
         --image_size   $IMAGE_SIZE   \
         --min_image_size $MIN_IMAGE_SIZE \
@@ -72,17 +73,86 @@ run() {
         --num_workers  $WORKERS
 }
 
+run_inference() {
+  CUDA_VISIBLE_DEVICES=0           \
+  $PY scripts/rw/inference.py      \
+      --architecture $ARCHITECTURE \
+      --model_name $TAG            \
+      --cam_dir $CAMS_DIR          \
+      --beta 10                    \
+      --exp_times 8                \
+      --dataset $DATASET           \
+      --domain $DOMAIN             \
+      --data_dir $DATA_DIR
+    
+  # CUDA_VISIBLE_DEVICES=1           \
+  # $PY scripts/rw/inference.py      \
+  #     --architecture $ARCHITECTURE \
+  #     --model_name $TAG            \
+  #     --cam_dir $CAMS_DIR          \
+  #     --beta 10                    \
+  #     --exp_times 8                \
+  #     --dataset $DATASET           \
+  #     --domain val                 \
+  #     --data_dir $DATA_DIR         &
+}
+
 
 DATASET=voc12
-DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
-DOMAIN=train_aug
-TAG=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
-LABEL_DIR=./experiments/predictions/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
-run
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
+
+# TAG=rw/voc12-an@rs269poc-ls0.1@fg0.4-bg0.1-crf10-gt0.9@aff_fg=0.40_bg=0.10
+# CAMS_DIR=./experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@rs269poc-ls0.1@fg0.4-bg0.1-crf10-gt0.9@aff_fg=0.40_bg=0.10
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.9@aff_fg=0.30_bg=0.10
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.9@aff_fg=0.30_bg=0.10
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@ccamh@rs269poc-ls0.1@fg0.4-bg0.1-crf10-gt0.9@aff_fg=0.40_bg=0.10
+# CAMS_DIR=./experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@ccamh@rs269poc-ls0.1@fg0.4-bg0.1-crf10-gt0.9@aff_fg=0.40_bg=0.10
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.9@aff_fg=0.30_bg=0.10
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.9@aff_fg=0.30_bg=0.10
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.05-crf10-gt0.7@aff_fg=0.30_bg=0.05
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.05-crf10-gt0.7@aff_fg=0.30_bg=0.05
+# run_training
+# run_inference
+
+# TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# LABEL_DIR=./experiments/predictions/voc12-an@ccamh@rs269apoc-ls0.1@crf10-gt0.7@aff_fg=0.30_bg=0.10
+# run_training
+# run_inference
+CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
+DOMAIN=val
+run_inference
 
 # DATASET=coco14
 # DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 # DOMAIN=train2014
-# TAG=
+# TAG=rw/coco14-an@...
 # LABEL_DIR=
-# run
+# run_training

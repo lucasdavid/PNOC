@@ -119,6 +119,8 @@ def get_segmentation_datasets(
     train = coco14.SegmentationDataset(data_dir, train_domain or 'train2014', train_transforms, pseudo_masks_dir)
     valid = coco14.SegmentationDataset(data_dir, 'val2014', valid_transforms, pseudo_masks_dir)
 
+  train = _apply_augmentation_strategies(train, augment, image_size, cutmix_prob, mixup_prob, segmentation=True)
+
   info = DatasetInfo.from_metafile(dataset)
   train.info = info
   valid.info = info
@@ -184,14 +186,14 @@ def get_hrcams_datasets(
   return train, valid
 
 
-def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob):
+def _apply_augmentation_strategies(dataset, augment, image_size, cutmix_prob, mixup_prob, segmentation=False):
   if 'cutormixup' in augment:
     print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob, segmentation=segmentation)
   else:
     if 'cutmix' in augment:
       print(f'Applying cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
+      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob, segmentation=segmentation)
     if 'mixup' in augment:
       print(f'Applying mixup num_mix=1, beta=1., prob={mixup_prob}')
       dataset = MixUp(dataset, num_mix=1, beta=1., prob=mixup_prob)

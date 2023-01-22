@@ -40,6 +40,7 @@ export PYTHONPATH=$(pwd)
 # export OMP_NUM_THREADS=16
 
 PY=python3.9
+PIP=pip3.9
 SOURCE=scripts/cam/train_apoc.py
 WORKERS=8
 DEVICES=0,1,2,3
@@ -64,6 +65,7 @@ MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=16
+LR=0.1
 ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
 
@@ -100,6 +102,7 @@ run_training () {
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
+        --lr                $LR              \
         --batch_size        $BATCH           \
         --accumulate_steps  $ACCUMULATE_STEPS \
         --mixed_precision   $MIXED_PRECISION \
@@ -152,31 +155,23 @@ run_inference () {
 }
 
 
-# OC_NAME=rs269ra
-# OC_PRETRAINED=experiments/models/resnest269@randaug.pth
-# OC_ARCHITECTURE=resnest269
-# LABELSMOOTHING=0.1
-# OW=1.0
-# OW_INIT=0.3
-# OW_SCHEDULE=0.5
-# OC_TRAIN_MASKS=features
+OC_NAME=rs269ra
+OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_ARCHITECTURE=resnest269
+LABELSMOOTHING=0.1
+OW=1.0
+OW_INIT=0.3
+OW_SCHEDULE=0.5
+OC_TRAIN_MASKS=features
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r1
 # run_training
+# run_inference
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r2
 # run_training
+# run_inference
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r3
 # run_training
-
-# DEVICES=0
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r1
 # run_inference
-# DEVICES=2
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r2
-# run_inference
-# DEVICES=3
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r3
-# run_inference
-# wait
 
 # OC_NAME=rs269ra
 # OC_PRETRAINED=experiments/models/resnest269@randaug.pth
@@ -194,7 +189,6 @@ run_inference () {
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r3
 # run_training
 
-
 OC_NAME=rs269ra
 OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
 OC_ARCHITECTURE=resnest269
@@ -205,10 +199,13 @@ OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-TAG=$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r2
-W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-run_training
-run_inference
+# TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
+# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+# run_training
+# run_inference
+
+## =============================
+## Alternatives
 
 # OW=1.0
 # OC_TRAIN_MASK_T=0.2
@@ -221,11 +218,34 @@ run_inference
 # run_training
 # run_inference
 
-
 # OC_TRAIN_MASK_T=0.3
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
+# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+# run_training
 # run_inference
+
 # OC_TRAIN_MASK_T=0.4
 # TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
+# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+# run_training
 # run_inference
-# run_inference
+
+$PIP install mxnet
+BATCH=16
+LR=0.01
+ARCH=rn38d
+ARCHITECTURE=resnet38d
+OC_NAME=rs101ra
+OC_PRETRAINED=experiments/models/cam/resnest101@randaug.pth
+OC_ARCHITECTURE=resnest101
+LABELSMOOTHING=0.1
+OW=1.0
+OW_INIT=0.0
+OW_SCHEDULE=1.0
+OC_TRAIN_MASKS=cams
+OC_TRAIN_MASK_T=0.2
+OC_TRAIN_INT_STEPS=1
+TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
+W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+run_training
+run_inference

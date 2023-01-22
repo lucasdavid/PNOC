@@ -70,6 +70,7 @@ LABELSMOOTHING=0  # 0.1
 
 run_experiment() {
   WANDB_TAGS="$DATASET,$ARCH,segmentation,ls:$LABEL_SMOOTHING"  \
+  WANDB_RUN_GROUP=""                        \
   CUDA_VISIBLE_DEVICES=$DEVICES             \
   $PY $SOURCE                               \
       --tag               $TAG              \
@@ -98,6 +99,8 @@ run_experiment() {
 # MASKS_DIR=$DATA_DIR/SegmentationClass
 # run_experiment
 
-TAG=dlv3p-$MODE-gn@pn-fgh@rs269apoc
-MASKS_DIR=./experiments/predictions/rw/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10@train@beta=10@exp_times=8@rw@crf=1
+TAG=d3p-$MODE-gn-ls$LABELSMOOTHING@pn-ccamh@rs269apoc-ls0.1
+MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@train@beta=10@exp_times=8@rw@crf=1
+MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw@crf=1
+# TODO: merge train and val.
 run_experiment
