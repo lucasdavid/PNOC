@@ -93,9 +93,9 @@ run_experiment () {
 # TAG=$DATASET-$ARCH
 # run_experiment
 
-AUGMENT=randaugment
-TAG=$DATASET-$ARCH-ra
-run_experiment
+# AUGMENT=randaugment
+# TAG=$DATASET-$ARCH-ra
+# run_experiment
 
 # AUGMENT=randaugment
 # TAG=$DATASET-$ARCH-ra
@@ -120,3 +120,10 @@ run_experiment
 # AUGMENT=randaugment
 # TAG=$DATASET-$ARCH-ls$LABELSMOOTHING-ra
 # run_experiment
+
+
+ARCH=rn38d
+ARCHITECTURE=resnet38d
+AUGMENT=randaugment
+TAG=$DATASET-$ARCH-ra
+run_experiment

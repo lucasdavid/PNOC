@@ -230,14 +230,16 @@ OC_TRAIN_INT_STEPS=1
 # run_training
 # run_inference
 
-$PIP install mxnet
+mv experiments/models/voc12-rn38d-ra.pth ./experiments/models/cam/voc12-rn38d-ra.pth
+
+ACCUMULATE_STEPS=2
 BATCH=16
 LR=0.01
 ARCH=rn38d
 ARCHITECTURE=resnet38d
-OC_NAME=rs101ra
-OC_PRETRAINED=experiments/models/cam/resnest101@randaug.pth
-OC_ARCHITECTURE=resnest101
+OC_NAME=rn38d
+OC_PRETRAINED=experiments/models/cam/voc12-rn38d-ra.pth
+OC_ARCHITECTURE=resnet38d
 LABELSMOOTHING=0.1
 OW=1.0
 OW_INIT=0.0

@@ -8,6 +8,8 @@ import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import multiprocessing
+from torch.utils.data import Subset
 
 from core.aff_utils import propagate_to_edge
 from core.datasets import *
@@ -58,73 +60,7 @@ GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
 
-def run(model, dataset):
-  skipped = 0
-
-  with torch.no_grad():
-    length = len(dataset)
-    for step, (ori_image, image_id, _) in enumerate(dataset):
-      ori_w, ori_h = ori_image.size
-
-      npy_path = os.path.join(PRED_DIR, image_id + '.npy')
-      if os.path.isfile(npy_path):
-        skipped += 1
-        continue
-
-      # preprocessing
-      with ori_image:
-        image = np.asarray(ori_image)
-      image = normalize_fn(image)
-      image = image.transpose((2, 0, 1))
-      image = torch.from_numpy(image)
-      flipped_image = image.flip(-1)
-
-      images = torch.stack([image, flipped_image])
-      images = images.to(DEVICE)
-
-      # inference
-      edge = model.get_edge(images)
-
-      # postprocessing
-      cam_dict = np.load(os.path.join(CAMS_DIR, image_id + '.npy'), allow_pickle=True).item()
-      cams = cam_dict['cam']
-
-      cam_downsized_values = cams.to(DEVICE)
-      rw = propagate_to_edge(cam_downsized_values, edge, beta=args.beta, exp_times=args.exp_times, radius=5)
-
-      rw_up = F.interpolate(rw, scale_factor=4, mode='bilinear', align_corners=False)[..., 0, :ori_h, :ori_w]
-      rw_up /= torch.max(rw_up)
-
-      np.save(npy_path, {"keys": cam_dict['keys'], "rw": to_numpy(rw_up)})
-
-      sys.stdout.write(
-        '\r# Make CAM with Random Walk [{}/{}] = {:.2f}%, ({}, rw_up={}, rw={})'.format(
-          step + 1, length, (step + 1) / length * 100, (ori_h, ori_w), rw_up.size(), rw.size()
-        )
-      )
-      sys.stdout.flush()
-    print()
-
-
-if __name__ == '__main__':
-  # Arguments
-  args = parser.parse_args()
-
-  SEED = args.seed
-  DEVICE = args.device
-  TAG = args.model_name
-  TAG += '@train' if 'train' in args.domain else '@val'
-  TAG += f"@beta={args.beta}@exp_times={args.exp_times}@rw"
-
-  log_config(vars(args), TAG)
-
-  CAMS_DIR = args.cam_dir
-  PRED_DIR = create_directory(f'./experiments/predictions/{TAG}/')
-
-  model_path = './experiments/models/' + f'{args.model_name}.pth'
-
-  set_seed(SEED)
-
+def run(args):
   normalize_fn = Normalize(*imagenet_stats())
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
@@ -142,19 +78,88 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   log_model("AffinityNet", model, args)
 
-  model = model.to(DEVICE)
+  print(f'loading weights from {model_path}')
+  load_model(model, model_path)
   model.eval()
 
-  if GPUS_COUNT > 1:
-    print(f"GPUs={GPUS_COUNT}")
-    model = torch.nn.DataParallel(model)
+  dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
 
-  print(f'loading weights from {model_path}')
-  load_model(model, model_path, parallel=GPUS_COUNT > 1)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, normalize_fn, CAMS_DIR, PREDS_DIR, DEVICE, args), join=True)
+
+def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device, args):
+  dataset = dataset[process_id]
+  length = len(dataset)
+  skipped = 0
+
+  with torch.no_grad(), torch.cuda.device(process_id):
+    model.cuda()
+
+    for step, (x, _id, _) in enumerate(dataset):
+      W, H = x.size
+
+      npy_path = os.path.join(preds_dir, _id + '.npy')
+      if os.path.isfile(npy_path):
+        skipped += 1
+        continue
+
+      # preprocessing
+      with x:
+        x = np.asarray(x)
+      x = normalize_fn(x)
+      x = x.transpose((2, 0, 1))
+      x = torch.from_numpy(x)
+      x = torch.stack([x, x.flip(-1)])
+      x = x.to(device)
+
+      # inference
+      edge = model.get_edge(x)
+
+      # postprocessing
+      cam_dict = np.load(os.path.join(cams_dir, _id + '.npy'), allow_pickle=True).item()
+      cams = cam_dict['cam']
+
+      rw = cams.to(device)
+      rw = propagate_to_edge(rw, edge, beta=args.beta, exp_times=args.exp_times, radius=5)
+
+      rw_up = F.interpolate(rw, scale_factor=4, mode='bilinear', align_corners=False)[..., 0, :H, :W]
+      rw_up /= torch.max(rw_up)
+
+      np.save(npy_path, {"keys": cam_dict['keys'], "rw": to_numpy(rw_up)})
+
+      if process_id == 0:
+        sys.stdout.write(
+          '\r# Make CAM with Random Walk [{}/{}] = {:.2f}%, ({}, rw_up={}, rw={})'.format(
+            step + 1, length, (step + 1) / length * 100, (H, W), rw_up.size(), rw.size()
+          )
+        )
+        sys.stdout.flush()
+
+    if process_id == 0:
+      print()
+
+
+if __name__ == '__main__':
+  # Arguments
+  args = parser.parse_args()
+
+  SEED = args.seed
+  DEVICE = args.device
+  TAG = args.model_name
+  TAG += '@train' if 'train' in args.domain else '@val'
+  TAG += f"@beta={args.beta}@exp_times={args.exp_times}@rw"
+
+  log_config(vars(args), TAG)
+
+  CAMS_DIR = args.cam_dir
+  PREDS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
+
+  model_path = './experiments/models/' + f'{args.model_name}.pth'
+
+  set_seed(SEED)
 
   try:
-    run(model, dataset)
+    run(args)
   except KeyboardInterrupt:
     print("\ninterrupted")
   else:
-    print(f"\n{TAG}/{args.domain} done")
+    print(f"\n{TAG} ({args.domain}) done")

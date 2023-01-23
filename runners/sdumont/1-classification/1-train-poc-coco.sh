@@ -64,6 +64,7 @@ MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=32
+LR=0.1
 ACCUMULATE_STEPS=1
 
 OC_NAME=rs101
@@ -91,11 +92,14 @@ run_training () {
     echo "============================================================"
     echo "Experiment $TAG"
     echo "============================================================"
+    WANDB_TAGS="$DATASET,$ARCH,poc,b:$BATCH,lr:$LR,ls:$LABELSMOOTHING,oc:$OC_NAME" \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-poc"     \
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
         --batch_size        $BATCH           \
+        --lr                $LR              \
         --architecture      $ARCHITECTURE    \
         --dilated           $DILATED         \
         --mode              $MODE            \
@@ -143,12 +147,13 @@ run_training () {
 ARCH=rs269
 ARCHITECTURE=resnest269
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/coco14-rs269-ra.pth
+OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
 BATCH=16
 ACCUMULATE_STEPS=2
 LABELSMOOTHING=0
-TAG=$DATASET-$ARCH-poc-b$BATCH-as$ACCUMULATE_STEPS@$OC_NAME
+LR=0.01
+TAG=poc/$DATASET-$ARCH-poc-b$BATCH-as$ACCUMULATE_STEPS-lr$LR@$OC_NAME-r1
 run_training
 
 # ARCH=rs269

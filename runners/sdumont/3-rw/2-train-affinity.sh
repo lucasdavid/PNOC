@@ -39,6 +39,7 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/rw/train_affinity.py
 WORKERS=8
+DEVICES=0,1,2,3
 
 # Dataset
 IMAGE_SIZE=512
@@ -57,7 +58,7 @@ run_training() {
     echo "Experiment $TAG"
     echo "============================================================"
 
-    CUDA_VISIBLE_DEVICES=0,1,2,3     \
+    CUDA_VISIBLE_DEVICES=$DEVICES    \
     WANDB_TAGS="$DATASET,$ARCH,rw"   \
     $PY $SOURCE                      \
         --architecture $ARCHITECTURE \
@@ -74,7 +75,7 @@ run_training() {
 }
 
 run_inference() {
-  CUDA_VISIBLE_DEVICES=0           \
+  CUDA_VISIBLE_DEVICES=$DEVICES    \
   $PY scripts/rw/inference.py      \
       --architecture $ARCHITECTURE \
       --model_name $TAG            \
@@ -141,14 +142,17 @@ DOMAIN=train
 # run_training
 # run_inference
 
-# TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7
+TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7
 # CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # LABEL_DIR=./experiments/predictions/voc12-an@ccamh@rs269apoc-ls0.1@crf10-gt0.7@aff_fg=0.30_bg=0.10
 # run_training
-# run_inference
-CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
-DOMAIN=val
+CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+DOMAIN=train_aug
 run_inference
+# run_inference
+# CAMS_DIR=./experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
+# DOMAIN=val
+# run_inference
 
 # DATASET=coco14
 # DATA_DIR=/home/ldavid/workspace/datasets/coco14/

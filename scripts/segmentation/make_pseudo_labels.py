@@ -43,7 +43,7 @@ def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
   length = len(subset)
 
   with torch.no_grad():
-    for step, (x, _id, _, _) in enumerate(subset):
+    for step, (x, _id, _) in enumerate(subset):
       png_path = os.path.join(PRED_DIR, _id + '.png')
       sal_file = os.path.join(SAL_DIR, _id + '.png') if SAL_DIR else None
       if os.path.isfile(png_path):

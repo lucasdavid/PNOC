@@ -64,6 +64,6 @@ TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@train@beta=10@exp_
 DOMAIN=train_aug
 run_inference
 
-TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw
-DOMAIN=val
-run_inference
+# TAG=rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw
+# DOMAIN=val
+# run_inference

@@ -38,6 +38,8 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/segmentation/train.py
+WORKERS=16
+DEVICES=0,1,2,3
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -47,6 +49,7 @@ DOMAIN=train_aug
 # DOMAIN=train2014
 
 # Architecture
+ARCH=rs269
 ARCHITECTURE=resnest269
 GROUP_NORM=true
 DILATED=false
@@ -57,7 +60,7 @@ LR=0.007
 EPOCHS=50
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
-MIXED_PRECISION=true
+MIXED_PRECISION=false
 
 IMAGE_SIZE=512
 MIN_IMAGE_SIZE=256
@@ -69,14 +72,14 @@ MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
 run_experiment() {
-  WANDB_TAGS="$DATASET,$ARCH,segmentation,ls:$LABEL_SMOOTHING"  \
-  WANDB_RUN_GROUP=""                        \
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,cutmix:$CUTMIX,ls:$LABELSMOOTHING"  \
+  WANDB_RUN_GROUP="$DATASET-segmentation-$ARCH"   \
   CUDA_VISIBLE_DEVICES=$DEVICES             \
   $PY $SOURCE                               \
       --tag               $TAG              \
       --num_workers       $WORKERS          \
       --lr                $LR               \
-      --epochs            $EPOCHS           \
+      --max_epoch         $EPOCHS           \
       --batch_size        $BATCH_SIZE       \
       --accumulate_steps  $ACCUMULATE_STEPS \
       --mixed_precision   $MIXED_PRECISION  \
@@ -95,12 +98,12 @@ run_experiment() {
       --masks_dir         $MASKS_DIR
 }
 
-# TAG=dlv3p-$MODE-gn-supervised
-# MASKS_DIR=$DATA_DIR/SegmentationClass
-# run_experiment
-
-TAG=d3p-$MODE-gn-ls$LABELSMOOTHING@pn-ccamh@rs269apoc-ls0.1
-MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@train@beta=10@exp_times=8@rw@crf=1
-MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw@crf=1
-# TODO: merge train and val.
+LABELSMOOTHING=0.1
+AUGMENT=colorjitter_cutmix
+TAG=d3p-$MODE-gn-ls$LABELSMOOTHING-sup
+MASKS_DIR=$DATA_DIR/SegmentationClass
 run_experiment
+
+# TAG=d3p@pn-ccamh@rs269apoc-ls0.1
+# MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
+# run_experiment
