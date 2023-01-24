@@ -79,7 +79,10 @@ def run(args):
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, normalize_fn, dataset, scales, PRED_DIR, DEVICE, args), join=True)
+  if GPUS_COUNT > 1:
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, normalize_fn, dataset, scales, PRED_DIR, DEVICE, args), join=True)
+  else:
+    _work(0, model, normalize_fn, dataset, scales, PRED_DIR, DEVICE, args)
 
 
 def forward_tta(model, images, image_size, device):
@@ -107,7 +110,7 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
 
       for scale in scales:
         x = copy.deepcopy(image)
-        x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
+        x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.BICUBIC)
 
         x = normalize_fn(x)
         x = x.transpose((2, 0, 1))

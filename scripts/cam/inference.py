@@ -136,7 +136,7 @@ def forward_tta(model, ori_image, scale, DEVICE):
 
   # Preprocessing
   x = copy.deepcopy(ori_image)
-  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
+  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.BICUBIC)
   x = normalize_fn(x)
   x = x.transpose((2, 0, 1))
   x = torch.from_numpy(x)

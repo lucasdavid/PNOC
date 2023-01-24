@@ -164,7 +164,7 @@ if __name__ == '__main__':
     def get_cam(ori_image, scale):
         # preprocessing
         image = copy.deepcopy(ori_image)
-        image = image.resize((round(ori_w*scale), round(ori_h*scale)), resample=PIL.Image.CUBIC)
+        image = image.resize((round(ori_w*scale), round(ori_h*scale)), resample=PIL.Image.BICUBIC)
         
         image = normalize_fn(image)
         image = image.transpose((2, 0, 1))

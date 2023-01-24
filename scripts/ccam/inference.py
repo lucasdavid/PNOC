@@ -116,7 +116,7 @@ def forward_tta(model, image, scale, device, args):
 
   # preprocessing
   x = copy.deepcopy(image)
-  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
+  x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.BICUBIC)
   x = normalize_fn(x)
   x = x.transpose((2, 0, 1))
 

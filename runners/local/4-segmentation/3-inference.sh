@@ -61,12 +61,25 @@ SCALES=0.5,1.0,1.5,2.0
 CRF_T=0
 CRF_GT_PROB=0.7
 
-TAG=segmentation/dlv3p-$MODE-gn@pn-fgh@rs269-poc
-DOMAIN=train
-run_inference
+# TAG=segmentation/dlv3p-normal-gn@pn-fgh@rs269-poc
+# DOMAIN=train
+# run_inference
 # DOMAIN=val
 # run_inference
 
-# TAG=dlv3p-$MODE-gn-supervised
+# TAG=segmentation/d3p-normal-gn-sup
 # DOMAIN=train
 # run_inference
+# DOMAIN=val
+# run_inference
+
+TAG=segmentation/d3p@pn-ccamh@rs269apoc-ls0.1
+# DOMAIN=train
+# run_inference
+# DOMAIN=val
+# run_inference
+
+CRF_T=1
+CRF_GT_PROB=0.9
+DOMAIN=test
+run_inference
