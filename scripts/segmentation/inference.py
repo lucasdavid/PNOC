@@ -5,10 +5,12 @@ import argparse
 import copy
 import sys
 
-import imageio
+from PIL import Image
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import multiprocessing
+from torch.utils.data import Subset
 
 from core.datasets import *
 from core.networks import *
@@ -32,7 +34,6 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 
 # Network
-parser.add_argument('--architecture', default='DeepLabv3+', type=str)
 parser.add_argument('--backbone', default='resnest269', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--dilated', default=False, type=str2bool)
@@ -40,29 +41,28 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 
 # Inference parameters
 parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--weights', default=None, type=str)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='val', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
-parser.add_argument('--iteration', default=0, type=int)
+parser.add_argument('--crf_t', default=0, type=int)
+parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
-if __name__ == '__main__':
-  args = parser.parse_args()
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
 
-  TAG = args.tag
-  DEVICE = args.device
 
-  set_seed(args.seed)
+def run(args):
+  print(TAG)
+  print(f"Saving predictions for {args.dataset}/{args.domain} to '{PRED_DIR}'.")
+  
+  scales = [float(scale) for scale in args.scales.split(',')]
 
-  pred_dir = TAG
-  pred_dir += '@train' if 'train' in args.domain else f'@{args.domain}'
-  pred_dir += f'@scale={args.scales}@iteration={args.iteration}'
-  pred_dir = create_directory(f'./experiments/predictions/{pred_dir}/')
-  model_dir = create_directory('./experiments/models/')
-  model_path = model_dir + f'{TAG}.pth'
-  print(f"Saving to '{pred_dir}'")
-
-  # Transform, Dataset, DataLoader
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
   normalize_fn = Normalize(*imagenet_stats())
 
@@ -73,71 +73,94 @@ if __name__ == '__main__':
     mode=args.mode,
     use_group_norm=args.use_gn,
   )
-  model = model.to(DEVICE)
+  load_model(model, MODEL_PATH, parallel=False)
   model.eval()
 
-  print('[i] Architecture is {}'.format(args.architecture))
-  print('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  print()
-
-  load_model(model, model_path, parallel=False)
-
-  eval_timer = Timer()
+  dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  model.eval()
-  eval_timer.tik()
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, normalize_fn, dataset, scales, PRED_DIR, DEVICE), join=True)
 
-  def inference(images, image_size):
-    images = images.to(DEVICE)
 
-    logits = model(images)
-    logits = resize_for_tensors(logits, image_size)
+def forward_tta(model, images, image_size, device):
+  images = images.to(device)
 
-    logits = logits[0] + logits[1].flip(-1)
-    logits = to_numpy(logits).transpose((1, 2, 0))
-    return logits
+  logits = model(images)
+  logits = resize_for_tensors(logits, image_size)
 
-  with torch.no_grad():
-    length = len(dataset)
-    for step, (ori_image, image_id, _) in enumerate(dataset):
-      ori_w, ori_h = ori_image.size
+  logits = logits[0] + logits[1].flip(-1)
+  logits = to_numpy(logits).transpose((1, 2, 0))
+  return logits
 
-      cams_list = []
+
+def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device):
+  dataset = dataset[process_id]
+  length = len(dataset)
+
+  with torch.no_grad(), torch.cuda.device(process_id):
+    model = model.cuda()
+
+    for step, (image, image_id, _) in enumerate(dataset):
+      W, H = image.size
+
+      ps = []
 
       for scale in scales:
-        image = copy.deepcopy(ori_image)
-        image = image.resize((round(ori_w * scale), round(ori_h * scale)), resample=PIL.Image.CUBIC)
+        x = copy.deepcopy(image)
+        x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.CUBIC)
 
-        image = normalize_fn(image)
-        image = image.transpose((2, 0, 1))
+        x = normalize_fn(x)
+        x = x.transpose((2, 0, 1))
 
-        image = torch.from_numpy(image)
-        flipped_image = image.flip(-1)
+        x = torch.from_numpy(x)
+        x = torch.stack([x, x.flip(-1)])
 
-        images = torch.stack([image, flipped_image])
+        p = forward_tta(model, x, (H, W), device)
+        ps.append(p)
 
-        cams = inference(images, (ori_h, ori_w))
-        cams_list.append(cams)
+      p = np.sum(ps, axis=0)
+      p = F.softmax(torch.from_numpy(p), dim=-1).numpy()
 
-      preds = np.sum(cams_list, axis=0)
-      preds = F.softmax(torch.from_numpy(preds), dim=-1).numpy()
-
-      if args.iteration > 0:
+      if args.crf_t > 0:
         # h, w, c -> c, h, w
-        preds = crf_inference(np.asarray(ori_image), preds.transpose((2, 0, 1)), t=args.iteration)
-        pred_mask = np.argmax(preds, axis=0)
+        p = crf_inference(np.asarray(image), p.transpose((2, 0, 1)), t=args.crf_t, gt_prob=args.crf_gt_prob)
+        p = np.argmax(p, axis=0)
       else:
-        pred_mask = np.argmax(preds, axis=-1)
+        p = np.argmax(p, axis=-1)
 
-      if args.domain == 'test':
-        pred_mask = decode_from_colormap(pred_mask, dataset.colors)[..., ::-1]
+      p = Image.fromarray(p.astype(np.uint8))
+      p.save(os.path.join(preds_dir, image_id + '.png'))
 
-      imageio.imwrite(os.path.join(pred_dir, image_id + '.png'), pred_mask.astype(np.uint8))
+      image.close()
+      p.close()
 
-      sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
-      sys.stdout.flush()
-    print()
+      if process_id == 0:
+        sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
+        sys.stdout.flush()
 
-  if args.domain == 'val':
-    print("python3 evaluate.py --experiment_name {} --domain {} --mode png".format(pred_dir, args.domain))
+    if process_id == 0:
+      print()
+
+
+if __name__ == '__main__':
+  import multiprocessing
+  multiprocessing.set_start_method('spawn')
+
+  args = parser.parse_args()
+
+  TAG = args.tag
+  SEED = args.seed
+  DEVICE = args.device
+
+  set_seed(SEED)
+
+  PRED_DIR = TAG
+  PRED_DIR += '@train' if 'train' in args.domain else f'@{args.domain}'
+  PRED_DIR += f'@scale={args.scales}'
+  if args.crf_t > 0:
+    PRED_DIR += f'@crf_t={args.crf_t}'
+  PRED_DIR = create_directory(f'./experiments/predictions/{PRED_DIR}/')
+  MODELS_DIR = create_directory('./experiments/models/')
+  MODEL_PATH = args.weights or os.path.join(MODELS_DIR, f'{TAG}.pth')
+
+  run(args)

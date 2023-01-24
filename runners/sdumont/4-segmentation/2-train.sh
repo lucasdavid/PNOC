@@ -73,7 +73,7 @@ LABELSMOOTHING=0  # 0.1
 
 run_experiment() {
   WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,cutmix:$CUTMIX,ls:$LABELSMOOTHING"  \
-  WANDB_RUN_GROUP="$DATASET-segmentation-$ARCH"   \
+  WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation"   \
   CUDA_VISIBLE_DEVICES=$DEVICES             \
   $PY $SOURCE                               \
       --tag               $TAG              \

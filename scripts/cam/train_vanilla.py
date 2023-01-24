@@ -157,6 +157,8 @@ if __name__ == '__main__':
 
     with torch.no_grad():
       for step, (inputs, targets, masks) in enumerate(loader):
+        targets = to_numpy(targets)
+        masks = to_numpy(masks)
         logits, features = model(inputs.to(DEVICE), with_cam=True)
 
         labels_mask = targets[..., np.newaxis, np.newaxis]

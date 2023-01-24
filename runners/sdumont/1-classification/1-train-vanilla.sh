@@ -63,13 +63,17 @@ MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
 EPOCHS=15
 BATCH=32
+LR=0.1
 
 run_experiment () {
   echo "Running $TAG experiment"
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR"   \
+  WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla"     \
   CUDA_VISIBLE_DEVICES=$DEVICES        \
   $PY $SOURCE                          \
     --tag             $TAG             \
     --num_workers     $WORKERS         \
+    --lr              $LR              \
     --batch_size      $BATCH           \
     --architecture    $ARCHITECTURE    \
     --dilated         $DILATED         \
@@ -122,6 +126,7 @@ run_experiment () {
 # run_experiment
 
 
+LR=0.01
 ARCH=rn38d
 ARCHITECTURE=resnet38d
 AUGMENT=randaugment

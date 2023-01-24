@@ -20,7 +20,6 @@ export PYTHONPATH=$(pwd)
 
 PY=python
 SOURCE=scripts/segmentation/inference.py
-
 WORKERS=8
 DEVICES=0  # 0,1,2,3
 
@@ -31,30 +30,43 @@ DOMAIN=train
 # DATA_DIR=/home/ldavid/workspace/datasets/coco14
 # DOMAIN=train2014
 
+
+run_inference() {
+  echo "================================================="
+  echo "Inference $TAG"
+  echo "================================================="
+
+  CUDA_VISIBLE_DEVICES=$DEVICES    \
+  $PY $SOURCE                      \
+      --backbone $ARCHITECTURE     \
+      --mode     $MODE             \
+      --dilated  $DILATED          \
+      --use_gn   $GROUP_NORM       \
+      --tag      $TAG              \
+      --domain   $DOMAIN           \
+      --scale    $SCALES           \
+      --crf_t    $CRF_T            \
+      --crf_gt_prob $CRF_GT_PROB   \
+      --data_dir $DATA_DIR
+}
+
 # Architecture
 ARCHITECTURE=resnest269
 GROUP_NORM=true
 DILATED=false
+BATCH_SIZE=32
 MODE=normal
 
-CRF_T=10
+SCALES=0.5,1.0,1.5,2.0
+CRF_T=0
+CRF_GT_PROB=0.7
 
-run_experiment() {
-  CUDA_VISIBLE_DEVICES=$DEVICES             \
-  $PY $SOURCE                               \
-      --num_workers       $WORKERS          \
-      --backbone          $ARCHITECTURE     \
-      --mode              $MODE             \
-      --dilated           $DILATED          \
-      --use_gn            $GROUP_NORM       \
-      --tag               $TAG              \
-      --dataset           $DATASET          \
-      --domain            $DOMAIN           \
-      --iteration         $CRF_T            \
-      --data_dir          $DATA_DIR
-}
+TAG=segmentation/dlv3p-$MODE-gn@pn-fgh@rs269-poc
+DOMAIN=train
+run_inference
+# DOMAIN=val
+# run_inference
 
-TAG=segmentation/dlv3p-normal-gn@pn-fgh@rs269-poc
-MASKS_DIR=$DATA_DIR/SegmentationClass
-DOMAIN=test
-run_experiment
+# TAG=dlv3p-$MODE-gn-supervised
+# DOMAIN=train
+# run_inference

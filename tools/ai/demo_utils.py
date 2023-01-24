@@ -45,17 +45,16 @@ def colormap(cam, shape=None, mode=cv2.COLORMAP_JET):
     cam = cv2.applyColorMap(cam, mode)
     return cam
 
-def decode_from_colormap(data, colors):
-    ignore = (data == 255).astype(np.int32)
-
-    mask = 1 - ignore
-    data *= mask
+def decode_from_colormap(data, colors, ignore_index=21):
+    # ignore = (data == ignore_index).astype(data.dtype)
+    # mask = 1 - ignore
+    # data *= mask
 
     h, w = data.shape
     image = colors[data.reshape((h * w))].reshape((h, w, 3))
 
-    ignore = np.concatenate([ignore[..., np.newaxis], ignore[..., np.newaxis], ignore[..., np.newaxis]], axis=-1)
-    image[ignore.astype('bool')] = 255
+    # ignore = np.concatenate([ignore[..., np.newaxis], ignore[..., np.newaxis], ignore[..., np.newaxis]], axis=-1)
+    # image[ignore.astype('bool')] = 255
     return image
 
 def normalize(cam, epsilon=1e-5):
