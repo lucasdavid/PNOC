@@ -79,7 +79,7 @@ def run(args):
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, normalize_fn, dataset, scales, PRED_DIR, DEVICE), join=True)
+  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, normalize_fn, dataset, scales, PRED_DIR, DEVICE, args), join=True)
 
 
 def forward_tta(model, images, image_size, device):
@@ -93,7 +93,7 @@ def forward_tta(model, images, image_size, device):
   return logits
 
 
-def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device):
+def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, args):
   dataset = dataset[process_id]
   length = len(dataset)
 
@@ -143,9 +143,6 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device):
 
 
 if __name__ == '__main__':
-  import multiprocessing
-  multiprocessing.set_start_method('spawn')
-
   args = parser.parse_args()
 
   TAG = args.tag

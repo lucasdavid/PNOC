@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
+import wandb
 from core.datasets import get_paths_dataset
+from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file, load_background_file
 
@@ -156,6 +158,8 @@ def do_python_eval(dataset, classes, num_workers=8):
 
 def run(args, dataset):
   classes = ['background'] + dataset.info.classes.tolist()
+  columns = ['threshold', *classes, 'overall', 'foreground']
+  report_iou = []
 
   miou_ = threshold_ = fp_ = 0.
   iou_ = {}
@@ -176,11 +180,25 @@ def run(args, dataset):
     fp_history.append(r['fp_all'])
     miou_history.append(r['mIoU'])
 
+    report_iou.append([t] + [r[c] for c in classes] + [r['mIoU'], r['miou_foreground']])
+    
+    logs = {
+      'evaluation/t': t,
+      'evaluation/miou': r['mIoU'],
+      'evaluation/miou_fg': r['miou_foreground'],
+      'evaluation/miou_bg': r['background'],
+      'evaluation/fp': r['fp_all'],
+      'evaluation/fn': r['fn_all'],
+      'evaluation/iou': wandb.Table(columns=columns, data=report_iou)
+    }
+
     if r['mIoU'] > miou_:
       threshold_ = t
       miou_ = r['mIoU']
       fp_ = r['fp_all']
       iou_ = r
+
+    wandb.log(logs)
 
   print(
     f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}',
@@ -189,6 +207,10 @@ def run(args, dataset):
     '-' * 80,
     sep='\n'
   )
+
+  wandb.run.summary[f'evaluation/best_t'] = threshold_
+  wandb.run.summary[f'evaluation/best_miou'] = miou_
+  wandb.run.summary[f'evaluation/best_fp'] = fp_
 
   if args.mode == 'rw':
     a_over = 1.60
@@ -203,25 +225,38 @@ def run(args, dataset):
     under_loss_list = [np.abs(FP - fp_under) for FP in fp_history]
 
     over_index = np.argmin(over_loss_list)
-    over_th = thresholds[over_index]
-    over_mIoU = miou_history[over_index]
+    t_over = thresholds[over_index]
+    miou_over = miou_history[over_index]
     fp_over = fp_history[over_index]
 
     under_index = np.argmin(under_loss_list)
-    under_th = thresholds[under_index]
-    under_mIoU = miou_history[under_index]
+    t_under = thresholds[under_index]
+    miou_under = miou_history[under_index]
     fp_under = fp_history[under_index]
 
     print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_ or 0., miou_, fp_))
-    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(over_th or 0., over_mIoU, fp_over))
-    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(under_th or 0., under_mIoU, fp_under))
+    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t_over or 0., miou_over, fp_over))
+    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t_under or 0., miou_under, fp_under))
+
+    wandb.run.summary[f'evaluation/over_t'] = t_over
+    wandb.run.summary[f'evaluation/over_miou'] = miou_over
+    wandb.run.summary[f'evaluation/over_fp'] = fp_over
+
+    wandb.run.summary[f'evaluation/under_t'] = t_under
+    wandb.run.summary[f'evaluation/under_miou'] = miou_under
+    wandb.run.summary[f'evaluation/under_fp'] = fp_under
 
 
 if __name__ == '__main__':
   args = parser.parse_args()
-
+  TAG = args.experiment_name
   PRED_DIR = args.pred_dir or f'./experiments/predictions/{args.experiment_name}/'
   SAL_DIR = args.sal_dir
+
+  wb_run = wandb_utils.setup(TAG, args, job_type="evaluation", tags=[
+    args.dataset, f'domain:{args.domain}', f"crf:{args.crf_t}-{args.crf_gt_prob}"
+  ])
+  wandb.define_metric("evaluation/t")
 
   dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
 
@@ -229,3 +264,5 @@ if __name__ == '__main__':
     run(args, dataset)
   except KeyboardInterrupt:
     print('\ninterrupted')
+
+  wb_run.finish()
