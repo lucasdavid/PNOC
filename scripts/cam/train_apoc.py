@@ -57,6 +57,7 @@ parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
+parser.add_argument('--max_grad_norm', default=None, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -168,6 +169,10 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
   cg_scaler.scale(cg_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:
+    if args.max_grad_norm:
+      cg_scaler.unscale_(cgopt)
+      torch.nn.utils.clip_grad_norm_(cgnet.parameters(), args.max_grad_norm)
+
     cg_scaler.step(cgopt)
     cg_scaler.update()
     cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
@@ -200,6 +205,10 @@ def train_step_oc(step, images_mask, targets_sm, ow):
   oc_scaler.scale(ot_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:
+    if args.max_grad_norm:
+      oc_scaler.unscale_(ocopt)
+      torch.nn.utils.clip_grad_norm_(ocnet.parameters(), args.max_grad_norm)
+
     oc_scaler.step(ocopt)
     oc_scaler.update()
     ocopt.zero_grad()

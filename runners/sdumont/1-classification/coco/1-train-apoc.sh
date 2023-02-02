@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-apoc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/apoc-%j.out
-#SBATCH --time=14:00:00
+#SBATCH --time=96:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -22,7 +22,7 @@
 
 #
 # Train ResNeSt269 to perform multilabel classification task over
-# the VOC12 or COCO14 dataset using Puzzle and OC-CSE strategies.
+# the COCO14 dataset using Puzzle and OC-CSE strategies.
 #
 
 echo "[sdumont/sequana/classification/train-poc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -45,12 +45,12 @@ SOURCE=scripts/cam/train_apoc.py
 WORKERS=8
 DEVICES=0,1,2,3
 
-DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DOMAIN=train
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
+# DATASET=voc12
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DOMAIN=train
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+DOMAIN=train2014
 
 
 ARCH=rs269
@@ -68,6 +68,7 @@ BATCH=16
 LR=0.1
 ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
+MAX_GRAD_NORM=1.0
 
 OC_NAME=rs269poc
 OC_PRETRAINED=experiments/models/ResNeSt269@PuzzleOc.pth
@@ -106,6 +107,7 @@ run_training () {
         --batch_size        $BATCH           \
         --accumulate_steps  $ACCUMULATE_STEPS \
         --mixed_precision   $MIXED_PRECISION \
+        --max_grad_norm     $MAX_GRAD_NORM   \
         --architecture      $ARCHITECTURE    \
         --dilated           $DILATED         \
         --mode              $MODE            \
@@ -155,99 +157,18 @@ run_inference () {
 }
 
 
-OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
-OC_ARCHITECTURE=resnest269
-LABELSMOOTHING=0.1
-OW=1.0
-OW_INIT=0.3
-OW_SCHEDULE=0.5
-OC_TRAIN_MASKS=features
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r1
-# run_training
-# run_inference
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r2
-# run_training
-# run_inference
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r3
-# run_training
-# run_inference
-
-# OC_NAME=rs269ra
-# OC_PRETRAINED=experiments/models/resnest269@randaug.pth
-# OC_ARCHITECTURE=resnest269
-# LABELSMOOTHING=0.1
-# OW=0.5
-# OW_INIT=0.0
-# OW_SCHEDULE=1.0
-# OC_TRAIN_MASKS=features
-# OC_TRAIN_INT_STEPS=5
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# run_training
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r2
-# run_training
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r3
-# run_training
 
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
+OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
-LABELSMOOTHING=0.1
+LABELSMOOTHING=0  # 0.1
 OW=1.0
 OW_INIT=0.0
 OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-# TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
-
-## =============================
-## Alternatives
-
-# OW=1.0
-# OC_TRAIN_MASK_T=0.2
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
-# OW=1.0
-# OC_TRAIN_INT_STEPS=5
-# OC_TRAIN_MASK_T=0.2
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
-# run_inference
-
-# OC_TRAIN_MASK_T=0.3
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
-# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
-
-# OC_TRAIN_MASK_T=0.4
-# TAG=$DATASET-$ARCH-apoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
-# W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
-
-mv experiments/models/voc12-rn38d-ra.pth ./experiments/models/cam/voc12-rn38d-ra.pth
-
-ACCUMULATE_STEPS=2
-BATCH=16
-LR=0.01
-ARCH=rn38d
-ARCHITECTURE=resnet38d
-OC_NAME=rn38d
-OC_PRETRAINED=experiments/models/cam/voc12-rn38d-ra.pth
-OC_ARCHITECTURE=resnet38d
-LABELSMOOTHING=0.1
-OW=1.0
-OW_INIT=0.0
-OW_SCHEDULE=1.0
-OC_TRAIN_MASKS=cams
-OC_TRAIN_MASK_T=0.2
-OC_TRAIN_INT_STEPS=1
-TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-W_GROUP=apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
 run_training
 run_inference

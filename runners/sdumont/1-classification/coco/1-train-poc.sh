@@ -144,17 +144,17 @@ run_training () {
 # TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING@$OC_NAME
 # run_training
 
-ARCH=rs269
-ARCHITECTURE=resnest269
-OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
-OC_ARCHITECTURE=resnest269
-BATCH=16
-ACCUMULATE_STEPS=2
-LABELSMOOTHING=0
-LR=0.01
-TAG=poc/$DATASET-$ARCH-poc-b$BATCH-as$ACCUMULATE_STEPS-lr$LR@$OC_NAME-r1
-run_training
+# ARCH=rs269
+# ARCHITECTURE=resnest269
+# OC_NAME=rs269ra
+# OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
+# OC_ARCHITECTURE=resnest269
+# BATCH=16
+# ACCUMULATE_STEPS=2
+# LABELSMOOTHING=0
+# LR=0.01
+# TAG=poc/$DATASET-$ARCH-poc-b$BATCH-as$ACCUMULATE_STEPS-lr$LR@$OC_NAME-r1
+# run_training
 
 # ARCH=rs269
 # ARCHITECTURE=resnest269

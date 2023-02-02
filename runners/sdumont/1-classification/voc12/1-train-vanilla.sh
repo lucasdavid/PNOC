@@ -42,10 +42,10 @@ SOURCE=scripts/cam/train_vanilla.py
 WORKERS=16
 DEVICES=0,1,2,3
 
-# DATASET=voc12
-# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DATASET=coco14
-DATA_DIR=$SCRATCH/datasets/coco14/
+DATASET=voc12
+DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+# DATASET=coco14
+# DATA_DIR=$SCRATCH/datasets/coco14/
 
 ARCH=rs269
 ARCHITECTURE=resnest269
@@ -130,5 +130,5 @@ LR=0.01
 ARCH=rn38d
 ARCHITECTURE=resnet38d
 AUGMENT=randaugment
-TAG=$DATASET-$ARCH-ra
+TAG=vanilla/$DATASET-$ARCH-ra
 run_experiment
