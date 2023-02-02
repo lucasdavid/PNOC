@@ -84,7 +84,10 @@ def run(args):
 
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, normalize_fn, CAMS_DIR, PREDS_DIR, DEVICE, args), join=True)
+  if GPUS_COUNT > 1:
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, normalize_fn, CAMS_DIR, PREDS_DIR, DEVICE, args), join=True)
+  else:
+    _work(0, model, dataset, normalize_fn, CAMS_DIR, PREDS_DIR, DEVICE, args)
 
 def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device, args):
   dataset = dataset[process_id]
@@ -129,7 +132,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       if process_id == 0:
         sys.stdout.write(
           '\r# Make CAM with Random Walk [{}/{}] = {:.2f}%, ({}, rw_up={}, rw={})'.format(
-            step + 1, length, (step + 1) / length * 100, (H, W), rw_up.size(), rw.size()
+            step + 1, length, (step + 1) / length * 100, (H, W), tuple(rw_up.shape), tuple(rw.shape)
           )
         )
         sys.stdout.flush()

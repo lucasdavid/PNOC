@@ -1,7 +1,7 @@
 
 
 export PYTHONPATH=$(pwd)
-export OMP_NUM_THREADS=8
+# export OMP_NUM_THREADS=4
 
 PY=python
 SOURCE=scripts/rw/inference.py
@@ -28,7 +28,7 @@ run() {
 
 DATASET=voc12
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
-DOMAIN=train_aug
+DOMAIN=train
 
 ARCHITECTURE=resnest269
 # MODEL_NAME=affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10

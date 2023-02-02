@@ -85,7 +85,10 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE), join=True)
+  if GPUS_COUNT > 1:
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDS_DIR, DEVICE), join=True)
+  else:
+    _work(0, model, dataset, scales, PREDS_DIR, DEVICE)
 
 
 def _work(process_id, model, dataset, scales, preds_dir, device):
@@ -160,7 +163,7 @@ if __name__ == '__main__':
   TAG += '@train' if 'train' in args.domain else '@val'
   TAG += '@scale=%s' % args.scales
 
-  PREDICTIONS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
+  PREDS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
   WEIGHTS_PATH = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
   set_seed(SEED)

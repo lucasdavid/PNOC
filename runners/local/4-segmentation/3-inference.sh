@@ -73,12 +73,13 @@ CRF_GT_PROB=0.7
 # DOMAIN=val
 # run_inference
 
-TAG=segmentation/d3p@pn-ccamh@rs269apoc-ls0.1
+# TAG=segmentation/d3p@pn-ccamh@rs269apoc-ls0.1
 # DOMAIN=train
 # run_inference
 # DOMAIN=val
 # run_inference
 
+TAG=segmentation/d3p-ls0.1@pn-ccamh@rs269apoc-ls0.1
 CRF_T=1
 CRF_GT_PROB=0.9
 DOMAIN=test
