@@ -114,5 +114,5 @@ run_inference
 
 # WEIGHTS=poc/voc12-rs269-poc-ls0.1@rs269ra-r3
 # run_inference
-# WEIGHTS=apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3
+# WEIGHTS=pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3
 # run_inference

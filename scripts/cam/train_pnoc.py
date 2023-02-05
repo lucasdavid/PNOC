@@ -25,6 +25,8 @@ from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
+# region Arguments
+
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
@@ -92,6 +94,8 @@ parser.add_argument('--ow-schedule', default=1.0, type=float)
 parser.add_argument('--oc-train-interval-steps', default=1, type=int)
 parser.add_argument('--oc-train-masks', default='features', choices=['features', 'cams'], type=str)
 parser.add_argument('--oc_train_mask_t', default=0.2, type=float)
+
+# endregion
 
 try:
   GPUS = os.environ['CUDA_VISIBLE_DEVICES']
@@ -267,15 +271,14 @@ if __name__ == '__main__':
   SEED = args.seed
   DEVICE = args.device
 
-  wb_run = wandb_utils.setup(TAG, args, tags=[args.dataset, args.architecture, 'apoc', f'ls:{args.label_smoothing}'])
+  wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
-  data_dir = create_directory(f'./experiments/data/')
-  model_dir = create_directory('./experiments/models/')
+  data_path = os.path.join('./experiments/data', f'{TAG}.json')
+  model_path = os.path.join('./experiments/models', f'{TAG}.json')
 
-  data_path = data_dir + f'{TAG}.json'
-  model_path = model_dir + f'{TAG}.pth'
-
+  create_directory(os.path.dirname(data_path))
+  create_directory(os.path.dirname(model_path))
   set_seed(SEED)
 
   tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)

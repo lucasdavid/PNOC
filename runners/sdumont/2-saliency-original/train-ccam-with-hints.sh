@@ -54,8 +54,8 @@ FG_T=0.4
 CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 TAG=voc12-ccamh-$ARCH@rs269poc-ls0.1@fg$FG_T-b$BATCH-lr$LR
 
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
-# TAG=voc12-ccamh-$ARCH@rs269apoc-ls0.1@fg$FG_T-b$BATCH-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
+# TAG=voc12-ccamh-$ARCH@rs269pnoc-ls0.1@fg$FG_T-b$BATCH-lr$LR
 
 # OMP_NUM_THREADS=16         \
 CUDA_VISIBLE_DEVICES=0,1,2,3 \

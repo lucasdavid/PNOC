@@ -36,11 +36,6 @@ run_inference () {
     --data_dir       $DATA_DIR
 }
 
-TAG=puzzle/ResNeSt269@Puzzle@optimal
-WEIGHTS=$TAG
-DOMAIN=val
-run_inference
-
 # ARCHITECTURE=resnest269
 # WEIGHTS=voc12-rs269-poc-ls0.1@rs269ra-r3
 # TAG=poc/$WEIGHTS
@@ -59,10 +54,37 @@ run_inference
 
 ## A-P-OC
 #
-ARCHITECTURE=resnest269
-WEIGHTS=poc/voc12-rs269-poc-ls0.1@rs269ra-r3
+# ARCHITECTURE=resnest269
+# WEIGHTS=poc/voc12-rs269-poc-ls0.1@rs269ra-r3
+# TAG=$WEIGHTS
+# DOMAIN=train_aug
+# run_inference
+# DOMAIN=val
+# run_inference
+
+DOMAIN=train
+
+WEIGHTS=cam/resnest269@randaug
 TAG=$WEIGHTS
-DOMAIN=train_aug
 run_inference
-DOMAIN=val
-run_inference
+
+WEIGHTS=puzzle/ResNeSt269@Puzzle@optimal
+TAG=$WEIGHTS
+# run_inference
+
+WEIGHTS=puzzle/resnest269@puzzlerep
+TAG=$WEIGHTS
+# run_inference
+
+WEIGHTS=puzzle/resnest269@puzzlerep2
+TAG=$WEIGHTS
+# run_inference
+
+WEIGHTS=poc/ResNeSt269@PuzzleOc
+TAG=$WEIGHTS
+# run_inference
+
+# WEIGHTS=poc/voc12-rs269-poc-ls0.1@rs269ra-r3
+# run_inference
+# WEIGHTS=pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3
+# run_inference

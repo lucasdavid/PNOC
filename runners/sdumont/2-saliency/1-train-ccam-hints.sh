@@ -147,26 +147,26 @@ run_inference
 # run_training
 # run_inference
 
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 # run_training
 # run_inference
 
 # FG_T=0.3
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 # run_training
 # run_inference
 
 # FG_T=0.25
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
 # run_training
 # run_inference
 
 # MIXED_PRECISION=true
 # FG_T=0.2
-# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269apoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
 # run_training
 # run_inference

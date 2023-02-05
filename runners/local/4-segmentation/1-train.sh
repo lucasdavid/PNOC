@@ -83,5 +83,5 @@ TAG=dlv3p-$MODE-gn-supervised
 MASKS_DIR=$DATA_DIR/SegmentationClass
 run_experiment
 
-# TAG=dlv3p-$MODE-gn@pn-fgh@rs269apoc
+# TAG=dlv3p-$MODE-gn@pn-fgh@rs269pnoc
 # MASKS_DIR=./experiments/predictions/rw/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10@train@beta=10@exp_times=8@rw@crf=1

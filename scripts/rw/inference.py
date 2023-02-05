@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
   log_config(vars(args), TAG)
 
-  CAMS_DIR = args.cam_dir
+  CAMS_DIR = os.path.join('./experiments/predictions', args.cam_dir)
   PREDS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
 
   model_path = './experiments/models/' + f'{args.model_name}.pth'

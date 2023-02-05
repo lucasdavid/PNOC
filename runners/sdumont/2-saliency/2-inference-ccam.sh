@@ -104,7 +104,7 @@ T=0.2
 run_inference
 run_crf
 
-TAG=saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001
+TAG=saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001
 PRETRAINED=./experiments/models/$TAG.pth
 T=0.2
 run_inference

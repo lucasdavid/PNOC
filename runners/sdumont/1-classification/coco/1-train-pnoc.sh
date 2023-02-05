@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-apoc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/apoc-%j.out
+#SBATCH -J tr-pnoc
+#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/pnoc-%j.out
 #SBATCH --time=96:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -41,7 +41,7 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 PIP=pip3.9
-SOURCE=scripts/cam/train_apoc.py
+SOURCE=scripts/cam/train_pnoc.py
 WORKERS=8
 DEVICES=0,1,2,3
 
@@ -100,6 +100,7 @@ run_training () {
     echo "============================================================"
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     WANDB_RUN_GROUP="$W_GROUP"               \
+    wANDB_TAGS="$W_TAGS"                     \
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
@@ -161,14 +162,15 @@ run_inference () {
 OC_NAME=rs269ra
 OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
-LABELSMOOTHING=0  # 0.1
+LABELSMOOTHING=0.1
 OW=1.0
 OW_INIT=0.0
 OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-TAG=apoc/$DATASET-$ARCH-apoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
-W_GROUP=$DATASET-apoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,aoc:$OC_TRAIN_MASKS,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS"
 run_training
 run_inference

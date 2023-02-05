@@ -51,8 +51,8 @@ ARCHITECTURE=resnet  # resnet vgg
 TAG=pn@ccamh-rs269@rs269poc-ls0.1
 PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-# TAG=pn@ccamh-rs269@rs269apoc-ls0.1
-# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269apoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+# TAG=pn@ccamh-rs269@rs269pnoc-ls0.1
+# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
 # CUDA_VISIBLE_DEVICES=0 $PY $SOURCE \
 #   --arch $ARCHITECTURE             \

@@ -5,7 +5,7 @@ export OMP_NUM_THREADS=8
 export WANDB_PROJECT=research-wsss-dev
 
 PY=python
-SOURCE=scripts/cam/train_apoc.py
+SOURCE=scripts/cam/train_pnoc.py
 DEVICE=cpu
 WORKERS=4
 AMP=true
@@ -35,7 +35,7 @@ OC_ARCHITECTURE=resnet50
 OC_PRETRAINED=./experiments/models/ResNet50.pth
 # OC_PRETRAINED=./experiments/models/coco14-rs50.pth
 
-TAG=$DATASET-$ARCH-apoc@rn50
+TAG=$DATASET-$ARCH-pnoc@rn50
 
 
 $PY $SOURCE                          \

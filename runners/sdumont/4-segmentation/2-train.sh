@@ -104,11 +104,11 @@ run_experiment() {
 # MASKS_DIR=$DATA_DIR/SegmentationClass
 # run_experiment
 
-# TAG=d3p@pn-ccamh@rs269apoc-ls0.1
-# MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
+# TAG=d3p@pn-ccamh@rs269pnoc-ls0.1
+# MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
 # run_experiment
 
 LABELSMOOTHING=0.1
-TAG=d3p-ls$LABELSMOOTHING@pn-ccamh@rs269apoc-ls0.1
-MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
+TAG=d3p-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-ls0.1
+MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
 run_experiment

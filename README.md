@@ -47,12 +47,12 @@ CUDA_VISIBLE_DEVICES=$DEVICES        \
     --data_dir        $DATA_DIR
 ```
 
-#### 1.2 Train Adversarial Puzzle-OC (APOC)
+#### 1.2 Train Puzzle-Not So Ordinary Classifier (P-NOC)
 ```shell
-TAG_APOC=$DATASET-rs269apoc@rs269ra
+TAG_PNOC=$DATASET-rs269pnoc@rs269ra
 
 CUDA_VISIBLE_DEVICES=$DEVICES            \
-    python scripts/cam/train_apoc.py     \
+    python scripts/cam/train_pnoc.py     \
         --tag               $TAG         \
         --batch_size        32           \
         --mixed_precision   true         \
@@ -69,8 +69,8 @@ CUDA_VISIBLE_DEVICES=$DEVICES            \
 
 #### 1.3 Inference of CAMs with TTA
 ```shell
-CUDA_VISIBLE_DEVICES=0 $PY scripts/cam/inference.py --domain $DOMAIN_TRAIN --architecture resnest269 --tag $TAG_APOC --dataset $DATASET --data_dir $DATA_DIR &
-CUDA_VISIBLE_DEVICES=1 $PY scripts/cam/inference.py --domain $DOMAIN_VALID --architecture resnest269 --tag $TAG_APOC --dataset $DATASET --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=0 $PY scripts/cam/inference.py --domain $DOMAIN_TRAIN --architecture resnest269 --tag $TAG_PNOC --dataset $DATASET --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=1 $PY scripts/cam/inference.py --domain $DOMAIN_VALID --architecture resnest269 --tag $TAG_PNOC --dataset $DATASET --data_dir $DATA_DIR &
 wait
 ```
 
@@ -78,7 +78,7 @@ wait
 #### 2.1 Train CCAM with hints
 ```shell
 FG_T=0.4
-TAG_CCAMH=$DATASET-ccamh-rs269@rs269apoc@rs269ra@$FG_T
+TAG_CCAMH=$DATASET-ccamh-rs269@rs269pnoc@rs269ra@$FG_T
 
 CUDA_VISIBLE_DEVICES=$DEVICES               \
   $PY scripts/ccam/train_with_cam_hints.py  \
@@ -89,7 +89,7 @@ CUDA_VISIBLE_DEVICES=$DEVICES               \
   --architecture    resnest269              \
   --stage4_out_features 1024                \
   --fg_threshold    $FG_T                   \
-  --cams_dir ./experiments/predictions/$TAG_APOC  \
+  --cams_dir ./experiments/predictions/$TAG_PNOC  \
   --dataset         $DATASET                \
   --data_dir        $DATA_DIR
 ```
@@ -103,7 +103,7 @@ CUDA_VISIBLE_DEVICES="" $PY scripts/ccam/inference_crf.py --experiment_name $TAG
 
 #### 2.3 Train PoolNet
 ```shell
-TAG_PN=$DATASET-pn@ccamh@rs269apoc@rs269ra
+TAG_PN=$DATASET-pn@ccamh@rs269pnoc@rs269ra
 
 cd poolnet
 
@@ -121,7 +121,7 @@ FG=0.4
 BG=0.1
 CRF_T=1
 CRF_GT=0.9
-TAG_RW=$DATASET-an@pn@ccamh@rs269apoc@rs269ra@fg$FG-bg$BG-crf$CRF_T-gt$CRF_GT
+TAG_RW=$DATASET-an@pn@ccamh@rs269pnoc@rs269ra@fg$FG-bg$BG-crf$CRF_T-gt$CRF_GT
 
 CUDA_VISIBLE_DEVICES=""                 \
 $PY scripts/rw/make_affinity_labels.py  \
@@ -130,7 +130,7 @@ $PY scripts/rw/make_affinity_labels.py  \
     --bg_threshold $BG                  \
     --crf_t        $CRF_T               \
     --crf_gt_prob  $CRF_GT              \
-    --cams_dir ./experiments/predictions/$TAG_APOC  \
+    --cams_dir ./experiments/predictions/$TAG_PNOC  \
     --sal_dir  ./experiments/predictions/$TAG_PN    \
     --num_workers  48                   \
     --domain       $DOMAIN_TRAIN        \
@@ -152,9 +152,9 @@ $PY scripts/rw/train_affinity.py \
 
 #### 3.3 Affinity Random Walk
 ```shell
-CUDA_VISIBLE_DEVICES=0 $PY scripts/rw/inference.py --domain $DOMAIN_TRAIN --architecture resnest269 --model_name $TAG_RW --cam_dir $TAG_APOC --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=0 $PY scripts/rw/inference.py --domain $DOMAIN_TRAIN --architecture resnest269 --model_name $TAG_RW --cam_dir $TAG_PNOC --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR &
 
-CUDA_VISIBLE_DEVICES=1 $PY scripts/rw/inference.py --domain $DOMAIN_VALID --architecture resnest269 --model_name $TAG_RW --cam_dir $TAG_APOC --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR &
+CUDA_VISIBLE_DEVICES=1 $PY scripts/rw/inference.py --domain $DOMAIN_VALID --architecture resnest269 --model_name $TAG_RW --cam_dir $TAG_PNOC --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR &
 
 wait
 ```
@@ -170,7 +170,7 @@ wait
 
 #### 4.2 Train DeepLabV3+
 ```shell
-TAG_DL=dlv3p-gn@an@pn@ccamh@rs269apoc@rs269ra
+TAG_DL=dlv3p-gn@an@pn@ccamh@rs269pnoc@rs269ra
 
 CUDA_VISIBLE_DEVICES=$DEVICES      \
 $PY scripts/segmentation/train.py  \

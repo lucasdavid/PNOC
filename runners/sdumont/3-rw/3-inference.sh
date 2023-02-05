@@ -97,12 +97,12 @@ CAM_DIR=poc/voc12-rs269-poc-ls0.1@rs269ra-r3@$DOMAIN@scale=0.5,1.0,1.5,2.0
 RW_DIR=$MODEL_NAME@$DOMAIN@beta=10@exp_times=8@rw
 run
 
-MODEL_NAME=rw/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
-CAM_DIR=apoc/voc12-rs269-apoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@$DOMAIN@scale=0.5,1.0,1.5,2.0
+MODEL_NAME=rw/voc12-an@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
+CAM_DIR=pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@$DOMAIN@scale=0.5,1.0,1.5,2.0
 RW_DIR=$MODEL_NAME@$DOMAIN@beta=10@exp_times=8@rw
 run
 
-# MODEL_NAME=rw/voc12-an@rs269apoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
+# MODEL_NAME=rw/voc12-an@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@aff_fg=0.30_bg=0.10
 
 ## ===================================
 ## COCO 14
