@@ -55,6 +55,7 @@ parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
+parser.add_argument('--persist_oc', default=False, type=str2bool)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -275,7 +276,8 @@ if __name__ == '__main__':
   log_config(vars(args), TAG)
 
   data_path = os.path.join('./experiments/data', f'{TAG}.json')
-  model_path = os.path.join('./experiments/models', f'{TAG}.json')
+  model_path = os.path.join('./experiments/models', f'{TAG}.pth')
+  oc_model_path = os.path.join('./experiments/models', f'{TAG}-oc.pth')
 
   create_directory(os.path.dirname(data_path))
   create_directory(os.path.dirname(model_path))
@@ -315,7 +317,7 @@ if __name__ == '__main__':
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
-    cgnet.load_state_dict(torch.load(args.restore), strict=True)
+    cgnet.load_state_dict(torch.load(args.restore, map_location=torch.device('cpu')), strict=True)
   log_model('CGNet', cgnet, args)
 
   # Ordinary Classifier.
@@ -339,9 +341,6 @@ if __name__ == '__main__':
     print(f'GPUs={GPUS_COUNT}')
     cgnet = torch.nn.DataParallel(cgnet)
     ocnet = torch.nn.DataParallel(ocnet)
-
-  load_model_fn = lambda: load_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
 
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
@@ -474,7 +473,9 @@ if __name__ == '__main__':
       )
 
       print(f'saving weights `{model_path}`\n')
-      save_model_fn()
+      save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
+      if args.persist_oc:
+        save_model(ocnet, oc_model_path, parallel=GPUS_COUNT > 1)
 
   write_json(data_path, data_dic)
   print(TAG)

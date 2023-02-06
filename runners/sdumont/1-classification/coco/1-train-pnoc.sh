@@ -63,6 +63,7 @@ REGULAR=none
 IMAGE_SIZE=512
 MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=640
+FIRST_EPOCH=0
 EPOCHS=15
 BATCH=16
 LR=0.1
@@ -101,6 +102,8 @@ run_training () {
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     WANDB_RUN_GROUP="$W_GROUP"               \
     wANDB_TAGS="$W_TAGS"                     \
+    WANDB_RESUME=$W_RESUME                   \
+    WANDB_RUN_ID=$W_RUN_ID                   \
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
@@ -124,6 +127,7 @@ run_training () {
         --cutmix_prob       $CUTMIX          \
         --mixup_prob        $MIXUP           \
         --label_smoothing   $LABELSMOOTHING  \
+        --first_epoch       $FIRST_EPOCH     \
         --max_epoch         $EPOCHS          \
         --alpha             $P_ALPHA         \
         --alpha_init        $P_INIT          \
@@ -173,4 +177,24 @@ TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_
 W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
 W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,aoc:$OC_TRAIN_MASKS,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS"
 run_training
-run_inference
+# run_inference
+
+
+# Resuome pnoc #1
+OC_NAME=rs269ra
+OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
+OC_ARCHITECTURE=resnest269
+LABELSMOOTHING=0
+OW=1.0
+OW_INIT=0.0
+OW_SCHEDULE=1.0
+OC_TRAIN_MASKS=cams
+OC_TRAIN_MASK_T=0.2
+OC_TRAIN_INT_STEPS=1
+TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,aoc:$OC_TRAIN_MASKS,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS"
+W_RESUME=must
+W_RUN_ID=1h6ytce6
+FIRST_EPOCH=8
+run_training
