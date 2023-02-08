@@ -22,7 +22,7 @@ def _decode_id(sample_id):
 
 
 def _load_labels_from_npy(images, root_dir):
-  filepath = os.path.join(root_dir, 'cls_labels.npy')
+  filepath = os.path.join(root_dir, 'cls_labels_coco.npy')
   cls_labels_dict = np.load(filepath, allow_pickle=True).item()
   return np.array([cls_labels_dict[int(img_name)] for img_name in images])
 

@@ -5,10 +5,53 @@ Experiments were run over LNCC SDumont infrastructure.
 
 Many of the code lines here were borrowed from OC-CSE, Puzzle-CAM and CCAM repositories.
 
+## Setup
+### Pascal VOC 2012
+
+```shell
+DATA_DIR=/datasets
+cd $DATA_DIR
+
+# Download images and labels from http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit:
+wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
+tar -xf VOCtrainval_11-May-2012.tar
+
+# Download the augmented segmentation maps from http://home.bharathh.info/pubs/codes/SBD
+# *only if* you are planning on training the fully-suppervised
+# models (for comparison purposes):
+wget http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/semantic_contours/benchmark.tgz
+tar -xzf benchmark.tgz
+
+# Merge them into the VOCdevkit/VOC2012/SegmentationClass folder:
+mv aug_seg/* VOCdevkit/VOC2012/SegmentationClass/
+```
+### MS COCO 2014
+
+```shell
+DATA_DIR=/datasets/coco14
+cd $DATA_DIR
+
+# Download MS COCO images and labels:
+wget http://images.cocodataset.org/zips/train2014.zip
+wget http://images.cocodataset.org/zips/val2014.zip
+wget https://github.com/jbeomlee93/RIB/raw/main/coco14/cls_labels.npy
+wget https://github.com/jbeomlee93/RIB/raw/main/coco14/cls_labels_coco.npy
+
+# Download segmentation labels in VOC format from
+# https://drive.google.com/file/d/1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV/view
+gdown 1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV
+
+# Unzip everything:
+unzip train2014.zip
+unzip val2014.zip
+unzip coco_annotations_semantic.zip
+mv coco_annotations_semantic/coco_seg_anno .
+rm coco_annotations_semantic -r
+```
+
 ## Experiments
 
 ### Pascal VOC 2012
-
 ```shell
 
 ### 0. Common Setup
@@ -29,6 +72,10 @@ DATASET=voc12
 DOMAIN_TRAIN=train_aug
 DOMAIN_VALID=val
 DATA_DIR=/datasets/VOCdevkit/VOC2012
+# DATASET=coco14
+# DOMAIN_TRAIN=train2014
+# DOMAIN_VALID=val2014
+# DATA_DIR=/datasets/coco14
 
 ARCHITECTURE=resnest269
 ACCUMULATE_STEPS=1
@@ -171,40 +218,4 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/segmentation/inference.py --domain val
 
 CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/segmentation/inference.py --domain test --backbone resnest269 --use_gn true --tag $TAG_DL --scale 0.5,1.0,1.5,2.0 --iteration 10 --data_dir $DATA_DIR
 
-```
-
-### MS COCO 2014
-
-```shell
-
-### 0. Setup
-
-DATASET=coco14
-DOMAIN_TRAIN=train2014
-DOMAIN_VALID=val2014
-
-DATA_DIR=/datasets/coco14
-WORK_DIR=$(pwd)
-
-#### 0.1. Download MS COCO images and labels:
-cd $DATA_DIR
-
-wget http://images.cocodataset.org/zips/train2014.zip
-wget http://images.cocodataset.org/zips/val2014.zip
-wget https://github.com/jbeomlee93/RIB/raw/main/coco14/cls_labels.npy
-
-#### 0.2. Download segmentation labels in VOC format from
-####      https://drive.google.com/file/d/1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV/view
-gdown 1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV
-
-#### 0.3. Unzip everything.
-unzip train2014.zip
-unzip val2014.zip
-unzip coco_annotations_semantic.zip
-mv coco_annotations_semantic/coco_seg_anno .
-rm coco_annotations_semantic -r
-
-cd $WORK_DIR
-
-### Run steps 1 through 4 as described above.
 ```

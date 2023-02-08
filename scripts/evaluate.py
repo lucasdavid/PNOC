@@ -38,7 +38,9 @@ parser.add_argument('--step_th', default=0.05, type=float)
 
 
 def compare(dataset, classes, start, step, TP, P, T):
-  skipped = 0
+  compared = missing = 0
+  corrupted = []
+  
   for idx in range(start, len(dataset), step):
     image_id, image_path, mask_path = dataset[idx]
 
@@ -56,7 +58,7 @@ def compare(dataset, classes, start, step, TP, P, T):
       try:
         data = np.load(npy_file, allow_pickle=True).item()
       except:
-        print(f'  {image_id}.npy is corrupted', file=sys.stderr)
+        corrupted.append(image_id)
         continue
 
       keys = data['keys']
@@ -76,7 +78,7 @@ def compare(dataset, classes, start, step, TP, P, T):
 
       cam = np.argmax(cam, axis=0)
     else:
-      skipped += 1
+      missing += 1
       continue
 
     if args.crf_t:
@@ -102,9 +104,14 @@ def compare(dataset, classes, start, step, TP, P, T):
       TP[i].acquire()
       TP[i].value += np.sum((y_true == i) * (y_pred == y_true) * valid_mask)
       TP[i].release()
+    
+    compared += 1
 
-  if start == 0 and skipped:
-    print(f"  {skipped} files were skipped because their predictions were not found")
+  if start == 0:
+    total = compared + missing + len(corrupted)
+    print(f"{compared} ({compared/total:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
+  if corrupted:
+    print(f"Corrupted files: {', '.join(corrupted)}", file=sys.stderr)
 
 
 def do_python_eval(dataset, classes, num_workers=8):
@@ -112,9 +119,9 @@ def do_python_eval(dataset, classes, num_workers=8):
   P = []
   T = []
   for i in range(len(classes)):
-    TP.append(multiprocessing.Value('i', 0, lock=True))
-    P.append(multiprocessing.Value('i', 0, lock=True))
-    T.append(multiprocessing.Value('i', 0, lock=True))
+    TP.append(multiprocessing.Value('L', 0, lock=True))
+    P.append(multiprocessing.Value('L', 0, lock=True))
+    T.append(multiprocessing.Value('L', 0, lock=True))
 
   p_list = []
   for i in range(num_workers):
@@ -160,7 +167,8 @@ def run(args, dataset):
   columns = ['threshold', *classes, 'overall', 'foreground']
   report_iou = []
 
-  miou_ = threshold_ = fp_ = 0.
+  miou_ = None
+  threshold_ = fp_ = 0.
   iou_ = {}
   miou_history = []
   fp_history = []
@@ -191,7 +199,7 @@ def run(args, dataset):
       'evaluation/iou': wandb.Table(columns=columns, data=report_iou)
     }
 
-    if r['mIoU'] > miou_:
+    if miou_ is None or r['mIoU'] > miou_:
       threshold_ = t
       miou_ = r['mIoU']
       fp_ = r['fp_all']
