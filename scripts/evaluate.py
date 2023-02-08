@@ -33,7 +33,7 @@ parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
 parser.add_argument('--mode', default='npy', type=str)  # png, rw
 parser.add_argument('--min_th', default=0.05, type=float)
-parser.add_argument('--max_th', default=0.50, type=float)
+parser.add_argument('--max_th', default=0.81, type=float)
 parser.add_argument('--step_th', default=0.05, type=float)
 
 
