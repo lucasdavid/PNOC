@@ -183,10 +183,10 @@ $PY scripts/rw/make_affinity_labels.py  \
     --bg_threshold $BG                  \
     --crf_t        $CRF_T               \
     --crf_gt_prob  $CRF_GT              \
-    --cams_dir ./experiments/predictions/$PNOC_CAMS  \
-    --sal_dir  ./experiments/predictions/$PN_TAG     \
+    --cams_dir ./experiments/predictions/$PNOC_CAMS \
+    --sal_dir  ./experiments/predictions/$PN_TAG    \
     --num_workers  $WORKERS             \
-    --domain       $D_TRAIN        \
+    --domain       $D_TRAIN             \
     --dataset      $DATASET             \
     --data_dir     $DATA_DIR
 
@@ -194,19 +194,19 @@ $PY scripts/rw/make_affinity_labels.py  \
 CUDA_VISIBLE_DEVICES=$DEVICES    \
 $PY scripts/rw/train_affinity.py \
     --tag          $RW_TAG       \
-    --architecture $ARCH \
-    --batch_size   $B        \
+    --architecture $ARCH         \
+    --batch_size   $B            \
     --label_dir    ./experiments/predictions/$RW_TAG  \
     --dataset      $DATASET      \
     --data_dir     $DATA_DIR
 
 # 3.3 Affinity Random Walk
 CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/rw/inference.py --domain $D_TRAIN \
-  --architecture $ARCH --model_name $RW_TAG --cam_dir $PNOC_TAG          \
+  --architecture $ARCH --model_name $RW_TAG --cam_dir $PNOC_TAG             \
   --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR
 
 CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/rw/inference.py --domain $D_VAL \
-  --architecture $ARCH --model_name $RW_TAG --cam_dir $PNOC_TAG          \
+  --architecture $ARCH --model_name $RW_TAG --cam_dir $PNOC_TAG           \
   --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR
 
 # 3.4 Generate pseudo labels
@@ -215,14 +215,14 @@ CRF_T=1
 CRF_P=0.9
 RW_LABELS=$RW_TAG@beta=10@exp_times=8@rw@crf=$CRF_T
 
-CUDA_VISIBLE_DEVICES="" $PY scripts/segmentation/make_pseudo_labels.py          \
+CUDA_VISIBLE_DEVICES="" $PY scripts/segmentation/make_pseudo_labels.py     \
   --experiment_name $RW_TAG@train@beta=10@exp_times=8@rw --domain $D_TRAIN \
-  --threshold $T --crf_t $CRF_T --crf_gt_prob $CRF_P                            \
-  --dataset $DATASET --data_dir $DATA_DIR                                       &
-CUDA_VISIBLE_DEVICES="" $PY scripts/segmentation/make_pseudo_labels.py          \
-  --experiment_name $RW_TAG@val@beta=10@exp_times=8@rw --domain $D_VAL   \
-  --threshold $T --crf_t $CRF_T --crf_gt_prob $CRF_P                            \
-  --dataset $DATASET --data_dir $DATA_DIR                                       &
+  --threshold $T --crf_t $CRF_T --crf_gt_prob $CRF_P                       \
+  --dataset $DATASET --data_dir $DATA_DIR                                  &
+CUDA_VISIBLE_DEVICES="" $PY scripts/segmentation/make_pseudo_labels.py     \
+  --experiment_name $RW_TAG@val@beta=10@exp_times=8@rw --domain $D_VAL     \
+  --threshold $T --crf_t $CRF_T --crf_gt_prob $CRF_P                       \
+  --dataset $DATASET --data_dir $DATA_DIR                                  &
 wait
 
 # Merge train and val pseudo labels into a single folder:
@@ -259,3 +259,12 @@ $PY scripts/segmentation/inference.py --tag $SEGM_TAG        \
   --backbone $ARCH --use_gn true --crf_t 1 --crf_gt_prob 0.9 \
   --dataset $DATASET --domain $DOMAIN --data_dir $DATA_DIR
 ```
+
+
+## Results
+### Pascal VOC 2012 (test)
+
+| bg | a.plane | bike | bird  | boat  | bottle | bus   | car   | cat   | chair | cow   | d.table | dog   | horse | m.bike | person | p.plant | sheep | sofa  | train | tv | Overall |
+| ---------- | --------- | ------- | ----- | ----- | ------ | ----- | ----- | ----- | ----- | ----- | ----------- | ----- | ----- | --------- | ------ | ----------- | ----- | ----- | ----- | --------- | ------- |
+| 91.55      | 86.74     | 38.28   | 89.29 | 61.13 | 74.81  | 92.01 | 86.57 | 89.91 | 20.53 | 85.81 | 56.98       | 90.21 | 83.53 | 83.38     | 80.78  | 67.99       | 86.96 | 47.09 | 62.76 | 43.09     | 72.35   |
+| 91.36      | 86.70     | 35.18   | 87.84 | 62.89 | 71.57  | 92.97 | 86.33 | 92.34 | 30.43 | 85.79 | 60.68       | 91.73 | 81.70 | 82.72     | 66.30  | 65.85       | 88.75 | 48.71 | 72.48 | 44.48     | 72.70   |
