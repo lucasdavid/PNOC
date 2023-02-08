@@ -21,8 +21,8 @@ def _decode_id(sample_id):
   return s
 
 
-def _load_labels_from_npy(images):
-  filepath = os.path.join(DATA_DIR, 'cls_labels_coco.npy')
+def _load_labels_from_npy(images, root_dir):
+  filepath = os.path.join(root_dir, 'cls_labels.npy')
   cls_labels_dict = np.load(filepath, allow_pickle=True).item()
   return np.array([cls_labels_dict[int(img_name)] for img_name in images])
 
@@ -34,12 +34,14 @@ def _load_images_list(domain):
 
 class COCO14Dataset(Dataset):
 
+  IGNORE_BG_IMAGES = False
+
   def __init__(self, root_dir, domain, transform=None):
     self.root_dir = root_dir
     self.domain = domain
     self.transform = transform
     self.img_name_list = _load_images_list(domain)
-    self.label_list = _load_labels_from_npy(self.img_name_list)
+    self.label_list = _load_labels_from_npy(self.img_name_list, root_dir)
 
   def __len__(self):
     return len(self.img_name_list)
@@ -50,13 +52,13 @@ class COCO14Dataset(Dataset):
   def get_image_path(self, image_id):
     return os.path.join(self.root_dir, IMAGES_DIR, f"COCO_{self.domain}_{image_id}.jpg")
 
-  def load_sample_with_labels(self, idx, ignore_bg_only=True):
+  def load_sample_with_labels(self, idx):
     import cv2
     cv2.setNumThreads(0)
     label = self.label_list[idx]
 
-    if ignore_bg_only and label.sum() == 0:
-      return self.load_sample_with_labels(idx + 1, ignore_bg_only)
+    if self.IGNORE_BG_IMAGES and label.sum() == 0:
+      return self.load_sample_with_labels(idx + 1)
 
     image_id = _decode_id(self.img_name_list[idx])
     file_path = self.get_image_path(image_id)
@@ -66,6 +68,8 @@ class COCO14Dataset(Dataset):
 
 
 class ClassificationDataset(COCO14Dataset):
+
+  IGNORE_BG_IMAGES = True
 
   def __getitem__(self, idx):
     _, image, label = super().__getitem__(idx)

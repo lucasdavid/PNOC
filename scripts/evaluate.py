@@ -91,7 +91,6 @@ def compare(dataset, classes, start, step, TP, P, T):
       y_true = np.array(y_true)
 
     valid_mask = y_true < 255
-    mask = (y_pred == y_true) * valid_mask
 
     for i in range(len(classes)):
       P[i].acquire()
@@ -101,7 +100,7 @@ def compare(dataset, classes, start, step, TP, P, T):
       T[i].value += np.sum((y_true == i) * valid_mask)
       T[i].release()
       TP[i].acquire()
-      TP[i].value += np.sum((y_true == i) * mask)
+      TP[i].value += np.sum((y_true == i) * (y_pred == y_true) * valid_mask)
       TP[i].release()
 
   if start == 0 and skipped:
