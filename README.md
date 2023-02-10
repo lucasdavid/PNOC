@@ -1,9 +1,24 @@
-# Research Weakly Supervised
+# Revisiting Weakly Supervised Semantic Segmentation: Obtaining Robust Segmentation Priors with Complementary Regularizing Strategies
 
-Studying regularization strategies for WSSS.
-Experiments were run over LNCC SDumont infrastructure.
+**News**
 
-Many of the code lines here were borrowed from OC-CSE, Puzzle-CAM and CCAM repositories.
+* Currently under peer-review in IJCAI23.
+* Experiments were run over LNCC SDumont infrastructure.
+
+## Introduction
+
+This respository contains the official implementation for the paper "Revisiting Weakly Supervised Semantic 
+Segmentation: Obtaining Robust Segmentation Priors with Complementary Regularizing Strategies".
+
+![Diagram for the proposed P-NOC (Puzzle-Not so Ordinary Classifier) training setup.](assets/diagram-p-noc.png)
+
+## Results
+### Pascal VOC 2012 (test)
+
+| Method | bg | a.plane | bike | bird  | boat  | bottle | bus   | car   | cat   | chair | cow   | d.table | dog   | horse | m.bike | person | p.plant | sheep | sofa  | train | tv | Overall |
+| ---------- | ---------- | --------- | ------- | ----- | ----- | ------ | ----- | ----- | ----- | ----- | ----- | ----------- | ----- | ----- | --------- | ------ | ----------- | ----- | ----- | ----- | --------- | ------- |
+| P-OC | 91.55      | 86.74     | 38.28   | 89.29 | 61.13 | 74.81  | 92.01 | 86.57 | 89.91 | 20.53 | 85.81 | 56.98       | 90.21 | 83.53 | 83.38     | 80.78  | 67.99       | 86.96 | 47.09 | 62.76 | 43.09     | 72.35   |
+| P-NOC | 91.36      | 86.70     | 35.18   | 87.84 | 62.89 | 71.57  | 92.97 | 86.33 | 92.34 | 30.43 | 85.79 | 60.68       | 91.73 | 81.70 | 82.72     | 66.30  | 65.85       | 88.75 | 48.71 | 72.48 | 44.48     | 72.70   |
 
 ## Setup
 ### Pascal VOC 2012
@@ -260,11 +275,7 @@ $PY scripts/segmentation/inference.py --tag $SEGM_TAG        \
   --dataset $DATASET --domain $DOMAIN --data_dir $DATA_DIR
 ```
 
+## Acknowledgements
 
-## Results
-### Pascal VOC 2012 (test)
-
-| bg | a.plane | bike | bird  | boat  | bottle | bus   | car   | cat   | chair | cow   | d.table | dog   | horse | m.bike | person | p.plant | sheep | sofa  | train | tv | Overall |
-| ---------- | --------- | ------- | ----- | ----- | ------ | ----- | ----- | ----- | ----- | ----- | ----------- | ----- | ----- | --------- | ------ | ----------- | ----- | ----- | ----- | --------- | ------- |
-| 91.55      | 86.74     | 38.28   | 89.29 | 61.13 | 74.81  | 92.01 | 86.57 | 89.91 | 20.53 | 85.81 | 56.98       | 90.21 | 83.53 | 83.38     | 80.78  | 67.99       | 86.96 | 47.09 | 62.76 | 43.09     | 72.35   |
-| 91.36      | 86.70     | 35.18   | 87.84 | 62.89 | 71.57  | 92.97 | 86.33 | 92.34 | 30.43 | 85.79 | 60.68       | 91.73 | 81.70 | 82.72     | 66.30  | 65.85       | 88.75 | 48.71 | 72.48 | 44.48     | 72.70   |
+Much of the code here was borrowed from psa, OC-CSE, Puzzle-CAM and CCAM repositories.
+We thank the authors for their considerable contributions and efforts.
