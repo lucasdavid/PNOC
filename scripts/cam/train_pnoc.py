@@ -48,6 +48,7 @@ parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
 parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
+parser.add_argument('--oc-persist', default=False, type=str2bool)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)
@@ -55,7 +56,6 @@ parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
-parser.add_argument('--persist_oc', default=False, type=str2bool)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -474,7 +474,7 @@ if __name__ == '__main__':
 
       print(f'saving weights `{model_path}`\n')
       save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
-      if args.persist_oc:
+      if args.oc_persist:
         save_model(ocnet, oc_model_path, parallel=GPUS_COUNT > 1)
 
   write_json(data_path, data_dic)

@@ -7,7 +7,6 @@ from torch.utils.data import Dataset
 
 from core.aff_utils import *
 
-IMAGES_DIR = "JPEGImages"
 MASKS_DIR = "coco_seg_anno"
 IGNORE = 255
 
@@ -50,7 +49,7 @@ class COCO14Dataset(Dataset):
     return self.load_sample_with_labels(idx)
 
   def get_image_path(self, image_id):
-    return os.path.join(self.root_dir, IMAGES_DIR, f"COCO_{self.domain}_{image_id}.jpg")
+    return os.path.join(self.root_dir, self.domain, f"COCO_{self.domain}_{image_id}.jpg")
 
   def load_sample_with_labels(self, idx):
     import cv2

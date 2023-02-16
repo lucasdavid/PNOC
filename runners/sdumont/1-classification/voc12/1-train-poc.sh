@@ -141,7 +141,7 @@ run_inference () {
 
 OC_MASK_GN=true
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
+OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
 OC_ARCHITECTURE=resnest269
 LABELSMOOTHING=0.1
 TAG=$DATASET-$ARCH-poc-ls$LABELSMOOTHING-noocgn@$OC_NAME-r1

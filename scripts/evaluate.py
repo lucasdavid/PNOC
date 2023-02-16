@@ -82,10 +82,17 @@ def compare(dataset, classes, start, step, TP, P, T):
       continue
 
     if args.crf_t:
-      with Image.open(image_path) as img:
-        cam = crf_inference_label(
-          np.asarray(img), cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob
-        )
+      try:
+        with Image.open(image_path) as img:
+          img = np.asarray(img.convert('RGB'))
+          cam = crf_inference_label(
+            img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob
+          )
+      except ValueError as error:
+        print(f"dCRF inference error for id={image_id} img.size={img.shape} "
+              f"cam={cam.shape} labels={keys}:", error,
+              file=sys.stderr)
+        corrupted.append(image_id)
 
     y_pred = keys[cam]
 
