@@ -4,119 +4,121 @@ import os
 import sys
 
 import numpy as np
-import pandas as pd
 from PIL import Image
 
 import wandb
 from core.datasets import get_paths_dataset
 from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
-from tools.general.io_utils import load_saliency_file, load_background_file
-
-SAL_MODES = ('saliency', 'segmentation')
+from tools.general.io_utils import load_saliency_file
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--experiment_name', type=str, required=True)
-parser.add_argument('--num_workers', default=48, type=int)
+parser.add_argument("--experiment_name", type=str, required=True)
+parser.add_argument("--num_workers", default=48, type=int)
 parser.add_argument("--threshold", default=None, type=float)
 
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
-parser.add_argument("--domain", default='train', type=str)
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
-parser.add_argument("--pred_dir", default='', type=str)
-parser.add_argument('--sal_dir', default=None, type=str)
-parser.add_argument('--sal_mode', default='saliency', type=str, choices=SAL_MODES)
+parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
+parser.add_argument("--domain", default="train", type=str)
+parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=str)
+parser.add_argument("--pred_dir", default="", type=str)
+parser.add_argument("--sal_dir", default=None, type=str)
+parser.add_argument("--sal_mode", default="saliency", type=str, choices=("saliency", "segmentation"))
 parser.add_argument("--sal_threshold", default=None, type=float)
 
-parser.add_argument('--crf_t', default=0, type=int)
-parser.add_argument('--crf_gt_prob', default=0.7, type=float)
+parser.add_argument("--crf_t", default=0, type=int)
+parser.add_argument("--crf_gt_prob", default=0.7, type=float)
 
-parser.add_argument('--mode', default='npy', type=str)  # png, rw
-parser.add_argument('--min_th', default=0.05, type=float)
-parser.add_argument('--max_th', default=0.81, type=float)
-parser.add_argument('--step_th', default=0.05, type=float)
+parser.add_argument("--mode", default="npy", type=str)  # png, rw
+parser.add_argument("--min_th", default=0.05, type=float)
+parser.add_argument("--max_th", default=0.81, type=float)
+parser.add_argument("--step_th", default=0.05, type=float)
 
 
 def compare(dataset, classes, start, step, TP, P, T):
   compared = missing = 0
   corrupted = []
-  
-  for idx in range(start, len(dataset), step):
-    image_id, image_path, mask_path = dataset[idx]
 
-    npy_file = os.path.join(PRED_DIR, image_id + '.npy')
-    png_file = os.path.join(PRED_DIR, image_id + '.png')
-    sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None
+  try:
+    for idx in range(start, len(dataset), step):
+      image_id, image_path, mask_path = dataset[idx]
 
-    if os.path.exists(png_file):
-      with Image.open(png_file) as y_pred:
-        y_pred = np.array(y_pred)
-      keys, cam = np.unique(y_pred, return_inverse=True)
-      cam = cam.reshape(y_pred.shape)
+      npy_file = os.path.join(PRED_DIR, image_id + ".npy")
+      png_file = os.path.join(PRED_DIR, image_id + ".png")
+      sal_file = os.path.join(SAL_DIR, image_id + ".png") if SAL_DIR else None
 
-    elif os.path.exists(npy_file):
-      try:
-        data = np.load(npy_file, allow_pickle=True).item()
-      except:
-        corrupted.append(image_id)
+      if os.path.exists(png_file):
+        with Image.open(png_file) as y_pred:
+          y_pred = np.array(y_pred)
+        keys, cam = np.unique(y_pred, return_inverse=True)
+        cam = cam.reshape(y_pred.shape)
+
+      elif os.path.exists(npy_file):
+        try:
+          data = np.load(npy_file, allow_pickle=True).item()
+        except:
+          corrupted.append(image_id)
+          continue
+
+        keys = data["keys"]
+
+        if "hr_cam" in data.keys():
+          cam = data["hr_cam"]
+        elif "rw" in data.keys():
+          cam = data["rw"]
+
+        if sal_file:
+          sal = load_saliency_file(sal_file, args.sal_mode)
+          bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
+
+          cam = np.concatenate((bg, cam), axis=0)
+        else:
+          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
+
+        cam = np.argmax(cam, axis=0)
+      else:
+        missing += 1
         continue
 
-      keys = data['keys']
-
-      if 'hr_cam' in data.keys():
-        cam = data['hr_cam']
-      elif 'rw' in data.keys():
-        cam = data['rw']
-
-      if sal_file:
-        sal = load_saliency_file(sal_file, args.sal_mode)
-        bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
-
-        cam = np.concatenate((bg, cam), axis=0)
-      else:
-        cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
-
-      cam = np.argmax(cam, axis=0)
-    else:
-      missing += 1
-      continue
-
-    if args.crf_t:
-      try:
-        with Image.open(image_path) as img:
-          img = np.asarray(img.convert('RGB'))
-          cam = crf_inference_label(
-            img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob
+      if args.crf_t:
+        try:
+          with Image.open(image_path) as img:
+            img = np.asarray(img.convert("RGB"))
+          cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+        except ValueError as error:
+          print(
+            f"dCRF inference error for id={image_id} img.size={img.shape} "
+            f"cam={cam.shape} labels={keys}:",
+            error,
+            file=sys.stderr
           )
-      except ValueError as error:
-        print(f"dCRF inference error for id={image_id} img.size={img.shape} "
-              f"cam={cam.shape} labels={keys}:", error,
-              file=sys.stderr)
-        corrupted.append(image_id)
+          corrupted.append(image_id)
 
-    y_pred = keys[cam]
+      y_pred = keys[cam]
 
-    with Image.open(mask_path) as y_true:
-      y_true = np.array(y_true)
+      with Image.open(mask_path) as y_true:
+        y_true = np.array(y_true)
 
-    valid_mask = y_true < 255
+      valid_mask = y_true < 255
 
-    for i in range(len(classes)):
-      P[i].acquire()
-      P[i].value += np.sum((y_pred == i) * valid_mask)
-      P[i].release()
-      T[i].acquire()
-      T[i].value += np.sum((y_true == i) * valid_mask)
-      T[i].release()
-      TP[i].acquire()
-      TP[i].value += np.sum((y_true == i) * (y_pred == y_true) * valid_mask)
-      TP[i].release()
-    
-    compared += 1
+      for i in range(len(classes)):
+        P[i].acquire()
+        P[i].value += np.sum((y_pred == i) * valid_mask)
+        P[i].release()
+        T[i].acquire()
+        T[i].value += np.sum((y_true == i) * valid_mask)
+        T[i].release()
+        TP[i].acquire()
+        TP[i].value += np.sum((y_true == i) * (y_pred == y_true) * valid_mask)
+        TP[i].release()
+
+      compared += 1
+
+  except KeyboardInterrupt:
+    ...
 
   if start == 0:
-    total = compared + missing + len(corrupted)
-    print(f"{compared} ({compared/total:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
+    read = compared + missing + len(corrupted)
+    print(f"{compared} ({compared/read:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
   if corrupted:
     print(f"Corrupted files: {', '.join(corrupted)}", file=sys.stderr)
 
@@ -126,9 +128,9 @@ def do_python_eval(dataset, classes, num_workers=8):
   P = []
   T = []
   for i in range(len(classes)):
-    TP.append(multiprocessing.Value('L', 0, lock=True))
-    P.append(multiprocessing.Value('L', 0, lock=True))
-    T.append(multiprocessing.Value('L', 0, lock=True))
+    TP.append(multiprocessing.Value("L", 0, lock=True))
+    P.append(multiprocessing.Value("L", 0, lock=True))
+    T.append(multiprocessing.Value("L", 0, lock=True))
 
   p_list = []
   for i in range(num_workers):
@@ -160,18 +162,18 @@ def do_python_eval(dataset, classes, num_workers=8):
   fp_all = np.mean(np.array(FP_ALL)[1:])
   fn_all = np.mean(np.array(FN_ALL)[1:])
   miou_foreground = np.mean(np.array(IoU)[1:])
-  loglist['mIoU'] = miou * 100
-  loglist['t_tp'] = t_tp
-  loglist['p_tp'] = p_tp
-  loglist['fp_all'] = fp_all
-  loglist['fn_all'] = fn_all
-  loglist['miou_foreground'] = miou_foreground
+  loglist["mIoU"] = miou * 100
+  loglist["t_tp"] = t_tp
+  loglist["p_tp"] = p_tp
+  loglist["fp_all"] = fp_all
+  loglist["fn_all"] = fn_all
+  loglist["miou_foreground"] = miou_foreground
   return loglist
 
 
 def run(args, dataset):
-  classes = ['background'] + dataset.info.classes.tolist()
-  columns = ['threshold', *classes, 'overall', 'foreground']
+  classes = ["background"] + dataset.info.classes.tolist()
+  columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 
   miou_ = None
@@ -185,55 +187,59 @@ def run(args, dataset):
     if args.threshold is None and SAL_DIR is None and args.mode != "png" else [args.threshold]
   )
 
-  for t in thresholds:
-    args.threshold = t
-    r = do_python_eval(dataset, classes, num_workers=args.num_workers)
+  try:
+    for t in thresholds:
+      args.threshold = t
+      r = do_python_eval(dataset, classes, num_workers=args.num_workers)
 
-    print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
+      print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
 
-    fp_history.append(r['fp_all'])
-    miou_history.append(r['mIoU'])
+      fp_history.append(r["fp_all"])
+      miou_history.append(r["mIoU"])
 
-    report_iou.append([t] + [r[c] for c in classes] + [r['mIoU'], r['miou_foreground']])
-    
-    logs = {
-      'evaluation/t': t,
-      'evaluation/miou': r['mIoU'],
-      'evaluation/miou_fg': r['miou_foreground'],
-      'evaluation/miou_bg': r['background'],
-      'evaluation/fp': r['fp_all'],
-      'evaluation/fn': r['fn_all'],
-      'evaluation/iou': wandb.Table(columns=columns, data=report_iou)
-    }
+      report_iou.append([t] + [r[c] for c in classes] + [r["mIoU"], r["miou_foreground"]])
 
-    if miou_ is None or r['mIoU'] > miou_:
-      threshold_ = t
-      miou_ = r['mIoU']
-      fp_ = r['fp_all']
-      iou_ = r
+      logs = {
+        "evaluation/t": t,
+        "evaluation/miou": r["mIoU"],
+        "evaluation/miou_fg": r["miou_foreground"],
+        "evaluation/miou_bg": r["background"],
+        "evaluation/fp": r["fp_all"],
+        "evaluation/fn": r["fn_all"],
+        "evaluation/iou": wandb.Table(columns=columns, data=report_iou)
+      }
 
-    wandb.log(logs)
+      if miou_ is None or r["mIoU"] > miou_:
+        threshold_ = t
+        miou_ = r["mIoU"]
+        fp_ = r["fp_all"]
+        iou_ = r
+
+      wandb.log(logs)
+
+  except KeyboardInterrupt:
+    print("\ninterrupted")
 
   print(
-    f'Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}',
-    '-' * 80,
-    *(f'{k:<12}\t{v:.5f}' for k, v in iou_.items()),
-    '-' * 80,
-    sep='\n'
+    f"Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}",
+    "-" * 80,
+    *(f"{k:<12}\t{v:.5f}" for k, v in iou_.items()),
+    "-" * 80,
+    sep="\n"
   )
 
-  wandb.run.summary[f'evaluation/best_t'] = threshold_
-  wandb.run.summary[f'evaluation/best_miou'] = miou_
-  wandb.run.summary[f'evaluation/best_fp'] = fp_
+  wandb.run.summary[f"evaluation/best_t"] = threshold_
+  wandb.run.summary[f"evaluation/best_miou"] = miou_
+  wandb.run.summary[f"evaluation/best_fp"] = fp_
 
-  if args.mode == 'rw':
+  if args.mode == "rw":
     a_over = 1.60
     a_under = 0.60
 
     fp_over = fp_ * a_over
     fp_under = fp_ * a_under
 
-    print('Over FP : {:.4f}, Under FP : {:.4f}'.format(fp_over, fp_under))
+    print("Over FP : {:.4f}, Under FP : {:.4f}".format(fp_over, fp_under))
 
     over_loss_list = [np.abs(FP - fp_over) for FP in fp_history]
     under_loss_list = [np.abs(FP - fp_under) for FP in fp_history]
@@ -248,28 +254,31 @@ def run(args, dataset):
     miou_under = miou_history[under_index]
     fp_under = fp_history[under_index]
 
-    print('Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(threshold_ or 0., miou_, fp_))
-    print('Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t_over or 0., miou_over, fp_over))
-    print('Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}'.format(t_under or 0., miou_under, fp_under))
+    print("Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(threshold_ or 0., miou_, fp_))
+    print("Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_over or 0., miou_over, fp_over))
+    print("Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_under or 0., miou_under, fp_under))
 
-    wandb.run.summary[f'evaluation/over_t'] = t_over
-    wandb.run.summary[f'evaluation/over_miou'] = miou_over
-    wandb.run.summary[f'evaluation/over_fp'] = fp_over
+    wandb.run.summary[f"evaluation/over_t"] = t_over
+    wandb.run.summary[f"evaluation/over_miou"] = miou_over
+    wandb.run.summary[f"evaluation/over_fp"] = fp_over
 
-    wandb.run.summary[f'evaluation/under_t'] = t_under
-    wandb.run.summary[f'evaluation/under_miou'] = miou_under
-    wandb.run.summary[f'evaluation/under_fp'] = fp_under
+    wandb.run.summary[f"evaluation/under_t"] = t_under
+    wandb.run.summary[f"evaluation/under_miou"] = miou_under
+    wandb.run.summary[f"evaluation/under_fp"] = fp_under
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   args = parser.parse_args()
   TAG = args.experiment_name
-  PRED_DIR = args.pred_dir or f'./experiments/predictions/{args.experiment_name}/'
+  PRED_DIR = args.pred_dir or f"./experiments/predictions/{args.experiment_name}/"
   SAL_DIR = args.sal_dir
 
-  wb_run = wandb_utils.setup(TAG, args, job_type="evaluation", tags=[
-    args.dataset, f'domain:{args.domain}', f"crf:{args.crf_t}-{args.crf_gt_prob}"
-  ])
+  wb_run = wandb_utils.setup(
+    TAG,
+    args,
+    job_type="evaluation",
+    tags=[args.dataset, f"domain:{args.domain}", f"crf:{args.crf_t}-{args.crf_gt_prob}"]
+  )
   wandb.define_metric("evaluation/t")
 
   dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
@@ -277,6 +286,6 @@ if __name__ == '__main__':
   try:
     run(args, dataset)
   except KeyboardInterrupt:
-    print('\ninterrupted')
+    print("\ninterrupted")
 
   wb_run.finish()

@@ -68,8 +68,8 @@ run_inference () {
     --data_dir       $DATA_DIR
 }
 
-DOMAIN=val2014
-TAG=poc/coco14-rs269-poc-b16-as2-lr0.1@rs269ra-r1
+DOMAIN=train2014
+TAG=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3
 run_inference
 
 # TAG=poc/coco14-rs101-poc@rs101

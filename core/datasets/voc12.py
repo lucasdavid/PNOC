@@ -249,6 +249,8 @@ class AffinityDataset(VOC12Dataset):
 
 class HRCAMsDataset(VOC12Dataset):
 
+  IGNORE_BG_IMAGES = True
+
   def __init__(self, root_dir, domain, cams_dir, transform):
     super().__init__(root_dir, domain, with_id=True, with_tags=True)
     self.cams_dir = cams_dir

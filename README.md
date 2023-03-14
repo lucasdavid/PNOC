@@ -7,7 +7,7 @@
 
 ## Introduction
 
-This respository contains the official implementation for the paper "Revisiting Weakly Supervised Semantic 
+This respository contains the official implementation for the paper "Revisiting Weakly Supervised Semantic
 Segmentation: Obtaining Robust Segmentation Priors with Complementary Regularizing Strategies".
 
 ![Diagram for the proposed P-NOC (Puzzle-Not so Ordinary Classifier) training setup.](assets/diagram-p-noc.png)
@@ -143,7 +143,7 @@ $PY scripts/evaluate.py --experiment_name $PNOC_CAMS --domain $D_TRAIN \
   --dataset $DATASET --data_dir $DATA_DIR --num_workers $WORKERS
 ```
 
-### 2 Train CCAM and generate saliency hints
+### 2 Train CCAM and generate pseudo saliency masks
 ```shell
 # 2.1 Train C²AM-H
 FG_T=0.3  # Might need fine-tuning. Usually a high value, inducing low FP for classes.
@@ -247,9 +247,9 @@ mv $RW_TAG@val@beta=10@exp_times=8@rw@crf=1/* $RW_LABELS/
 rm $RW_TAG@train@beta=10@exp_times=8@rw@crf=1 $RW_TAG@val@beta=10@exp_times=8@rw@crf=1 -r
 ```
 
-#### 4 Semantic Segmentation
+#### 4 Train DeepLabV3+ and generate semantic segmentation predictions
 ```shell
-# 4.2 Train DeepLabV3+
+# 4.1 Train DeepLabV3+
 SEGM_TAG=dlv3p-gn@an@pn@ccamh@rs269pnoc@rs269ra
 B=32
 AUG=colorjitter  # colorjitter_cutmix
@@ -267,7 +267,7 @@ $PY scripts/segmentation/train.py \
     --dataset         $DATASET    \
     --data_dir        $DATA_DIR
 
-# 4.3 Inference with DeepLabV3+ and TTA:
+# 4.2 Inference with DeepLabV3+ and TTA:
 DOMAIN=val
 CUDA_VISIBLE_DEVICES=$DEVICES                                \
 $PY scripts/segmentation/inference.py --tag $SEGM_TAG        \

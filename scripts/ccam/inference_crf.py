@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
 

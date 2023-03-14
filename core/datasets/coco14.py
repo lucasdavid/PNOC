@@ -157,6 +157,8 @@ class AffinityDataset(COCO14Dataset):
 
 class HRCAMsDataset(COCO14Dataset):
 
+  IGNORE_BG_IMAGES = True
+
   def __init__(self, root_dir, domain, cams_dir, transform):
     super().__init__(root_dir, domain, transform)
     self.cams_dir = cams_dir

@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-pn-%j.out
-#SBATCH --time=01:00:00
+#SBATCH --time=36:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -38,23 +38,19 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 PY=python3.9
 SOURCE=main_custom.py
 
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$SCRATCH/datasets/coco14/
+# DATASET=voc12
+# DOMAIN=train_aug
+# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DATASET=coco14
+DOMAIN=train2014
+DATA_DIR=$SCRATCH/datasets/coco14/
 
 LOGS_DIR=$SCRATCH/logs/ccam
 
 ARCHITECTURE=resnet  # resnet vgg
 
-# TAG=pn@ccamh-rs269@rs269poc
-# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
-# TAG=pn@ccamh-rs269@rs269poc-ls0.1
-# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
-# TAG=pn@ccamh-rs269@rs269pnoc-ls0.1
-# PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+TAG=coco14-pn@ccamh-rs269-fg0.2@rs269pnoc-ls0.1
+PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/coco14-ccamh-rs269@rs269pnoc@rs269@b64-fg0.3-lr0.0005-b64@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
 CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
   --arch        $ARCHITECTURE       \
@@ -64,7 +60,7 @@ CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
   --train_list  $DOMAIN             \
   --pseudo_root $PSEUDO_CUES
 
-MODEL_CKPT=./results/run-1/models/epoch_9.pth
+MODEL_CKPT=./results/run-0/models/epoch_9.pth
 
 CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
   --arch        $ARCHITECTURE       \

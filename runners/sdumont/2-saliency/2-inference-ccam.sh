@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J mk-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-%j.out
-#SBATCH --time=01:00:00
+#SBATCH --time=05:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -98,14 +98,27 @@ CRF_GT_PROB=0.9
 # run_inference
 # run_crf
 
-TAG=saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001
-PRETRAINED=./experiments/models/$TAG.pth
-T=0.2
-run_inference
-run_crf
+# TAG=saliency/voc12-ccamh-rs269@rs269poc-ls0.1-r3@fg0.4-h1.0-e10-b32-lr0.001
+# PRETRAINED=./experiments/models/$TAG.pth
+# T=0.2
+# run_inference
+# run_crf
 
-TAG=saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001
+# TAG=saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001
+# PRETRAINED=./experiments/models/$TAG.pth
+# T=0.2
+# run_inference
+# run_crf
+
+## =============================================================================
+## # MS COCO 2014
+##
+
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+DOMAIN=train2014
+TAG=saliency/coco14-ccamh-rs269@rs269pnoc@rs269@b64-fg0.3-lr0.0005-b64
 PRETRAINED=./experiments/models/$TAG.pth
 T=0.2
-run_inference
+# run_inference
 run_crf
