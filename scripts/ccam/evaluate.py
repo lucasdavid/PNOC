@@ -85,16 +85,9 @@ def compare(args, dataset, classes, start, step, TP, P, T):
           img = np.asarray(img.convert("RGB"))
         s_pred = crf_inference_label(img, s_pred, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
 
-      try:
-        with Image.open(mask_path) as y_true:
-          y_true = np.asarray(y_true)
-        valid_mask = y_true < 255
-      except Exception as error:
-        print("***** CONTEXT")
-        print(f"image_id={image_id}, image_path={image_path}, mask_path={mask_path}")
-        print(np.unique(y_true, return_counts=True))
-        corrupted.append(image_id)
-        continue
+      with Image.open(mask_path) as y_true:
+        y_true = np.asarray(y_true)
+      valid_mask = y_true < 255
 
       if args.eval_mode == "saliency":
         # Segmentation to saliency map:
@@ -107,13 +100,17 @@ def compare(args, dataset, classes, start, step, TP, P, T):
       else:
         # Predicted saliency to segmentation map, assuming perfect pixel segm.:
         fg_pred = s_pred == 1
-        fg_true = ~np.isin(y_true, [0, 255])
+        fg_true = ~np.isin(y_true, [0, 255])  # [[0, 1], [2, 0]] --> [[0, 1], [1, 0]]
 
-        # does not leak true bg:
+        # Do not leak true bg by simulating the prediction of a random
+        # class in the label set. If it only contains bg, take any class.
         random_pixels = np.unique(y_true[fg_true].ravel())
+        if not random_pixels.shape or random_pixels.shape[0] == 0:
+          random_pixels = list(range(1, len(classes)))
         random_pixels = np.random.choice(random_pixels, size=y_true.shape)
+
         y_pred = fg_true * y_true + ~fg_true * random_pixels
-        y_pred[~fg_pred] = 0
+        y_pred[~fg_pred] = 0  # remove all random pixels if the prediction was correct.
 
       mask = (y_pred == y_true) * valid_mask
 
@@ -279,7 +276,6 @@ if __name__ == "__main__":
     TAG,
     args,
     job_type="evaluation-saliency",
-    tags=[args.dataset, f"domain:{args.domain}", f"crf:{args.crf_t}-{args.crf_gt_prob}", "ccam"]
   )
   wandb.define_metric("evaluation/t")
 

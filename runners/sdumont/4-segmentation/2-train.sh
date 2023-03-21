@@ -66,7 +66,7 @@ IMAGE_SIZE=512
 MIN_IMAGE_SIZE=256
 MAX_IMAGE_SIZE=1024
 
-AUGMENT=colorjitter
+AUGMENT=colorjitter  # colorjitter_randaug_cutmix_mixup_cutormixup
 CUTMIX=0.5
 MIXUP=1.
 LABELSMOOTHING=0  # 0.1

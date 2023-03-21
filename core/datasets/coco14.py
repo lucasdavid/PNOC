@@ -35,11 +35,18 @@ class COCO14Dataset(Dataset):
 
   IGNORE_BG_IMAGES = False
 
-  def __init__(self, root_dir, domain, transform=None):
+  def __init__(self, root_dir, domain, transform=None, sample_ids=None):
     self.root_dir = root_dir
     self.domain = domain
     self.transform = transform
-    self.img_name_list = _load_images_list(domain)
+    if sample_ids is None:
+      self.img_name_list = _load_images_list(domain)
+    else:
+      self.img_name_list = (
+        sample_ids.split(",")
+        if isinstance(sample_ids, str)
+        else sample_ids
+      )
     self.label_list = _load_labels_from_npy(self.img_name_list, root_dir)
 
   def __len__(self):
@@ -92,8 +99,8 @@ class InferenceDataset(COCO14Dataset):
 
 class CAMEvaluationDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, transform=None, masks_dir=None):
-    super().__init__(root_dir, domain, transform)
+  def __init__(self, root_dir, domain, transform=None, masks_dir=None, sample_ids=None):
+    super().__init__(root_dir=root_dir, domain=domain, transform=transform, sample_ids=sample_ids)
 
     self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
 
@@ -120,8 +127,8 @@ class SegmentationDataset(CAMEvaluationDataset):
 
 class PathsDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, masks_dir=None):
-    super().__init__(root_dir, domain)
+  def __init__(self, root_dir, domain, masks_dir=None, sample_ids=None):
+    super().__init__(root_dir=root_dir, domain=domain, sample_ids=sample_ids)
 
     self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
 
@@ -135,8 +142,10 @@ class PathsDataset(COCO14Dataset):
 
 class AffinityDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
-    super().__init__(root_dir, domain, transform=transform)
+  IGNORE_BG_IMAGES = True
+
+  def __init__(self, root_dir, domain, path_index, label_dir, transform=None, sample_ids=None):
+    super().__init__(root_dir, domain, transform=transform, sample_ids=sample_ids)
 
     self.label_dir = label_dir
     self.path_index = path_index
@@ -159,8 +168,8 @@ class HRCAMsDataset(COCO14Dataset):
 
   IGNORE_BG_IMAGES = True
 
-  def __init__(self, root_dir, domain, cams_dir, transform):
-    super().__init__(root_dir, domain, transform)
+  def __init__(self, root_dir, domain, cams_dir, transform, sample_ids=None):
+    super().__init__(root_dir, domain, transform, sample_ids=sample_ids)
     self.cams_dir = cams_dir
 
   def __getitem__(self, index):

@@ -49,6 +49,7 @@ parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--activation', default='relu', type=str, choices=['relu', 'sigmoid'])
 
+
 GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
 GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 
@@ -152,4 +153,3 @@ if __name__ == '__main__':
 
   set_seed(SEED)
   run(args)
-

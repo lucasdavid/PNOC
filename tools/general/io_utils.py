@@ -27,11 +27,13 @@ def str2bool(v):
 
 
 def load_saliency_file(sal_file, kind='saliency'):
+
+  with Image.open(sal_file) as s:
+    s = np.asarray(s)
+
   if kind == 'saliency':
-    s = np.array(Image.open(sal_file)).astype(float)
-    s = s / 255.
+    s = s.astype(float) / 255.
   elif kind == 'segmentation':
-    s = np.array(Image.open(sal_file))
     s = (~np.isin(s, [0, 255])).astype(float)
 
   if len(s.shape) == 2:

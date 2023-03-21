@@ -58,9 +58,29 @@ class VOCImageDataTest(data.Dataset):
     return len(self.sal_list)
 
 
-class COCOImageDataTrain(coco14.PathsDataset):
+class PadIfSmallerMixin:
+  min_size = 224
 
-  def __init__(self, root_dir, domain, masks_dir=None, min_size=500):
+  def pad_if_smaller_than_min_size(self, image, sal=None):
+    if self.min_size:
+      _, h, w = image.shape
+      if h <= self.min_size or w <= self.min_size:
+        sizes_pad = (max(h, self.min_size), max(w, self.min_size))
+        i_pad = np.zeros((image.shape[0], *sizes_pad), dtype=image.dtype)
+        i_pad[:, :h, :w] = image
+        image = i_pad
+
+        if sal is not None:
+          sal_pad = np.zeros((sal.shape[0], *sizes_pad), dtype=sal.dtype)
+          sal_pad[:, :h, :w] = sal
+          sal = sal_pad
+
+    return image, sal
+
+
+class COCOImageDataTrain(PadIfSmallerMixin, coco14.PathsDataset):
+
+  def __init__(self, root_dir, domain, masks_dir=None, min_size=224):
     super().__init__(root_dir, domain, masks_dir=masks_dir)
     self.min_size = min_size
 
@@ -69,35 +89,31 @@ class COCOImageDataTrain(coco14.PathsDataset):
 
     img = load_image(image_path)
     sal = load_sal_label(mask_path)
-
-    if self.min_size:
-      _, h, w = img.shape
-      if h <= self.min_size or w <= self.min_size:
-        sizes_pad = (max(h, self.min_size), max(w, self.min_size))
-        i_pad = np.zeros((img.shape[0], *sizes_pad), dtype=img.dtype)
-        i_pad[:, :h, :w] = img
-        img = i_pad
-
-        sal_pad = np.zeros((sal.shape[0], *sizes_pad), dtype=sal.dtype)
-        sal_pad[:, :h, :w] = sal
-        sal = sal_pad
-
     img, sal = cv_random_flip(img, sal)
+    h, w = img.shape[1:]
+
+    img, sal = self.pad_if_smaller_than_min_size(img, sal)
     img = torch.Tensor(img)
     sal = torch.Tensor(sal)
 
-    return {'sal_image': img, 'sal_label': sal, 'image_id': image_id}
+    return {'sal_image': img, 'sal_label': sal, 'image_id': image_id, "height": h, "width": w}
 
 
-class COCOImageDataTest(coco14.PathsDataset):
+class COCOImageDataTest(PadIfSmallerMixin, coco14.PathsDataset):
+  def __init__(self, root_dir, domain, min_size=224):
+    super().__init__(root_dir, domain)
+    self.min_size = min_size
 
   def __getitem__(self, item):
     image_id, image_path, _ = super().__getitem__(item)
 
     img = load_image(image_path)
+    h, w = img.shape[1:]
+
+    img, _ = self.pad_if_smaller_than_min_size(img)
     img = torch.Tensor(img)
 
-    return {'sal_image': img, 'image_id': image_id}
+    return {'sal_image': img, 'image_id': image_id, "height": h, "width": w}
 
 
 # ------------------------------------ added by sierkinhane ------------------------------------#

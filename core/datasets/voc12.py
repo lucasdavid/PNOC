@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 import imageio
 import numpy as np
@@ -68,7 +69,14 @@ def get_color_map_dic():
 class VOC12Dataset(torch.utils.data.Dataset):
 
   def __init__(
-    self, root_dir, domain, masks_dir=None, with_image=True, with_id=False, with_tags=False, with_mask=False
+    self, root_dir,
+    domain: str,
+    masks_dir: str = None,
+    with_image: bool = True,
+    with_id: bool = False,
+    with_tags: bool = False,
+    with_mask: bool = False,
+    sample_ids: List[str] = None,
   ):
     self.root_dir = root_dir
     self.image_dir = os.path.join(self.root_dir, 'JPEGImages/')
@@ -77,9 +85,16 @@ class VOC12Dataset(torch.utils.data.Dataset):
 
     filepath = os.path.join(DATA_DIR, f"{domain}.txt")
 
-    with open(filepath) as f:
-      image_ids = f.readlines()
-    self.image_id_list = [image_id.strip() for image_id in image_ids]
+    if sample_ids is not None:
+      self.image_id_list = (
+        sample_ids.split(",")
+        if isinstance(sample_ids, str)
+        else sample_ids
+      )
+    else:
+      with open(filepath) as f:
+        image_ids = f.readlines()
+      self.image_id_list = [image_id.strip() for image_id in image_ids]
 
     data = read_json(os.path.join(DATA_DIR, "meta.json"))
     self.class_dic = data['class_dic']
@@ -97,8 +112,6 @@ class VOC12Dataset(torch.utils.data.Dataset):
     return os.path.join(self.image_dir, image_id + '.jpg')
 
   def get_image(self, image_id):
-    import cv2
-    cv2.setNumThreads(0)
     return Image.open(self.get_image_path(image_id)).convert('RGB')
 
   def get_mask(self, image_id):
@@ -142,8 +155,8 @@ class VOC12Dataset(torch.utils.data.Dataset):
 
 class ClassificationDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, with_tags=True)
+  def __init__(self, root_dir, domain, transform=None, sample_ids=None):
+    super().__init__(root_dir, domain, with_tags=True, sample_ids=sample_ids)
     self.transform = transform
 
   def __getitem__(self, index):
@@ -158,8 +171,8 @@ class ClassificationDataset(VOC12Dataset):
 
 class CAMEvaluationDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, transform=None, masks_dir=None):
-    super().__init__(root_dir, domain, masks_dir=masks_dir, with_tags=True, with_mask=True)
+  def __init__(self, root_dir, domain, transform=None, masks_dir=None, sample_ids=None):
+    super().__init__(root_dir, domain, masks_dir=masks_dir, with_tags=True, with_mask=True, sample_ids=sample_ids)
     self.transform = transform
 
     cmap_dic, _, class_names = get_color_map_dic()
@@ -187,8 +200,8 @@ class SegmentationDataset(CAMEvaluationDataset):
 
 class PathsDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, masks_dir=None):
-    super().__init__(root_dir, domain, masks_dir=masks_dir, with_id=True, with_image=False)
+  def __init__(self, root_dir, domain, masks_dir=None, sample_ids=None):
+    super().__init__(root_dir, domain, masks_dir=masks_dir, with_id=True, with_image=False, sample_ids=sample_ids)
 
   def __getitem__(self, index):
     image_id, = super().__getitem__(index)
@@ -200,8 +213,8 @@ class PathsDataset(VOC12Dataset):
 
 class InferenceDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, transform=None):
-    super().__init__(root_dir, domain, with_id=True, with_tags=True)
+  def __init__(self, root_dir, domain, transform=None, sample_ids=None):
+    super().__init__(root_dir, domain, with_id=True, with_tags=True, sample_ids=sample_ids)
     self.transform = transform
 
     cmap_dic, _, class_names = get_color_map_dic()
@@ -223,8 +236,8 @@ class InferenceDataset(VOC12Dataset):
 
 class AffinityDataset(VOC12Dataset):
 
-  def __init__(self, root_dir, domain, path_index, label_dir, transform=None):
-    super().__init__(root_dir, domain, with_id=True)
+  def __init__(self, root_dir, domain, path_index, label_dir, transform=None, sample_ids=None):
+    super().__init__(root_dir, domain, with_id=True, sample_ids=sample_ids)
 
     self.transform = transform
 
@@ -251,8 +264,8 @@ class HRCAMsDataset(VOC12Dataset):
 
   IGNORE_BG_IMAGES = True
 
-  def __init__(self, root_dir, domain, cams_dir, transform):
-    super().__init__(root_dir, domain, with_id=True, with_tags=True)
+  def __init__(self, root_dir, domain, cams_dir, transform, sample_ids=None):
+    super().__init__(root_dir, domain, with_id=True, with_tags=True, sample_ids=sample_ids)
     self.cams_dir = cams_dir
     self.transform = transform
 

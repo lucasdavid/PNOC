@@ -70,6 +70,9 @@ parser.add_argument('--hint_w', type=float, default=1.0)
 parser.add_argument('--fg_threshold', type=float, default=0.4)
 # parser.add_argument('--bg_threshold', type=float, default=0.1)
 
+import cv2
+cv2.setNumThreads(0)
+
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
 except KeyError:

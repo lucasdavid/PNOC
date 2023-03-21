@@ -98,6 +98,9 @@ parser.add_argument('--oc_train_mask_t', default=0.2, type=float)
 
 # endregion
 
+import cv2
+cv2.setNumThreads(0)
+
 try:
   GPUS = os.environ['CUDA_VISIBLE_DEVICES']
 except KeyError:

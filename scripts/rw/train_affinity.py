@@ -58,6 +58,9 @@ parser.add_argument('--print_ratio', default=0.1, type=float)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--label_dir', default='./experiments/predictions/rn50@train_aug@aff', type=str)
 
+import cv2
+cv2.setNumThreads(0)
+
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
 except KeyError:

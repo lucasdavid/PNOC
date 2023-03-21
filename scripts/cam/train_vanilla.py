@@ -57,6 +57,9 @@ parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--cutmix_prob', default=1.0, type=float)
 parser.add_argument('--mixup_prob', default=1.0, type=float)
 
+import cv2
+cv2.setNumThreads(0)
+
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
 except KeyError:

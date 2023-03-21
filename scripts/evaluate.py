@@ -35,8 +35,9 @@ parser.add_argument("--step_th", default=0.05, type=float)
 
 
 def compare(dataset, classes, start, step, TP, P, T):
-  compared = missing = 0
+  compared = 0
   corrupted = []
+  missing = []
 
   try:
     for idx in range(start, len(dataset), step):
@@ -48,7 +49,7 @@ def compare(dataset, classes, start, step, TP, P, T):
 
       if os.path.exists(png_file):
         with Image.open(png_file) as y_pred:
-          y_pred = np.array(y_pred)
+          y_pred = np.asarray(y_pred)
         keys, cam = np.unique(y_pred, return_inverse=True)
         cam = cam.reshape(y_pred.shape)
 
@@ -76,7 +77,7 @@ def compare(dataset, classes, start, step, TP, P, T):
 
         cam = np.argmax(cam, axis=0)
       else:
-        missing += 1
+        missing.append(image_id)
         continue
 
       if args.crf_t:
@@ -96,7 +97,7 @@ def compare(dataset, classes, start, step, TP, P, T):
       y_pred = keys[cam]
 
       with Image.open(mask_path) as y_true:
-        y_true = np.array(y_true)
+        y_true = np.asarray(y_true)
 
       valid_mask = y_true < 255
 
@@ -117,10 +118,12 @@ def compare(dataset, classes, start, step, TP, P, T):
     ...
 
   if start == 0:
-    read = compared + missing + len(corrupted)
-    print(f"{compared} ({compared/read:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
+    read = compared + len(missing) + len(corrupted)
+    print(f"{compared} ({compared/read:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={len(missing)}).", flush=True)
+  if missing:
+    print(f"Missing files: {', '.join(missing)}", flush=True)
   if corrupted:
-    print(f"Corrupted files: {', '.join(corrupted)}", file=sys.stderr)
+    print(f"Corrupted files: {', '.join(corrupted)}", flush=True)
 
 
 def do_python_eval(dataset, classes, num_workers=8):

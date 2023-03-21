@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J inf
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/coco-inf-%j.out
-#SBATCH --time=8:00:00
+#SBATCH --time=2:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #

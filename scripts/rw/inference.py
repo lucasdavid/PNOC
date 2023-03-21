@@ -127,7 +127,12 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       rw_up = F.interpolate(rw, scale_factor=4, mode='bilinear', align_corners=False)[..., 0, :H, :W]
       rw_up /= torch.max(rw_up)
 
-      np.save(npy_path, {"keys": cam_dict['keys'], "rw": to_numpy(rw_up)})
+      try:
+        np.save(npy_path, {"keys": cam_dict['keys'], "rw": to_numpy(rw_up)})
+      except:
+        if os.path.exists(npy_path):
+          os.remove(npy_path)
+        raise
 
       if process_id == 0:
         sys.stdout.write(

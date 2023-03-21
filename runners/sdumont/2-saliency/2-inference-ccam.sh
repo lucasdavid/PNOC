@@ -44,8 +44,6 @@ DEVICES=0,1,2,3
 
 LOGS_DIR=$SCRATCH/logs/ccam
 
-WORKERS=8
-
 DATASET=voc12
 DOMAIN=train
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/

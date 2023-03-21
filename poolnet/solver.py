@@ -57,28 +57,31 @@ class Solver(object):
 
     def test(self):
         mode_name = 'sal_fuse'
-        time_s = time.time()
-        img_num = len(self.test_loader)
-        for i, data_batch in enumerate(self.test_loader):
-            images, image_id = data_batch['sal_image'], data_batch['image_id'][0]
-            with torch.no_grad():
-                images = Variable(images)
-                b, c, h, w = images.shape
-                if h <= 100 or w <= 100:
-                    images = F.interpolate(images, scale_factor=2, mode='bilinear')
-                if self.config.cuda:
-                    images = images.cuda()
-                preds = self.net(images)
-                if h <= 100 or w <= 100:
-                    preds = F.interpolate(preds, size=(h, w), mode='bilinear')
-
-                pred = np.squeeze(torch.sigmoid(preds).cpu().data.numpy())
-                multi_fuse = 255 * pred
-                if os.path.isfile(os.path.join(self.config.sal_folder, image_id + '.png')):
+        t0 = time.time()
+        total = len(self.test_loader)
+        with torch.no_grad():
+            for step, batch in enumerate(self.test_loader):
+                x, image_id, h, w = (
+                    batch['sal_image'], batch['image_id'][0],
+                    batch["height"][0], batch["width"][0]
+                )
+                image_path = os.path.join(self.config.sal_folder, image_id + '.png')
+                if os.path.isfile(image_path):
                     continue
-                cv2.imwrite(os.path.join(self.config.sal_folder, image_id + '.png'), multi_fuse)
+                x = Variable(x)
+                if self.config.cuda:
+                    x = x.cuda()
+                preds = self.net(x)
+                preds = preds[..., :h, :w]
+                pred = np.squeeze(torch.sigmoid(preds).cpu().data.numpy())
+                cv2.imwrite(image_path, 255 * pred)
+
+                if (step + 1) % (total // 10) == 0:
+                    print(f"step={step}/{total} fps={step / (time.time()-t0):.1f}")
+
+
         time_e = time.time()
-        print('Speed: %f FPS' % (img_num/(time_e-time_s)))
+        print('Speed: %f FPS' % (total/(time_e-t0)))
         print('Test Done!')
 
     # training phase
@@ -125,7 +128,7 @@ class Solver(object):
                         epoch, self.config.epoch, i, iter_num, r_sal_loss/x_showEvery))
                     print('Learning rate: ' + str(self.lr))
                     r_sal_loss= 0
-                if i % 200 == 0:
+                if i % (4*self.show_every // self.config.batch_size) == 0:
                     pred = np.squeeze(torch.sigmoid(sal_pred).cpu().data.numpy())
                     multi_fuse = 255 * pred
                     cv2.imwrite(os.path.join(self.config.test_fold, image_id + '_sal' + '.png'), multi_fuse)
