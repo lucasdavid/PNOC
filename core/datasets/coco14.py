@@ -59,8 +59,6 @@ class COCO14Dataset(Dataset):
     return os.path.join(self.root_dir, self.domain, f"COCO_{self.domain}_{image_id}.jpg")
 
   def load_sample_with_labels(self, idx):
-    import cv2
-    cv2.setNumThreads(0)
     label = self.label_list[idx]
 
     if self.IGNORE_BG_IMAGES and label.sum() == 0:
@@ -127,12 +125,22 @@ class SegmentationDataset(CAMEvaluationDataset):
 
 class PathsDataset(COCO14Dataset):
 
-  def __init__(self, root_dir, domain, masks_dir=None, sample_ids=None):
+  def __init__(self, root_dir, domain, masks_dir=None, sample_ids=None, ignore_bg_images=None):
     super().__init__(root_dir=root_dir, domain=domain, sample_ids=sample_ids)
 
     self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
+    self.ignore_bg_images = (
+      self.IGNORE_BG_IMAGES
+      if ignore_bg_images is None
+      else ignore_bg_images
+    )
 
   def __getitem__(self, idx):
+    label = self.label_list[idx]
+    while self.ignore_bg_images and label.sum() == 0:
+      idx += 1
+      label = self.label_list[idx]
+
     image_id = _decode_id(self.img_name_list[idx])
     image_path = self.get_image_path(image_id)
     mask_path = os.path.join(self.masks_dir, image_id + '.png')

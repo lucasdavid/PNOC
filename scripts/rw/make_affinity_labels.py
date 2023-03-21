@@ -1,6 +1,9 @@
 # Copyright (C) 2020 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
+import cv2
+cv2.setNumThreads(0)
+
 import os
 import argparse
 from torch import multiprocessing
@@ -14,7 +17,7 @@ from core.datasets import get_paths_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.log_utils import log_config
 from tools.ai.torch_utils import set_seed
-from tools.general.io_utils import create_directory, load_saliency_file
+from tools.general.io_utils import create_directory, load_saliency_file, str2bool
 
 parser = argparse.ArgumentParser()
 
@@ -27,6 +30,7 @@ parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--cams_dir', required=True, type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
+parser.add_argument('--exclude_bg_images', default=None, type=str2bool)
 
 ###############################################################################
 # Inference parameters
@@ -39,9 +43,6 @@ parser.add_argument('--bg_threshold', default=0.05, type=float)
 
 parser.add_argument('--crf_t', default=0, type=int)
 parser.add_argument('--crf_gt_prob', default=0.7, type=float)
-
-import cv2
-cv2.setNumThreads(0)
 
 
 def _work(process_id, dataset, args, work_dir):
@@ -83,7 +84,7 @@ def _work(process_id, dataset, args, work_dir):
     keys = data['keys']
     cam = data['hr_cam']
 
-    if keys.shape[0] < 2:
+    if cam.shape[0] == 0:
       processed += 1
       # print(f"{image_id} skipped (bg)")
       continue
@@ -145,7 +146,7 @@ if __name__ == '__main__':
     f'./experiments/predictions/{TAG}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/'
   )
 
-  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
+  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain, exclude_bg_images=args.exclude_bg_images)
 
   if args.num_workers > 1:
     multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args, work_dir), join=True)

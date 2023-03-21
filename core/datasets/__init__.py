@@ -143,7 +143,7 @@ def get_inference_dataset(dataset, data_dir, domain=None, transform=None):
   return infer
 
 
-def get_paths_dataset(dataset, data_dir, domain=None, transform=None):
+def get_paths_dataset(dataset, data_dir, domain=None, transform=None, ignore_bg_images=None):
   print(f'Loading {dataset} Segmentation Evaluation Dataset')
 
   if dataset == 'voc12':
@@ -151,7 +151,7 @@ def get_paths_dataset(dataset, data_dir, domain=None, transform=None):
     valid = voc12.PathsDataset(data_dir, domain or 'train_aug', transform)
   else:
     from . import coco14
-    valid = coco14.PathsDataset(data_dir, domain or 'train2014', transform)
+    valid = coco14.PathsDataset(data_dir, domain or 'train2014', transform, ignore_bg_images=ignore_bg_images)
 
   valid.info = DatasetInfo.from_metafile(dataset)
 

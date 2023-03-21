@@ -58,7 +58,8 @@ run_make_affinity_labels() {
     --cams_dir     $CAMS_DIR  \
     --sal_dir      $SAL_DIR   \
     --data_dir     $DATA_DIR  \
-    --num_workers  $WORKERS
+    --num_workers  $WORKERS   \
+    --exclude_bg_images true
 }
 
 
