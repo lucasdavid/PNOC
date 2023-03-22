@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import torch
+from torch import multiprocessing
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -266,8 +267,10 @@ def evaluate(loader, classes):
 
 
 if __name__ == '__main__':
-  import multiprocessing
-  multiprocessing.set_start_method('spawn')
+  try:
+    multiprocessing.set_start_method('spawn')
+  except RuntimeError:
+    ...
 
   args = parser.parse_args()
 

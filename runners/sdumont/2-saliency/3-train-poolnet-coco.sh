@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-pn-%j.out
-#SBATCH --time=02:00:00
+#SBATCH --time=08:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #

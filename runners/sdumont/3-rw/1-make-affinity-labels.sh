@@ -39,7 +39,7 @@ export PYTHONPATH=$(pwd)
 
 PY=python3.9
 SOURCE=scripts/rw/make_affinity_labels.py
-WORKERS=1
+WORKERS=24
 
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
@@ -58,8 +58,7 @@ run_make_affinity_labels() {
     --cams_dir     $CAMS_DIR  \
     --sal_dir      $SAL_DIR   \
     --data_dir     $DATA_DIR  \
-    --num_workers  $WORKERS   \
-    --exclude_bg_images true
+    --num_workers  $WORKERS
 }
 
 
@@ -96,5 +95,5 @@ FG=0.3
 BG=0.8
 CRF_T=10
 CRF_GT=0.7
-TAG=coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf$CRF_T-gt$CRF_GT
+TAG=affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf$CRF_T-gt$CRF_GT
 run_make_affinity_labels

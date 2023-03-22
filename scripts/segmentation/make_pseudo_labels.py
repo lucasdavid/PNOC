@@ -76,8 +76,10 @@ def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
 
 
 if __name__ == '__main__':
-  import multiprocessing
-  multiprocessing.set_start_method('spawn')
+  try:
+    multiprocessing.set_start_method('spawn')
+  except RuntimeError:
+    ...
 
   args = parser.parse_args()
 

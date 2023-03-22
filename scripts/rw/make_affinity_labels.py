@@ -30,7 +30,7 @@ parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--cams_dir', required=True, type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
-parser.add_argument('--exclude_bg_images', default=None, type=str2bool)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 ###############################################################################
 # Inference parameters
@@ -44,8 +44,13 @@ parser.add_argument('--bg_threshold', default=0.05, type=float)
 parser.add_argument('--crf_t', default=0, type=int)
 parser.add_argument('--crf_gt_prob', default=0.7, type=float)
 
+parser.add_argument('--verbose', default=0, type=int)
+
 
 def _work(process_id, dataset, args, work_dir):
+  import cv2
+  cv2.setNumThreads(0)
+
   subset = range(process_id, len(dataset), args.num_workers)
   errors = []
   missing = []
@@ -60,25 +65,29 @@ def _work(process_id, dataset, args, work_dir):
       processed += 1
       continue
 
-    print(f"id={image_id}", end=" ", flush=True)
+    if args.verbose >= 2:
+      print(f"id={image_id}", end=" ", flush=True)
 
     try:
       with Image.open(image_path) as image:
         image = np.asarray(image.convert("RGB"))
     except FileNotFoundError:
       missing.append(image_path)
-      # print(f"{image_id} skipped (image missing)")
+      if args.verbose >= 3:
+        print(f"{image_id} skipped (image missing)")
       continue
 
     try:
       data = np.load(cam_path, allow_pickle=True).item()
     except UnpicklingError as error:
       errors.append(cam_path)
-      # print(f"{image_id} skipped (cam error)")
+      if args.verbose >= 3:
+        print(f"{image_id} skipped (cam error)")
       continue
     except FileNotFoundError:
       missing.append(cam_path)
-      # print(f"{image_id} skipped (cam missing)")
+      if args.verbose >= 3:
+        print(f"{image_id} skipped (cam missing)")
       continue
 
     keys = data['keys']
@@ -86,7 +95,8 @@ def _work(process_id, dataset, args, work_dir):
 
     if cam.shape[0] == 0:
       processed += 1
-      # print(f"{image_id} skipped (bg)")
+      if args.verbose >= 2:
+        print(f"{image_id} skipped (bg)")
       continue
 
     if not args.sal_dir:
@@ -118,8 +128,6 @@ def _work(process_id, dataset, args, work_dir):
     conf[fg_conf == 0] = 255
     conf[bg_conf + fg_conf == 0] = 0
 
-    # print(f"crf={conf.shape}", end=" ")
-
     try:
       imageio.imwrite(png_path, conf.astype(np.uint8))
     except:
@@ -127,7 +135,9 @@ def _work(process_id, dataset, args, work_dir):
         os.remove(png_path)
       raise
     processed += 1
-    print(f"{image_id} ok")
+
+    if args.verbose >= 1:
+      print(f"{image_id} ok")
 
   if missing: print(f"{len(missing)} files were missing and were not processed:", *missing, sep='\n  - ', flush=True)
   if errors: print(f"{len(errors)} CAM files could not be read:", *errors, sep="\n  - ", flush=True)
@@ -136,6 +146,11 @@ def _work(process_id, dataset, args, work_dir):
 
 
 if __name__ == '__main__':
+  try:
+    multiprocessing.set_start_method('spawn')
+  except RuntimeError:
+    ...
+
   args = parser.parse_args()
   TAG = args.tag
 
@@ -146,7 +161,7 @@ if __name__ == '__main__':
     f'./experiments/predictions/{TAG}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/'
   )
 
-  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain, exclude_bg_images=args.exclude_bg_images)
+  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images)
 
   if args.num_workers > 1:
     multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args, work_dir), join=True)

@@ -4,7 +4,8 @@ import os
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
+from tqdm import tqdm
 
 import wandb
 from core.datasets import get_paths_dataset
@@ -15,7 +16,6 @@ from tools.general.io_utils import load_saliency_file
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)
 parser.add_argument("--num_workers", default=48, type=int)
-parser.add_argument("--threshold", default=None, type=float)
 
 parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
 parser.add_argument("--domain", default="train", type=str)
@@ -29,6 +29,7 @@ parser.add_argument("--crf_t", default=0, type=int)
 parser.add_argument("--crf_gt_prob", default=0.7, type=float)
 
 parser.add_argument("--mode", default="npy", type=str)  # png, rw
+parser.add_argument("--threshold", default=None, type=float)
 parser.add_argument("--min_th", default=0.05, type=float)
 parser.add_argument("--max_th", default=0.81, type=float)
 parser.add_argument("--step_th", default=0.05, type=float)
@@ -39,8 +40,13 @@ def compare(dataset, classes, start, step, TP, P, T):
   corrupted = []
   missing = []
 
+  steps = range(start, len(dataset), step)
+
+  if start == 0:
+    steps = tqdm(steps, mininterval=2.)
+
   try:
-    for idx in range(start, len(dataset), step):
+    for idx in steps:
       image_id, image_path, mask_path = dataset[idx]
 
       npy_file = os.path.join(PRED_DIR, image_id + ".npy")
@@ -48,8 +54,13 @@ def compare(dataset, classes, start, step, TP, P, T):
       sal_file = os.path.join(SAL_DIR, image_id + ".png") if SAL_DIR else None
 
       if os.path.exists(png_file):
-        with Image.open(png_file) as y_pred:
-          y_pred = np.asarray(y_pred)
+        try:
+          with Image.open(png_file) as y_pred:
+            y_pred = np.asarray(y_pred)
+        except UnidentifiedImageError:
+          corrupted.append(image_id)
+          continue
+
         keys, cam = np.unique(y_pred, return_inverse=True)
         cam = cam.reshape(y_pred.shape)
 
