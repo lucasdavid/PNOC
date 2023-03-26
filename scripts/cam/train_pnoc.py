@@ -184,7 +184,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
     del cg_loss, o_loss, p_loss, c_loss, re_loss
     del cl_logits, images_mask, labels_oc, labels_mask, re_mask
-    del re_features, tiled_features, re_logits, tiled_images, features, logits
+    del re_features, tiled_features, tiled_images, features, logits
     cgopt.zero_grad()
     return None, None, None, {}
 
