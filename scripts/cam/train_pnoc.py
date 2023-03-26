@@ -179,6 +179,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
     cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
 
+  # print(f"step={step} cg_loss={cg_loss} o-loss={o_loss}")
   cg_scaler.scale(cg_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:
@@ -344,7 +345,7 @@ if __name__ == '__main__':
   ocnet = Classifier(
     args.oc_architecture,
     train_dataset.info.num_classes,
-    mode=args.mode,
+    mode="fix",
     regularization=args.oc_regularization,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=True)

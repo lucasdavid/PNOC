@@ -74,7 +74,7 @@ def make_cam(x, eps=1e-5, shift_min=False, global_norm=False, inplace=True):
     flat_x = x.view(b, c, -1)
     x_min = flat_x.min(axis=-1)[0].view((b, c, 1, 1)) if shift_min else 0
     x_max = flat_x.max(axis=-1)[0].view((b, c, 1, 1)) - x_min
-  
+
   if shift_min:
     if inplace:
       x -= x_min
@@ -115,26 +115,11 @@ def get_learning_rate_from_optimizer(optimizer):
   return optimizer.param_groups[0]['lr']
 
 
-def batchnorm_freeze(model):
+def set_layers_require_grad(model, klass):
   for m in model.modules():
-    if isinstance(m, torch.nn.BatchNorm2d):
+    if isinstance(m, klass):
       m.weight.requires_grad = False
       m.bias.requires_grad = False
-
-
-def batchnorm_eval(model):
-  for m in model.modules():
-    if isinstance(m, torch.nn.BatchNorm2d):
-      m.eval()
-
-
-def freeze_and_eval(modules):
-  for m in modules:
-    m.eval()
-    for p in ('weight', 'bias'):
-      p = getattr(m, p, None)
-      if p is not None:
-        p.requires_grad = False
 
 
 def to_numpy(tensor):
@@ -187,5 +172,5 @@ def get_cosine_schedule_with_warmup(optimizer, warmup_iteration, max_iteration, 
 def label_smoothing(labels, alpha):
   if alpha:
     return (1 - alpha) * labels + alpha * 0.5
-  
+
   return labels

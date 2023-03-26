@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from torchvision import models
 
-from tools.ai.torch_utils import batchnorm_freeze, freeze_and_eval, gap2d, resize_for_tensors
+from tools.ai.torch_utils import set_layers_require_grad, gap2d, resize_for_tensors
 
 from . import ccam, regularizers
 from .aff_utils import PathIndex
@@ -113,6 +113,8 @@ class Backbone(nn.Module):
 
     self.mode = mode
     self.trainable_stem = trainable_stem
+    self.not_training = []
+    self.from_scratch_layers = []
 
     if mode == 'normal':
       self.norm_fn = nn.BatchNorm2d
@@ -129,8 +131,11 @@ class Backbone(nn.Module):
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
 
-    self.not_training = []
-    self.from_scratch_layers = []
+    if self.mode == "fix":
+      set_layers_require_grad(model, torch.nn.BatchNorm2d)
+      self.not_training.extend([
+        m for m in model.modules() if isinstance(m, torch.nn.BatchNorm2d)
+      ])
 
     if not self.trainable_stem:
       self.not_training.extend([self.stage1])
