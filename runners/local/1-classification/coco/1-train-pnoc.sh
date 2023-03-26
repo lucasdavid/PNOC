@@ -31,27 +31,27 @@ DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 DOMAIN=train2014
 
 
-ARCH=rs269
-ARCHITECTURE=resnest269
+ARCH=rs101
+ARCHITECTURE=resnest101
 TRAINABLE_STEM=true
 DILATED=false
 MODE=normal
 REGULAR=none
 
-IMAGE_SIZE=64
-MIN_IMAGE_SIZE=32
-MAX_IMAGE_SIZE=128
+IMAGE_SIZE=256
+MIN_IMAGE_SIZE=128
+MAX_IMAGE_SIZE=384
 FIRST_EPOCH=0
 EPOCHS=1
-BATCH=8
-LR=0.1
+BATCH=14
+LR=0.001
 ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
 VALIDATE=false
 # MAX_GRAD_NORM=10.0
 
-OC_NAME=rs269poc
-OC_PRETRAINED=experiments/models/ResNeSt269@PuzzleOc.pth
+OC_NAME=rs101poc
+OC_PRETRAINED=experiments/models/ResNeSt101@PuzzleOc.pth
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_REGULAR=none
 OC_TRAIN_MASKS=features
@@ -144,9 +144,9 @@ run_inference () {
 
 
 
-OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
-OC_ARCHITECTURE=resnest269
+OC_NAME=rs101ra
+OC_PRETRAINED=experiments/models/cam/coco14-rs101-ra.pth
+OC_ARCHITECTURE=resnest101
 LABELSMOOTHING=0.1
 OW=1.0
 OW_INIT=0.0
@@ -160,11 +160,11 @@ W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,aoc:$OC_TRAIN_MASK
 # run_training
 # run_inference
 
-OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
-OC_ARCHITECTURE=resnest269
+OC_NAME=rs101ra
+OC_PRETRAINED=experiments/models/cam/coco14-rs101-ra.pth
+OC_ARCHITECTURE=resnest101
 OC_PERSIST=false  # Needed because I will probably be interrupted.
-LR=0.05
+LR=0.1
 LABELSMOOTHING=0
 OW=1.0
 OW_INIT=0.0

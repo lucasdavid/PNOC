@@ -58,19 +58,20 @@ parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
-parser.add_argument('--amp_min_scale', default=128, type=int)
+parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
 parser.add_argument('--max_grad_norm', default=None, type=float)
+parser.add_argument('--max_grad_norm_oc', default=None, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=1.0, type=float)
+parser.add_argument('--print_ratio', default=0.015, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -134,9 +135,9 @@ def train_step(train_iterator, step):
   if cg_features is not None and (step + 1) % args.oc_train_interval_steps == 0:
     oc_step = int((step + 1) // args.oc_train_interval_steps) - 1
 
-    if args.oc_train_masks == 'cams':
+    if args.oc_train_masks == "cams":
       del images_mask
-      images_mask = occse.hard_mask_images(images, cg_features, labels_mask, t=args.oc_train_mask_t)
+      images_mask = occse.hard_mask_images(images, cg_features.detach(), labels_mask, t=args.oc_train_mask_t)
 
     images_mask = images_mask.detach()
 
@@ -178,16 +179,6 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
     cg_loss = c_loss + p_loss + ap * re_loss + ao * o_loss
 
-  if torch.isnan(cg_loss):
-    # Skip this step.
-    print(f"Found cg_loss=nan at step {step} (c_loss={c_loss} p_loss={p_loss} re_loss={re_loss} o_loss={o_loss})", file=sys.stderr)
-
-    del cg_loss, o_loss, p_loss, c_loss, re_loss
-    del cl_logits, images_mask, labels_oc, labels_mask, re_mask
-    del re_features, tiled_features, tiled_images, features, logits
-    cgopt.zero_grad()
-    return None, None, None, {}
-
   cg_scaler.scale(cg_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:
@@ -200,7 +191,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
     cgopt.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     if args.amp_min_scale and cg_scaler._scale < args.amp_min_scale:
-        cg_scaler._scale = torch.as_tensor(args.amp_min_scale, device=cg_scaler._scale.device)
+        cg_scaler._scale = torch.as_tensor(args.amp_min_scale, dtype=cg_scaler._scale.dtype, device=cg_scaler._scale.device)
 
   occse.update_focal(
     targets,
@@ -227,25 +218,20 @@ def train_step_oc(step, images_mask, targets_sm, ow):
     cl_logits = ocnet(images_mask)
     ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
 
-  if torch.isnan(ot_loss):
-    print(f"Found ot_loss=nan at oc-step {step}", file=sys.stderr)
-    del ot_loss, cl_logits
-    ocopt.zero_grad()
-    return {}
-
+  # print(f"step={step} ow={ow} ot-loss={ot_loss}")
   oc_scaler.scale(ot_loss).backward()
 
   if (step + 1) % args.accumulate_steps == 0:
-    if args.max_grad_norm:
+    if args.max_grad_norm_oc:
       oc_scaler.unscale_(ocopt)
-      torch.nn.utils.clip_grad_norm_(ocnet.parameters(), args.max_grad_norm)
+      torch.nn.utils.clip_grad_norm_(ocnet.parameters(), args.max_grad_norm_oc)
 
     oc_scaler.step(ocopt)
     oc_scaler.update()
     ocopt.zero_grad()
 
     if args.amp_min_scale and oc_scaler._scale < args.amp_min_scale:
-        oc_scaler._scale = torch.as_tensor(args.amp_min_scale, device=oc_scaler._scale.device)
+        oc_scaler._scale = torch.as_tensor(args.amp_min_scale, dtype=oc_scaler._scale.dtype, device=oc_scaler._scale.device)
 
   return {'ot_loss': ot_loss.item()}
 
@@ -388,8 +374,8 @@ if __name__ == '__main__':
   log_opt_params('CGNet', cg_param_groups)
   log_opt_params('OCNet', oc_param_groups)
 
-  cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision, growth_interval=200)
-  oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision, growth_interval=200)
+  cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
+  oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
   data_dic = {'train': [], 'validation': []}
@@ -408,7 +394,7 @@ if __name__ == '__main__':
 
   train_iterator = Iterator(train_loader)
 
-  for step in tqdm(range(step_init, step_max), 'Training'):
+  for step in tqdm(range(step_init, step_max), 'Training', disable=True):
     metrics_values = train_step(train_iterator, step)
     train_metrics.update(metrics_values)
 
