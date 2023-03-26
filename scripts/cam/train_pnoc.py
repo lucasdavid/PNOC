@@ -395,7 +395,7 @@ if __name__ == '__main__':
 
   train_iterator = Iterator(train_loader)
 
-  for step in tqdm(range(step_init, step_max), 'Training', disable=True):
+  for step in tqdm(range(step_init, step_max), 'Training'):
     metrics_values = train_step(train_iterator, step)
     train_metrics.update(metrics_values)
 
