@@ -1,11 +1,3 @@
-#!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=48
-#SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-pnoc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/pnoc-%j.out
-#SBATCH --time=14:00:00
-
 # Copyright 2021 Lucas Oliveira David
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,34 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Train a model to perform multilabel classification task over the VOC12 dataset using P-NOC strategy.
+# Train a model to perform multilabel classification task over the COCO14 dataset using P-NOC strategy.
 
-echo "[sdumont/sequana/classification/pnoc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
-
-nodeset -e $SLURM_JOB_NODELIST
-
-cd $SCRATCH/PuzzleCAM
-
-module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
-# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
+echo "[local/classification/coco/train-pnoc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 # export LD_LIBRARY_PATH=$SCRATCH/.local/lib/python3.9/site-packages/nvidia/cublas/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$(pwd)
 # export OMP_NUM_THREADS=16
 
-PY=python3.9
-PIP=pip3.9
+PY=python
+PIP=pip
 SOURCE=scripts/cam/train_pnoc.py
-WORKERS=8
-DEVICES=0,1,2,3
+WORKERS=2
+DEVICES=0
 
-DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DOMAIN=train
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
+DATASET=coco14
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+DOMAIN=train2014
 
 
 ARCH=rs269
@@ -57,15 +38,17 @@ DILATED=false
 MODE=normal
 REGULAR=none
 
-IMAGE_SIZE=512
-MIN_IMAGE_SIZE=320
-MAX_IMAGE_SIZE=640
-EPOCHS=15
-BATCH=16
+IMAGE_SIZE=64
+MIN_IMAGE_SIZE=32
+MAX_IMAGE_SIZE=128
+FIRST_EPOCH=0
+EPOCHS=1
+BATCH=4
 LR=0.1
-ACCUMULATE_STEPS=2
+ACCUMULATE_STEPS=1
 MIXED_PRECISION=true
-MAX_GRAD_NORM=0  # 1.0
+VALIDATE=false
+# MAX_GRAD_NORM=10.0
 
 OC_NAME=rs269poc
 OC_PRETRAINED=experiments/models/ResNeSt269@PuzzleOc.pth
@@ -74,6 +57,7 @@ OC_REGULAR=none
 OC_TRAIN_MASKS=features
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
+OC_PERSIST=false
 
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.8
@@ -95,8 +79,11 @@ run_training () {
     echo "============================================================"
     echo "Experiment $TAG"
     echo "============================================================"
+    # WANDB_RESUME=$W_RESUME                   \
+    # WANDB_RUN_ID=$W_RUN_ID                   \
     CUDA_VISIBLE_DEVICES=$DEVICES            \
     WANDB_RUN_GROUP="$W_GROUP"               \
+    WANDB_TAGS="$W_TAGS"                     \
     $PY $SOURCE                              \
         --tag               $TAG             \
         --num_workers       $WORKERS         \
@@ -104,7 +91,7 @@ run_training () {
         --batch_size        $BATCH           \
         --accumulate_steps  $ACCUMULATE_STEPS \
         --mixed_precision   $MIXED_PRECISION \
-        --max_grad_norm     $MAX_GRAD_NORM   \
+        --validate          $VALIDATE        \
         --architecture      $ARCHITECTURE    \
         --dilated           $DILATED         \
         --mode              $MODE            \
@@ -120,6 +107,7 @@ run_training () {
         --cutmix_prob       $CUTMIX          \
         --mixup_prob        $MIXUP           \
         --label_smoothing   $LABELSMOOTHING  \
+        --first_epoch       $FIRST_EPOCH     \
         --max_epoch         $EPOCHS          \
         --alpha             $P_ALPHA         \
         --alpha_init        $P_INIT          \
@@ -130,6 +118,7 @@ run_training () {
         --oc-strategy       $OC_STRATEGY     \
         --oc-focal-momentum $OC_F_MOMENTUM   \
         --oc-focal-gamma    $OC_F_GAMMA      \
+        --oc-persist        $OC_PERSIST      \
         --ow                $OW              \
         --ow-init           $OW_INIT         \
         --ow-schedule       $OW_SCHEDULE     \
@@ -154,42 +143,9 @@ run_inference () {
 }
 
 
-OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/resnest269@randaug.pth
-OC_ARCHITECTURE=resnest269
-LABELSMOOTHING=0.1
-OW=1.0
-OW_INIT=0.3
-OW_SCHEDULE=0.5
-OC_TRAIN_MASKS=features
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r1
-# run_training
-# run_inference
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r2
-# run_training
-# run_inference
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r3
-# run_training
-# run_inference
-
-# OC_NAME=rs269ra
-# OC_PRETRAINED=experiments/models/resnest269@randaug.pth
-# OC_ARCHITECTURE=resnest269
-# LABELSMOOTHING=0.1
-# OW=0.5
-# OW_INIT=0.0
-# OW_SCHEDULE=1.0
-# OC_TRAIN_MASKS=features
-# OC_TRAIN_INT_STEPS=5
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# run_training
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r2
-# run_training
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r3
-# run_training
 
 OC_NAME=rs269ra
-OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
+OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
 OC_ARCHITECTURE=resnest269
 LABELSMOOTHING=0.1
 OW=1.0
@@ -198,62 +154,31 @@ OW_SCHEDULE=1.0
 OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
-# TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,aoc:$OC_TRAIN_MASKS,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS"
 # run_training
 # run_inference
 
-## =============================
-## Alternatives
-
-# OW=1.0
-# OC_TRAIN_MASK_T=0.2
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
-
-# OW=1.0
-# OC_TRAIN_INT_STEPS=5
-# OC_TRAIN_MASK_T=0.2
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
-# run_inference
-
-# OC_TRAIN_MASK_T=0.3
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
-# W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
-
-# OC_TRAIN_MASK_T=0.4
-# TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
-# W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
-
-
+OC_NAME=rs269ra
+OC_PRETRAINED=experiments/models/cam/coco14-rs269-ra.pth
+OC_ARCHITECTURE=resnest269
+OC_PERSIST=false  # Needed because I will probably be interrupted.
+LR=0.05
+LABELSMOOTHING=0
 OW=1.0
+OW_INIT=0.0
+OW_SCHEDULE=1.0
+OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
-ACCUMULATE_STEPS=2
-TAG="pnoc/$DATASET-${ARCH}pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T@$OC_NAME-r6"
+OC_TRAIN_INT_STEPS=1
+TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,lr:$LR,aoc:$OC_TRAIN_MASKS:$OC_TRAIN_MASK_T,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS,oc:$OC_NAME"
 run_training
-run_inference
 
-# LR=0.01
-# BATCH=32
-# ACCUMULATE_STEPS=1
-# ARCH=rn38d
-# ARCHITECTURE=resnet38d
-# OC_NAME=rn38d
-# OC_PRETRAINED=experiments/models/vanilla/$DATASET-$ARCH-ra.pth
-# OC_ARCHITECTURE=resnet38d
-# LABELSMOOTHING=0.1
-# OW=1.0
-# OW_INIT=0.0
-# OW_SCHEDULE=1.0
-# OC_TRAIN_MASKS=cams
-# OC_TRAIN_MASK_T=0.2
-# OC_TRAIN_INT_STEPS=1
-# TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+LABELSMOOTHING=0.1
+TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
+W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
+W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,lr:$LR,aoc:$OC_TRAIN_MASKS:$OC_TRAIN_MASK_T,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS,oc:$OC_NAME"
 # run_training
-# run_inference

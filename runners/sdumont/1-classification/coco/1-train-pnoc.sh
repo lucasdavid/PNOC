@@ -20,12 +20,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# Train ResNeSt269 to perform multilabel classification task over
-# the COCO14 dataset using Puzzle and OC-CSE strategies.
-#
+# Train a model to perform multilabel classification task over the COCO14 dataset using P-NOC strategy.
 
-echo "[sdumont/sequana/classification/train-poc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/sequana/classification/coco/train-pnoc] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -110,7 +107,7 @@ run_training () {
         --batch_size        $BATCH           \
         --accumulate_steps  $ACCUMULATE_STEPS \
         --mixed_precision   $MIXED_PRECISION \
-        --validade          $VALIDATE        \
+        --validate          $VALIDATE        \
         --architecture      $ARCHITECTURE    \
         --dilated           $DILATED         \
         --mode              $MODE            \
