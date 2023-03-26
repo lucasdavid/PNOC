@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from torch import multiprocessing
 from torch.utils.data import Subset
+from pickle import UnpicklingError
 
 from core.aff_utils import propagate_to_edge
 from core.datasets import *
@@ -35,6 +36,7 @@ parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='train', type=str)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -52,6 +54,9 @@ parser.add_argument('--cam_dir', default='', type=str)
 parser.add_argument('--beta', default=10, type=int)
 parser.add_argument('--exp_times', default=8, type=int)
 
+parser.add_argument('--verbose', default=0, type=int)
+
+
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
 except KeyError:
@@ -64,7 +69,7 @@ def run(args):
   normalize_fn = Normalize(*imagenet_stats())
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images)
 
   # Network
   model = AffinityNet(
@@ -90,19 +95,35 @@ def run(args):
     _work(0, model, dataset, normalize_fn, CAMS_DIR, PREDS_DIR, DEVICE, args)
 
 def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device, args):
+  import cv2
+  cv2.setNumThreads(0)
+
   dataset = dataset[process_id]
   length = len(dataset)
+  errors = []
+  missing = []
+  processed = 0
   skipped = 0
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for step, (x, _id, _) in enumerate(dataset):
+    for step, (x, image_id, label) in enumerate(dataset):
       W, H = x.size
 
-      npy_path = os.path.join(preds_dir, _id + '.npy')
+      cam_path = os.path.join(cams_dir, image_id + '.npy')
+      npy_path = os.path.join(preds_dir, image_id + '.npy')
+
       if os.path.isfile(npy_path):
         skipped += 1
+        continue
+
+      if args.verbose >= 2:
+        print(f"id={image_id}", end=" ", flush=True)
+
+      if label.sum() == 0:
+        if args.verbose >= 2:
+          print(f"{image_id} skipped (bg)")
         continue
 
       # preprocessing
@@ -118,7 +139,19 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       edge = model.get_edge(x)
 
       # postprocessing
-      cam_dict = np.load(os.path.join(cams_dir, _id + '.npy'), allow_pickle=True).item()
+      try:
+        cam_dict = np.load(cam_path, allow_pickle=True).item()
+      except UnpicklingError as error:
+        errors.append(cam_path)
+        if args.verbose >= 3:
+          print(f"{image_id} skipped (cam error={error})")
+        continue
+      except FileNotFoundError:
+        missing.append(cam_path)
+        if args.verbose >= 3:
+          print(f"{image_id} skipped (cam missing)")
+        continue
+
       cams = cam_dict['cam']
 
       rw = cams.to(device)
@@ -133,17 +166,15 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         if os.path.exists(npy_path):
           os.remove(npy_path)
         raise
+      processed += 1
 
-      if process_id == 0:
-        sys.stdout.write(
-          '\r# Make CAM with Random Walk [{}/{}] = {:.2f}%, ({}, rw_up={}, rw={})'.format(
-            step + 1, length, (step + 1) / length * 100, (H, W), tuple(rw_up.shape), tuple(rw.shape)
-          )
-        )
-        sys.stdout.flush()
+      if args.verbose >= 1:
+        print(f"{image_id} ok")
 
-    if process_id == 0:
-      print()
+    if missing: print(f"{len(missing)} files were missing and were not processed:", *missing, sep='\n  - ', flush=True)
+    if errors: print(f"{len(errors)} CAM files could not be read:", *errors, sep="\n  - ", flush=True)
+
+    print(f"{processed} images successfully processed")
 
 
 if __name__ == '__main__':

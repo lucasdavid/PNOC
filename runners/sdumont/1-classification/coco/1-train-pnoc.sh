@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_long
 #SBATCH -J tr-pnoc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/pnoc-%j.out
-#SBATCH --time=192:00:00
+#SBATCH --time=120:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -66,7 +66,8 @@ BATCH=16
 LR=0.1
 ACCUMULATE_STEPS=2
 MIXED_PRECISION=true
-MAX_GRAD_NORM=10.0
+VALIDATE=false
+# MAX_GRAD_NORM=10.0
 
 OC_NAME=rs269poc
 OC_PRETRAINED=experiments/models/ResNeSt269@PuzzleOc.pth
@@ -109,6 +110,7 @@ run_training () {
         --batch_size        $BATCH           \
         --accumulate_steps  $ACCUMULATE_STEPS \
         --mixed_precision   $MIXED_PRECISION \
+        --validade          $VALIDATE        \
         --architecture      $ARCHITECTURE    \
         --dilated           $DILATED         \
         --mode              $MODE            \
@@ -198,4 +200,4 @@ LABELSMOOTHING=0.1
 TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS@$OC_NAME-r1
 W_GROUP=$DATASET-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
 W_TAGS="$DATASET,$ARCH,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc,amp,lr:$LR,aoc:$OC_TRAIN_MASKS:$OC_TRAIN_MASK_T,ls:$LABELSMOOTHING,octis:$OC_TRAIN_INT_STEPS,oc:$OC_NAME"
-run_training
+# run_training

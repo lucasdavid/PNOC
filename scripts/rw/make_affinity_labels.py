@@ -82,7 +82,7 @@ def _work(process_id, dataset, args, work_dir):
     except UnpicklingError as error:
       errors.append(cam_path)
       if args.verbose >= 3:
-        print(f"{image_id} skipped (cam error)")
+        print(f"{image_id} skipped (cam error={error})")
       continue
     except FileNotFoundError:
       missing.append(cam_path)

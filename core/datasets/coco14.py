@@ -35,7 +35,7 @@ class COCO14Dataset(Dataset):
 
   IGNORE_BG_IMAGES = False
 
-  def __init__(self, root_dir, domain, transform=None, sample_ids=None):
+  def __init__(self, root_dir, domain, transform=None, sample_ids=None, ignore_bg_images=None):
     self.root_dir = root_dir
     self.domain = domain
     self.transform = transform
@@ -47,6 +47,11 @@ class COCO14Dataset(Dataset):
         if isinstance(sample_ids, str)
         else sample_ids
       )
+    self.ignore_bg_images = (
+      self.IGNORE_BG_IMAGES
+      if ignore_bg_images is None
+      else ignore_bg_images
+    )
     self.label_list = _load_labels_from_npy(self.img_name_list, root_dir)
 
   def __len__(self):
@@ -61,7 +66,7 @@ class COCO14Dataset(Dataset):
   def load_sample_with_labels(self, idx):
     label = self.label_list[idx]
 
-    if self.IGNORE_BG_IMAGES and label.sum() == 0:
+    if self.ignore_bg_images and label.sum() == 0:
       return self.load_sample_with_labels(idx + 1)
 
     image_id = _decode_id(self.img_name_list[idx])
@@ -126,14 +131,9 @@ class SegmentationDataset(CAMEvaluationDataset):
 class PathsDataset(COCO14Dataset):
 
   def __init__(self, root_dir, domain, masks_dir=None, sample_ids=None, ignore_bg_images=None):
-    super().__init__(root_dir=root_dir, domain=domain, sample_ids=sample_ids)
+    super().__init__(root_dir=root_dir, domain=domain, sample_ids=sample_ids, ignore_bg_images=ignore_bg_images)
 
     self.masks_dir = masks_dir or os.path.join(self.root_dir, MASKS_DIR)
-    self.ignore_bg_images = (
-      self.IGNORE_BG_IMAGES
-      if ignore_bg_images is None
-      else ignore_bg_images
-    )
 
   def __getitem__(self, idx):
     label = self.label_list[idx]
