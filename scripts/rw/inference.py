@@ -37,6 +37,7 @@ parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
+parser.add_argument('--sample_ids', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -69,7 +70,7 @@ def run(args):
   normalize_fn = Normalize(*imagenet_stats())
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images, sample_ids=args.sample_ids)
 
   # Network
   model = AffinityNet(
@@ -140,12 +141,6 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         continue
 
       cams = cam_dict['cam']
-      if args.verbose >= 3:
-        print(cam_dict["keys"], end=" ")
-
-      if cams.shape[1] == 0:
-        print(f"{image_id} skipped (bg)")
-        continue
 
       # preprocessing
       with x:
@@ -157,7 +152,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       x = x.to(device)
 
       # inference
-      edge = model.get_edge(x)
+      edge = model.get_edge(x, image_size=args.image_size)
 
       # postprocessing
       rw = cams.to(device)
@@ -184,6 +179,11 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
 
 
 if __name__ == '__main__':
+  try:
+    multiprocessing.set_start_method('spawn')
+  except RuntimeError:
+    ...
+
   # Arguments
   args = parser.parse_args()
 

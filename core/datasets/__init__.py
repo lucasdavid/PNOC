@@ -128,15 +128,16 @@ def get_segmentation_datasets(
   return train, valid
 
 
-def get_inference_dataset(dataset, data_dir, domain=None, transform=None, ignore_bg_images=None):
+def get_inference_dataset(dataset, data_dir, domain=None, transform=None, ignore_bg_images=None, sample_ids=None):
   print(f'Loading {dataset} Inference Dataset')
 
   if dataset == 'voc12':
     from . import voc12
-    infer = voc12.InferenceDataset(data_dir, domain or 'train_aug', transform)
+    infer = voc12.InferenceDataset(data_dir, domain or 'train_aug', transform, sample_ids=sample_ids)
   else:
     from . import coco14
-    infer = coco14.InferenceDataset(data_dir, domain or 'train2014', transform, ignore_bg_images=ignore_bg_images)
+    infer = coco14.InferenceDataset(data_dir, domain or 'train2014', transform,
+                                    sample_ids=sample_ids, ignore_bg_images=ignore_bg_images)
 
   infer.info = DatasetInfo.from_metafile(dataset)
 

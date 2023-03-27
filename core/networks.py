@@ -364,12 +364,17 @@ class AffinityNet(Backbone):
       return edge
 
   def get_edge(self, x, image_size=512, stride=4):
+    print(f"get_edge x={x.shape} image_size={image_size} stride={stride}")
     feat_size = (x.size(2) - 1) // stride + 1, (x.size(3) - 1) // stride + 1
+    print(f"feat_size={feat_size}")
 
     x = F.pad(x, [0, image_size - x.size(3), 0, image_size - x.size(2)])
+    print(f"pad(x)={x.shape}")
     edge_out = self.forward(x)
+    print(f"edge(x)={edge_out.shape}")
     edge_out = edge_out[..., :feat_size[0], :feat_size[1]]
     edge_out = torch.sigmoid(edge_out[0] / 2 + edge_out[1].flip(-1) / 2)
+    print(f"valid(edge(x))={edge_out.shape}")
 
     return edge_out
 

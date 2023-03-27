@@ -51,19 +51,9 @@ run_inference() {
       --beta 10                    \
       --exp_times 8                \
       --dataset $DATASET           \
+      --image_size $MAX_IMAGE_SIZE \
       --domain $DOMAIN             \
       --data_dir $DATA_DIR
-    
-  # CUDA_VISIBLE_DEVICES=1           \
-  # $PY scripts/rw/inference.py      \
-  #     --architecture $ARCHITECTURE \
-  #     --model_name $TAG            \
-  #     --cam_dir $CAMS_DIR          \
-  #     --beta 10                    \
-  #     --exp_times 8                \
-  #     --dataset $DATASET           \
-  #     --domain val                 \
-  #     --data_dir $DATA_DIR         &
 }
 
 
@@ -117,21 +107,23 @@ DOMAIN=train
 # run_training
 # run_inference
 
-TAG=rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7
+# TAG=rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7
 # CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # LABEL_DIR=./experiments/predictions/voc12-an@ccamh@rs269pnoc-ls0.1@crf10-gt0.7@aff_fg=0.30_bg=0.10
 # run_training
-CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-DOMAIN=train_aug
-run_inference
+# CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# DOMAIN=train_aug
 # run_inference
 # CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
 # DOMAIN=val
 # run_inference
 
-# DATASET=coco14
-# DATA_DIR=/home/ldavid/workspace/datasets/coco14/
-# DOMAIN=train2014
-# TAG=rw/coco14-an@...
-# LABEL_DIR=
+DATASET=coco14
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+DOMAIN=train2014
+
+TAG=rw/coco14-an@pnoc-ls0.1-ccamh-ls0.1@rs269ra
+CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+LABEL_DIR=./experiments/predictions/affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf10-gt0.7@aff_fg=0.30_bg=0.80
 # run_training
+run_inference
