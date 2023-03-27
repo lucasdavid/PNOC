@@ -50,8 +50,8 @@ run_inference() {
       --cam_dir $CAMS_DIR          \
       --beta 10                    \
       --exp_times 8                \
+      --image_size $IMAGE_SIZE     \
       --dataset $DATASET           \
-      --image_size $MAX_IMAGE_SIZE \
       --domain $DOMAIN             \
       --data_dir $DATA_DIR
 }
