@@ -4,7 +4,9 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-aff
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/train-%j.out
-#SBATCH --time=48:00:00
+#SBATCH --time=00:30:00
+
+### 48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -24,7 +26,7 @@
 # CAMs Inference.
 #
 
-echo "[sdumont/sequana/classification/train-puzzle] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+echo "[sdumont/rw/train-affinity] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
@@ -77,6 +79,7 @@ run_training() {
 run_inference() {
   CUDA_VISIBLE_DEVICES=$DEVICES    \
   $PY scripts/rw/inference.py      \
+      --verbose      3             \
       --architecture $ARCHITECTURE \
       --model_name $TAG            \
       --cam_dir $CAMS_DIR          \
@@ -85,17 +88,6 @@ run_inference() {
       --dataset $DATASET           \
       --domain $DOMAIN             \
       --data_dir $DATA_DIR
-
-  # CUDA_VISIBLE_DEVICES=1           \
-  # $PY scripts/rw/inference.py      \
-  #     --architecture $ARCHITECTURE \
-  #     --model_name $TAG            \
-  #     --cam_dir $CAMS_DIR          \
-  #     --beta 10                    \
-  #     --exp_times 8                \
-  #     --dataset $DATASET           \
-  #     --domain val                 \
-  #     --data_dir $DATA_DIR         &
 }
 
 
@@ -160,7 +152,7 @@ DATA_DIR=$SCRATCH/datasets/coco14/
 DOMAIN=train2014
 
 TAG=rw/coco14-an@pnoc-ls0.1-ccamh-ls0.1@rs269ra
-CAMS_DIR=./experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 LABEL_DIR=./experiments/predictions/affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf10-gt0.7@aff_fg=0.30_bg=0.80
 # run_training
 run_inference

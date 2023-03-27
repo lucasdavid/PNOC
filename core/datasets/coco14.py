@@ -48,9 +48,9 @@ class COCO14Dataset(Dataset):
         else sample_ids
       )
     self.ignore_bg_images = (
-      self.IGNORE_BG_IMAGES
-      if ignore_bg_images is None
-      else ignore_bg_images
+      ignore_bg_images
+      if ignore_bg_images is not None
+      else self.IGNORE_BG_IMAGES
     )
     self.label_list = _load_labels_from_npy(self.img_name_list, root_dir)
 

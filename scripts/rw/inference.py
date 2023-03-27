@@ -126,19 +126,6 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
           print(f"{image_id} skipped (bg)")
         continue
 
-      # preprocessing
-      with x:
-        x = np.asarray(x)
-      x = normalize_fn(x)
-      x = x.transpose((2, 0, 1))
-      x = torch.from_numpy(x)
-      x = torch.stack([x, x.flip(-1)])
-      x = x.to(device)
-
-      # inference
-      edge = model.get_edge(x)
-
-      # postprocessing
       try:
         cam_dict = np.load(cam_path, allow_pickle=True).item()
       except UnpicklingError as error:
@@ -153,7 +140,26 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         continue
 
       cams = cam_dict['cam']
+      if args.verbose >= 3:
+        print(cam_dict["keys"], end=" ")
 
+      if cams.shape[1] == 0:
+        print(f"{image_id} skipped (bg)")
+        continue
+
+      # preprocessing
+      with x:
+        x = np.asarray(x)
+      x = normalize_fn(x)
+      x = x.transpose((2, 0, 1))
+      x = torch.from_numpy(x)
+      x = torch.stack([x, x.flip(-1)])
+      x = x.to(device)
+
+      # inference
+      edge = model.get_edge(x)
+
+      # postprocessing
       rw = cams.to(device)
       rw = propagate_to_edge(rw, edge, beta=args.beta, exp_times=args.exp_times, radius=5)
 

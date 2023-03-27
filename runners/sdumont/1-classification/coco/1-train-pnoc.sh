@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
-#SBATCH -p sequana_gpu_long
+#SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-pnoc
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/pnoc-%j.out
-#SBATCH --time=192:00:00
+#SBATCH --time=72:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
