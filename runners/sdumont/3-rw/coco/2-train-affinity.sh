@@ -81,8 +81,8 @@ run_inference() {
   $PY scripts/rw/inference.py        \
       --architecture $ARCHITECTURE   \
       --model_name   $TAG            \
+      --image_size   $IMAGE_SIZE     \
       --cam_dir      $CAMS_DIR       \
-      --image_size   $MAX_IMAGE_SIZE \
       --dataset      $DATASET        \
       --domain       $DOMAIN         \
       --data_dir     $DATA_DIR       \
@@ -99,4 +99,12 @@ TAG=rw/coco14-an@pnoc-ls0.1-ccamh-ls0.1@rs269ra
 CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 LABEL_DIR=./experiments/predictions/affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf10-gt0.7@aff_fg=0.30_bg=0.80
 # run_training
-run_inference
+# run_inference
+
+
+IMAGE_SIZE=640
+MIN_IMAGE_SIZE=400
+MAX_IMAGE_SIZE=800
+TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra
+run_training
+# run_inference

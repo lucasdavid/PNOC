@@ -91,9 +91,7 @@ if __name__ == '__main__':
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
   train_dataset = get_affinity_datasets(args.dataset, args.data_dir, args.label_dir, path_index, tt)
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, None)
 
   step_valid = len(train_loader)
