@@ -1,9 +1,4 @@
-# Revisiting Weakly Supervised Semantic Segmentation: Obtaining Robust Segmentation Priors with Complementary Regularizing Strategies
-
-**News**
-
-* Currently under peer-review in IJCAI23.
-* Experiments were run over LNCC SDumont infrastructure.
+# P-NOC: Adversarial CAM Generation for More Reliable Segmentation Cues in Weakly Supervised Semantic Segmentation
 
 ## Introduction
 
