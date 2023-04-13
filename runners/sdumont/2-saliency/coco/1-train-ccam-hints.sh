@@ -131,22 +131,29 @@ BATCH_SIZE=128
 ACCUMULATE_STEPS=2
 LABELSMOOTHING=0.1
 
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-# run_training
-
-BATCH_SIZE=64
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-# run_training
-
-FG_T=0.3
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-# run_training
-
 LR=0.0005
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+FG_T=0.3
+BATCH_SIZE=64
+TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-lr0.05@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
 run_training
 
-FG_T=0.2
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+###############
+# Alternatives
+###############
+
+# BATCH_SIZE=32
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
 # run_training
 
+# BATCH_SIZE=64
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# run_training
+
+# FG_T=0.3
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# run_training
+
+# FG_T=0.2
+# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# run_training

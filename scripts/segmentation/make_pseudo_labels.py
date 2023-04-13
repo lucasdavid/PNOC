@@ -7,9 +7,12 @@ import sys
 
 import imageio
 import numpy as np
+from tqdm import tqdm
+
 import torch
 from torch import multiprocessing
 from torch.utils.data import Subset
+from pickle import UnpicklingError
 
 from core.datasets import get_inference_dataset
 from tools.ai.demo_utils import crf_inference_label
@@ -40,39 +43,66 @@ def split_dataset(dataset, n_splits):
 
 def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
   subset = dataset[process_id]
-  length = len(subset)
+  processed = 0
+  missing = []
+  errors = []
+
+  if process_id == 0:
+    subset = tqdm(subset, mininterval=5.)
 
   with torch.no_grad():
-    for step, (x, _id, _) in enumerate(subset):
-      png_path = os.path.join(PRED_DIR, _id + '.png')
-      sal_file = os.path.join(SAL_DIR, _id + '.png') if SAL_DIR else None
+    for image, image_id, label in subset:
+      png_path = os.path.join(PRED_DIR, image_id + '.png')
+      cam_path = os.path.join(CAM_DIR, image_id + '.npy')
+      sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None
+
       if os.path.isfile(png_path):
         continue
 
-      W, H = x.size
-      data = np.load(CAM_DIR + _id + '.npy', allow_pickle=True).item()
+      W, H = image.size
 
-      keys = data['keys']
-      cam = data['rw']
-      if sal_file:
-        sal = load_saliency_file(sal_file)
-        cam = np.concatenate((sal, cam), axis=0)
+      if label.sum() == 0:  # only background regions
+        conf = np.zeros((H, W), dtype=np.uint8)
       else:
-        cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
+        try:
+          data = np.load(cam_path, allow_pickle=True).item()
+        except UnpicklingError as error:
+          errors.append(cam_path)
+          print(f"{image_id} skipped (cam error={error})")
+          continue
+        except FileNotFoundError:
+          missing.append(cam_path)
+          print(f"{image_id} skipped (cam missing)")
+          continue
 
-      cam = np.argmax(cam, axis=0)
+        keys = data['keys']
+        cam = data['rw']
+        if sal_file:
+          try:
+            sal = load_saliency_file(sal_file)
+            cam = np.concatenate((sal, cam), axis=0)
+          except FileNotFoundError:
+            missing.append(sal_file)
+            continue
+        else:
+          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
 
-      if args.crf_t > 0:
-        cam = crf_inference_label(np.asarray(x), cam, n_labels=keys.shape[0], t=args.crf_t, gt_prob=args.crf_gt_prob)
+        cam = np.argmax(cam, axis=0)
 
-      conf = keys[cam]
+        if args.crf_t > 0:
+          x = np.array(image)
+          image.close()
+          cam = crf_inference_label(x, cam, n_labels=keys.shape[0], t=args.crf_t, gt_prob=args.crf_gt_prob)
+
+        conf = keys[cam]
+
       imageio.imwrite(png_path, conf.astype(np.uint8))
+      processed += 1
 
-      if process_id == 0 and step % max(1, length // 20) == 0:
-        sys.stdout.write(
-          f'\r# Make pseudo labels [{step + 1}/{length}] = {(step + 1) / length * 100:.2f}%, ({(H, W)}, {cam.shape})'
-        )
-        sys.stdout.flush()
+  if missing: print(f"{len(missing)} files were missing and were not processed:", *missing, sep='\n  - ', flush=True)
+  if errors: print(f"{len(errors)} CAM files could not be read:", *errors, sep="\n  - ", flush=True)
+
+  print(f"{processed} images successfully processed")
 
 
 if __name__ == '__main__':

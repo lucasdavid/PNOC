@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J inf
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/coco-inf-%j.out
-#SBATCH --time=2:00:00
+#SBATCH --time=16:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -43,9 +43,6 @@ PY=python3.9
 SOURCE=scripts/cam/inference.py
 DEVICES=0,1,2,3
 
-# DATASET=voc12
-# DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-# DOMAIN=train
 DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 DOMAIN=train2014
@@ -69,10 +66,18 @@ run_inference () {
 }
 
 DOMAIN=train2014
-TAG=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3
+# DOMAIN=val2014
+
+TAG=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1
 run_inference
 
 # TAG=poc/coco14-rs101-poc@rs101
 # ARCHITECTURE=resnest101
+# run_inference
+
+# TAG=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1
+# run_inference
+
+# TAG=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1
 # run_inference
 

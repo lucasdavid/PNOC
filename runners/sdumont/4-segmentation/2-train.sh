@@ -44,9 +44,6 @@ DEVICES=0,1,2,3
 DATASET=voc12
 DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 DOMAIN=train_aug
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
 
 # Architecture
 ARCH=rs269
@@ -72,7 +69,7 @@ MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
 run_experiment() {
-  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,ls:$LABELSMOOTHING"  \
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING"  \
   WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation"   \
   CUDA_VISIBLE_DEVICES=$DEVICES             \
   $PY $SOURCE                               \
@@ -108,7 +105,28 @@ run_experiment() {
 # MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
 # run_experiment
 
+# LABELSMOOTHING=0.1
+# TAG=d3p-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-ls0.1
+# MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
+# run_experiment
+
+
+## ====================================
+## MS COCO Dataset
+## ===================================
+
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+DOMAIN=train2014
+
+IMAGE_SIZE=640
+MIN_IMAGE_SIZE=320
+MAX_IMAGE_SIZE=1024
+
+LR=0.007
 LABELSMOOTHING=0.1
-TAG=d3p-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-ls0.1
-MASKS_DIR=./experiments/predictions/rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@beta=10@exp_times=8@rw@crf=1
+
+TAG=$DATASET-d3p-lr$LR-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-ls0.1
+MASKS_DIR=./experiments/predictions/rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@beta=10@exp_times=8@rw@crf=1
 run_experiment
+

@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-aff
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/train-%j.out
-#SBATCH --time=00:30:00
+#SBATCH --time=16:00:00
 
 ### 48:00:00
 
@@ -106,5 +106,10 @@ IMAGE_SIZE=640
 MIN_IMAGE_SIZE=400
 MAX_IMAGE_SIZE=800
 TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra
-run_training
+# run_training
 # run_inference
+
+CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
+DOMAIN=val2014
+run_inference
+

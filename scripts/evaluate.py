@@ -5,7 +5,6 @@ import sys
 
 import numpy as np
 from PIL import Image, UnidentifiedImageError
-from tqdm import tqdm
 
 import wandb
 from core.datasets import get_paths_dataset
@@ -41,9 +40,6 @@ def compare(dataset, classes, start, step, TP, P, T):
   missing = []
 
   steps = range(start, len(dataset), step)
-
-  if start == 0:
-    steps = tqdm(steps, mininterval=2.)
 
   try:
     for idx in steps:
@@ -128,13 +124,13 @@ def compare(dataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if start == 0:
-    read = compared + len(missing) + len(corrupted)
-    print(f"{compared} ({compared/read:.3%}) predictions evaluated (corrupted={len(corrupted)} missing={len(missing)}).", flush=True)
   if missing:
-    print(f"Missing files: {', '.join(missing)}", flush=True)
+    print(f"Missing files: {', '.join(missing)}")
   if corrupted:
-    print(f"Corrupted files: {', '.join(corrupted)}", flush=True)
+    print(f"Corrupted files: {', '.join(corrupted)}")
+  if start == 0 and (missing or corrupted):
+    read = compared + len(missing) + len(corrupted)
+    print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
 
 
 def do_python_eval(dataset, classes, num_workers=8):

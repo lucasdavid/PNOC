@@ -4,7 +4,7 @@
 #SBATCH -p nvidia_long
 #SBATCH -J mk-pseudo-segm
 #SBATCH -o /scratch/lerdl/lucas.david/logs/mk-pseudo-segm-%j.out
-#SBATCH --time=03:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -36,15 +36,9 @@ export PYTHONPATH=$(pwd)
 PY=python3.9
 SOURCE=scripts/segmentation/make_pseudo_labels.py
 
-DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
-DOMAIN=train_aug
-# DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
-# DOMAIN=train2014
-
-CAMS_DIR=./experiments/predictions/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0/
-# SAL_DIR=./experiments/predictions/saliency/poolnet@ccam-fgh@rs269@rs269-poc/
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+DOMAIN=train2014
 
 THRESHOLD=0.25
 CRF_T=1
@@ -53,6 +47,7 @@ CRF_GT=0.9
 run_inference() {
   $PY $SOURCE                      \
       --experiment_name $TAG       \
+      --dataset         $DATASET   \
       --domain          $DOMAIN    \
       --threshold       $THRESHOLD \
       --crf_t           $CRF_T     \
@@ -60,10 +55,14 @@ run_inference() {
       --data_dir        $DATA_DIR
 }
 
-TAG=rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@train@beta=10@exp_times=8@rw
-DOMAIN=train_aug
+
+TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@train@beta=10@exp_times=8@rw
+THRESHOLD=0.3
+
+DOMAIN=train2014
+# run_inference
+
+TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@val@beta=10@exp_times=8@rw
+DOMAIN=val2014
 run_inference
 
-# TAG=rw/voc12-an@ccamh@rs269pnoc-ls0.1@fg0.3-bg0.1-crf10-gt0.7@val@beta=10@exp_times=8@rw
-# DOMAIN=val
-# run_inference
