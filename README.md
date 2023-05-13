@@ -5,6 +5,15 @@
 This respository contains the official implementation for the paper
 "P-NOC: Adversarial CAM Generation for Weakly Supervised Semantic Segmentation".
 
+In summary, P-NOC is trained by alternatively optimizing two objectives:
+```math
+\begin{align}
+    \mathcal{L}_f &= \mathbb{E}_{(x,y)\sim\mathcal{D},r\sim y}[\mathcal{L}_\text{P} + \lambda_\text{cse}\ell_\text{cls}(p^\text{oc}, y\setminus\{r\})] \\
+    \mathcal{L}_\text{noc} &= \mathbb{E}_{(x,y)\sim\mathcal{D},r\sim y}[\lambda_\text{noc}\ell_\text{cls}(p^\text{noc}, y)]
+\end{align}
+```
+where $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
+
 ![Diagram for the proposed P-NOC (Puzzle-Not so Ordinary Classifier) training setup.](assets/diagram-p-noc.png)
 
 ## Results
