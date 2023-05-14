@@ -119,21 +119,22 @@ $PY scripts/evaluate.py --experiment_name $PNOC_CAMS --domain $D_TRAIN \
 ### 2 Train CCAM and generate pseudo saliency masks
 ```shell
 # 2.1 Train C²AM-H
-FG_T=0.3  # Might need fine-tuning. Usually a high value, inducing low FP for classes.
-CCAMH_TAG=$DATASET-ccamh-rs269-fg$FG_T@rs269pnoc@rs269ra
-
 B=256
 AC=1
 # If memory requirements too high:
 B=128
 AC=2
 
-LR=0.001
-LR=0.0005
+CCAMH_LR=0.001   # VOC12
+CCAMH_LR=0.0005  # MSCOCO14
+
+FG_T=0.3  # Might need fine-tuning. Usually a high value, inducing low FP for classes.
+CCAMH_TAG=$DATASET-ccamh-rs269-fg$FG_T@rs269pnoc@rs269ra
 
 CUDA_VISIBLE_DEVICES=$DEVICES       \
   $PY scripts/ccam/train_hints.py   \
   --tag                 $CCAMH_TAG  \
+  --lr                  $CCAMH_LR   \
   --batch_size          $B          \
   --accumulate_steps    $AC         \
   --mixed_precision     true        \
