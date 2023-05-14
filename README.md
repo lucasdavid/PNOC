@@ -31,92 +31,54 @@ where $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
 | P-NOC | 51.01 | 4.88 | 38.23 | 47.6 | 52.41 | 19.91 | 12.16 | 29.33 | 35.3 | 24.73 | 39.83 | 52.14 | 32.73 | 27.16 | 30.61 | 17.83 | 13.88 | 66.68 | 53.38 | 55.49 | 67.76 | 35.56 | 29.03 | 56.26 | 66.46 | 67.79 | 52.73 | 21.4 | 30.02 | 20.05 | 46.51 | 12.61 | 66.04 | 41.53 | 60.33 | 24.88 | 33.13 | 60.94 | 65.85 | 38.99 | 35.53 | 25.06 | 34.14 | 27.63 | 40.1 | 24.18 | 37.42 | 50.07 | 72.15 | 27.29 | 35.36 | 48.12 |
 
 ## Setup
-### Pascal VOC 2012
-
-```shell
-DATA_DIR=/datasets
-cd $DATA_DIR
-
-# Download images and labels from http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit:
-wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
-tar -xf VOCtrainval_11-May-2012.tar
-
-# Download the augmented segmentation maps from http://home.bharathh.info/pubs/codes/SBD
-# *only if* you are planning on training the fully-suppervised
-# models (for comparison purposes):
-wget http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/semantic_contours/benchmark.tgz
-tar -xzf benchmark.tgz
-
-# Merge them into the VOCdevkit/VOC2012/SegmentationClass folder:
-mv aug_seg/* VOCdevkit/VOC2012/SegmentationClass/
-```
-### MS COCO 2014
-
-```shell
-DATA_DIR=/datasets/coco14
-cd $DATA_DIR
-
-# Download MS COCO images and labels:
-wget http://images.cocodataset.org/zips/train2014.zip
-wget http://images.cocodataset.org/zips/val2014.zip
-wget https://github.com/jbeomlee93/RIB/raw/main/coco14/cls_labels.npy
-wget https://github.com/jbeomlee93/RIB/raw/main/coco14/cls_labels_coco.npy
-
-# Download segmentation labels in VOC format from
-# https://drive.google.com/file/d/1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV/view
-gdown 1pRE9SEYkZKVg0Rgz2pi9tg48j7GlinPV
-
-# Unzip everything:
-unzip train2014.zip
-unzip val2014.zip
-unzip coco_annotations_semantic.zip
-mv coco_annotations_semantic/coco_seg_anno .
-rm coco_annotations_semantic -r
-```
+Check the [SETUP.md](SETUP.md) file for information regarding the setup of the Pascal VOC 2012 and MS COCO 2014 datasets.
 
 ## Experiments
 
+The scripts used for training P-NOC are available in the [runners](runners) folder.
+Generally, they will run the following scripts, in this order:
+
 ### 0. Common Setup
 ```shell
-export PYTHONPATH=$(pwd)
+ARCH=rs269
+ARCHTECTURE=resnest269
+B=32    # batch size
+AC=1    # accumulate steps
+## If memory requirements are too high: 
+# B=16
+# AC=2
 
-PY=python3.9
-PIP=pip3.9
-DEVICES=0,1,2,3
-WORKERS=24
-
-$PIP install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
-$PIP install -r requirements.txt
-
-# WANDB_PROJECT=some-project-id  # Specify project to export training reports
-# wandb disabled                 # Otherwise, no metrics exported.
-
+# Pascal VOC 2012
+# ===============
+LR=0.1
+LS=0.1  # label smoothing
 DATASET=voc12
 D_TRAIN=train_aug
 D_VAL=val
 DATA_DIR=/datasets/VOCdevkit/VOC2012
-# DATASET=coco14
-# D_TRAIN=train2014
-# D_VAL=val2014
-# DATA_DIR=/datasets/coco14
 
-ARCH=resnest269
-B=32    # batch size
-AC=1    # accumulate steps
-LS=0.1  # label smoothing
+# MS COCO 2014
+# ============
+LR=0.05
+LS=0  # label smoothing
+DATASET=coco14
+D_TRAIN=train2014
+D_VAL=val2014
+DATA_DIR=/datasets/coco14
 ```
 
 ### 1. Train classifiers and generate segmentation priors
 ```shell
 # 1.1 Train Ordinary Classifier (OC).
-OC_TAG=$DATASET-rs269ra
+OC_TAG=$DATASET-$ARCHra
 OC_WEIGHTS=./experiments/models/$OC_TAG.pth
 
 CUDA_VISIBLE_DEVICES=$DEVICES    \
 $PY scripts/cam/train_vanilla.py \
   --tag             $OC_TAG      \
+  --lr              $LR          \
   --batch_size      $B           \
-  --architecture    $ARCH        \
+  --architecture    $ARCHTECTURE \
   --augment         randaugment  \
   --label_smoothing $LS          \
   --dataset         $DATASET     \
@@ -126,20 +88,21 @@ $PY scripts/cam/train_vanilla.py \
 PNOC_TAG=$DATASET-rs269pnoc@rs269ra
 PNOC_CAMS=$PNOC_TAG@$D_TRAIN@scale=0.5,1.0,1.5,2.0
 
-CUDA_VISIBLE_DEVICES=$DEVICES     \
-$PY scripts/cam/train_pnoc.py     \
-  --tag               $PNOC_TAG   \
-  --batch_size        $B          \
-  --accumulate_steps  $AC         \
-  --mixed_precision   true        \
-  --augment           colorjitter \
-  --label_smoothing   $LS         \
-  --architecture      $ARCH       \
-  --oc-architecture   $ARCH       \
-  --oc-train-masks    cams        \
-  --oc_train_mask_t   0.2         \
-  --oc-pretrained     $OC_WEIGHTS \
-  --dataset           $DATASET    \
+CUDA_VISIBLE_DEVICES=$DEVICES      \
+$PY scripts/cam/train_pnoc.py      \
+  --tag               $PNOC_TAG    \
+  --lr                $LR          \
+  --batch_size        $B           \
+  --accumulate_steps  $AC          \
+  --mixed_precision   true         \
+  --augment           colorjitter  \
+  --label_smoothing   $LS          \
+  --oc-train-masks    cams         \
+  --oc_train_mask_t   0.2          \
+  --architecture      $ARCHTECTURE \
+  --oc-architecture   $ARCHTECTURE \
+  --oc-pretrained     $OC_WEIGHTS  \
+  --dataset           $DATASET     \
   --data_dir          $DATA_DIR
 
 # 1.3 Inference of CAMs with TTA.
@@ -159,8 +122,14 @@ $PY scripts/evaluate.py --experiment_name $PNOC_CAMS --domain $D_TRAIN \
 FG_T=0.3  # Might need fine-tuning. Usually a high value, inducing low FP for classes.
 CCAMH_TAG=$DATASET-ccamh-rs269-fg$FG_T@rs269pnoc@rs269ra
 
-B=128
+B=256
 AC=1
+# If memory requirements too high:
+B=128
+AC=2
+
+LR=0.001
+LR=0.0005
 
 CUDA_VISIBLE_DEVICES=$DEVICES       \
   $PY scripts/ccam/train_hints.py   \
@@ -168,7 +137,7 @@ CUDA_VISIBLE_DEVICES=$DEVICES       \
   --batch_size          $B          \
   --accumulate_steps    $AC         \
   --mixed_precision     true        \
-  --architecture        $ARCH       \
+  --architecture        $ARCHTECTURE \
   --stage4_out_features 1024        \
   --fg_threshold        $FG_T       \
   --cams_dir ./experiments/predictions/$PNOC_CAMS  \
@@ -219,7 +188,7 @@ $PY scripts/rw/make_affinity_labels.py  \
 CUDA_VISIBLE_DEVICES=$DEVICES    \
 $PY scripts/rw/train_affinity.py \
     --tag          $RW_TAG       \
-    --architecture $ARCH         \
+    --architecture $ARCHTECTURE  \
     --batch_size   $B            \
     --label_dir    ./experiments/predictions/$RW_TAG  \
     --dataset      $DATASET      \
@@ -233,8 +202,11 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/rw/inference.py --domain $D_TRAIN \
 CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/rw/inference.py --domain $D_VAL \
   --architecture $ARCH --model_name $RW_TAG --cam_dir $PNOC_TAG           \
   --beta 10 --exp_times 8 --dataset $DATASET --data_dir $DATA_DIR
+```
 
-# 3.4 Generate pseudo labels
+#### 4 Train DeepLabV3+ and generate semantic segmentation predictions (optional)
+```shell
+# 4.1 Generate pseudo labels
 T=0.3
 CRF_T=1
 CRF_P=0.9
@@ -255,11 +227,8 @@ mkdir -p $RW_LABELS
 mv $RW_TAG@train@beta=10@exp_times=8@rw@crf=1/* $RW_LABELS/
 mv $RW_TAG@val@beta=10@exp_times=8@rw@crf=1/* $RW_LABELS/
 rm $RW_TAG@train@beta=10@exp_times=8@rw@crf=1 $RW_TAG@val@beta=10@exp_times=8@rw@crf=1 -r
-```
 
-#### 4 Train DeepLabV3+ and generate semantic segmentation predictions
-```shell
-# 4.1 Train DeepLabV3+
+# 4.2 Train DeepLabV3+
 SEGM_TAG=dlv3p-gn@an@pn@ccamh@rs269pnoc@rs269ra
 B=32
 AUG=colorjitter  # colorjitter_cutmix
