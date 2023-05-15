@@ -9,6 +9,8 @@ DEVICE=cuda
 DEVICES=0
 WORKERS=8
 
+MIXED_PRECISION=true  # false
+
 # Dataset
 IMAGE_SIZE=512
 
@@ -22,7 +24,10 @@ run() {
         --domain       $DOMAIN       \
         --beta         10            \
         --exp_times    8             \
+        --mixed_precision $MIXED_PRECISION \
+        --dataset      $DATASET      \
         --data_dir     $DATA_DIR
+
 }
 
 
@@ -81,16 +86,26 @@ RW_DIR=$MODEL_NAME@$DOMAIN@beta=10@exp_times=8@rw
 MODEL_NAME=rw/affnet@rs269-poc@pn-fgh@crf-10-gt-0.9@aff_fg=0.40_bg=0.10
 CAM_DIR=poc/ResNeSt269@PuzzleOc@$DOMAIN@scale=0.5,1.0,1.5,2.0
 RW_DIR=$MODEL_NAME@$DOMAIN@beta=10@exp_times=8@rw
-run
-$PY scripts/evaluate.py --experiment_name $RW_DIR --dataset voc12 --domain val --data_dir $DATA_DIR --min_th 0.05 --max_th 0.81 --crf_t 1 --crf_gt_prob 0.9
-
-## ===================================
-## COCO 14
-
-# DATASET=coco14
-# DATA_DIR=/home/ldavid/workspace/datasets/coco14/
-# DOMAIN=train2014
-# MODEL_NAME=
-# CAM_DIR=
-# RW_DIR=
 # run
+# $PY scripts/evaluate.py --experiment_name $RW_DIR --dataset voc12 --domain val --data_dir $DATA_DIR --min_th 0.05 --max_th 0.81 --crf_t 1 --crf_gt_prob 0.9
+
+
+## =========================================
+## MS COCO 14 Dataset
+## =========================================
+
+DATASET=coco14
+IMAGE_SIZE=640
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+
+MODEL_NAME=rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra
+
+DOMAIN=train2014
+CAM_DIR=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
+RW_DIR=$MODEL_NAME@train@beta=10@exp_times=8@rw
+# run
+
+DOMAIN=val2014
+CAM_DIR=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@val@scale=0.5,1.0,1.5,2.0
+RW_DIR=$MODEL_NAME@val@beta=10@exp_times=8@rw
+run

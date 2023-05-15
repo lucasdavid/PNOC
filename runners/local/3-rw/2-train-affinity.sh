@@ -118,6 +118,11 @@ DOMAIN=train
 # DOMAIN=val
 # run_inference
 
+
+## =========================================
+## MS COCO 14 Dataset
+## =========================================
+
 DATASET=coco14
 DATA_DIR=/home/ldavid/workspace/datasets/coco14/
 DOMAIN=train2014

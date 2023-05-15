@@ -28,6 +28,11 @@ DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 DOMAIN=train2014
 # DOMAIN=val2014
+VERBOSE=1
+
+MIN_TH=0.15
+MAX_TH=0.51
+
 
 run_inference() {
   $PY $SOURCE                   \
@@ -39,6 +44,7 @@ run_inference() {
     --max_th          $MAX_TH   \
     --crf_t           $CRF_T       \
     --crf_gt_prob     $CRF_GT_PROB \
+    --verbose         $VERBOSE     \
     --num_workers     $WORKERS
 }
 
@@ -53,11 +59,9 @@ run_inference_sal() {
     --max_th          $MAX_TH   \
     --crf_t           $CRF_T       \
     --crf_gt_prob     $CRF_GT_PROB \
+    --verbose         $VERBOSE     \
     --num_workers     $WORKERS
 }
-
-MIN_TH=0.05
-MAX_TH=0.81
 
 # TAG=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # run_inference
@@ -77,10 +81,14 @@ MAX_TH=0.81
 # TAG=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@val@scale=0.5,1.0,1.5,2.0
 TAG=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@val@scale=0.5,1.0,1.5,2.0
 DOMAIN=val2014
-CRF_T=0
-# run_inference
-
-CRF_T=10
 CRF_GT_PROB=0.7
+CRF_T=0
 run_inference
 
+# CRF_T=10
+# CRF_GT_PROB=0.7
+# run_inference
+
+CRF_T=1
+CRF_GT_PROB=0.9
+run_inference

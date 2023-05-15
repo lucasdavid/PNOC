@@ -35,6 +35,7 @@ parser.add_argument('--device', default='cuda', type=str)
 # parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--sample_ids', default=None, type=str)
 
 ###############################################################################
 # Network
@@ -66,7 +67,7 @@ normalize_fn = Normalize(*imagenet_stats())
 
 
 def run(args):
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
   print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 
   model = Classifier(

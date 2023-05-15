@@ -13,9 +13,6 @@ WORKERS=8
 DATASET=voc12
 DATA_DIR=/home/ldavid/workspace/datasets/voc/VOCdevkit/VOC2012/
 DOMAIN=train
-# DATASET=coco14
-# DATA_DIR=/home/ldavid/workspace/datasets/coco14/
-# DOMAIN=train2014
 
 ARCHITECTURE=resnest269
 DILATED=false
@@ -66,7 +63,7 @@ DOMAIN=train
 
 WEIGHTS=cam/resnest269@randaug
 TAG=$WEIGHTS
-run_inference
+# run_inference
 
 WEIGHTS=puzzle/ResNeSt269@Puzzle@optimal
 TAG=$WEIGHTS
@@ -88,3 +85,17 @@ TAG=$WEIGHTS
 # run_inference
 # WEIGHTS=pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3
 # run_inference
+
+## =========================================
+## MS COCO Dataset
+## =========================================
+
+
+DATASET=coco14
+DATA_DIR=/home/ldavid/workspace/datasets/coco14/
+DOMAIN=train2014
+
+WEIGHTS=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3
+TAG=$WEIGHTS
+# DOMAIN=val2014
+run_inference

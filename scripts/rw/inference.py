@@ -38,6 +38,7 @@ parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=st
 parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 parser.add_argument('--sample_ids', default=None, type=str)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -151,15 +152,20 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       x = torch.stack([x, x.flip(-1)])
       x = x.to(device)
 
-      # inference
-      edge = model.get_edge(x, image_size=args.image_size)
+      with torch.autocast(device_type=device, dtype=torch.float16, enabled=args.mixed_precision):
+        # inference
+        edge = model.get_edge(x, image_size=args.image_size)
 
-      # postprocessing
-      rw = cams.to(device)
-      rw = propagate_to_edge(rw, edge, beta=args.beta, exp_times=args.exp_times, radius=5)
+        # postprocessing
+        rw = cams.to(device)
+        try:
+          rw = propagate_to_edge(rw, edge, beta=args.beta, exp_times=args.exp_times, radius=5)
+        except RuntimeError as error:  # usually memory issues.
+          print(error, file=sys.stderr)
+          continue
 
-      rw_up = F.interpolate(rw, scale_factor=4, mode='bilinear', align_corners=False)[..., 0, :H, :W]
-      rw_up /= torch.max(rw_up)
+        rw_up = F.interpolate(rw, scale_factor=4, mode='bilinear', align_corners=False)[..., 0, :H, :W]
+        rw_up /= torch.max(rw_up)
 
       try:
         np.save(npy_path, {"keys": cam_dict['keys'], "rw": to_numpy(rw_up)})
