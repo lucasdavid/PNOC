@@ -27,6 +27,7 @@ parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='train', type=str)
+parser.add_argument('--sample_ids', default=None, type=str)
 
 parser.add_argument('--experiment_name', default='', type=str)
 parser.add_argument('--sal_dir', default=None, type=str)
@@ -119,7 +120,7 @@ if __name__ == '__main__':
 
   set_seed(args.seed)
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(

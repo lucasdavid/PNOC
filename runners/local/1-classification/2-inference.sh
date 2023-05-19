@@ -98,4 +98,9 @@ DOMAIN=train2014
 WEIGHTS=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3
 TAG=$WEIGHTS
 # DOMAIN=val2014
+# run_inference
+
+WEIGHTS=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1
+TAG=$WEIGHTS
+DOMAIN=train2014
 run_inference
