@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-dlv3
 #SBATCH -o /scratch/lerdl/lucas.david/logs/dlv3/train-%j.out
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -91,6 +91,7 @@ run_experiment() {
       --cutmix_prob       $CUTMIX           \
       --mixup_prob        $MIXUP            \
       --label_smoothing   $LABELSMOOTHING   \
+      --dataset           $DATASET          \
       --data_dir          $DATA_DIR         \
       --masks_dir         $MASKS_DIR
 }
@@ -123,10 +124,13 @@ IMAGE_SIZE=640
 MIN_IMAGE_SIZE=320
 MAX_IMAGE_SIZE=1024
 
-LR=0.007
+LR=0.004
 LABELSMOOTHING=0.1
 
-TAG=$DATASET-d3p-lr$LR-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-ls0.1
-MASKS_DIR=./experiments/predictions/rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@beta=10@exp_times=8@rw@crf=1
+BATCH_SIZE=16
+ACCUMULATE_STEPS=2
+
+TAG=$DATASET-d3p-lr$LR-ls$LABELSMOOTHING@pn-ccamh@rs269pnoc-lr0.05
+MASKS_DIR=./experiments/predictions/rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra@beta=10@exp_times=8@rw@crf=1
 run_experiment
 

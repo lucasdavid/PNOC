@@ -4,7 +4,7 @@
 #SBATCH -p nvidia_long
 #SBATCH -J ev
 #SBATCH -o /scratch/lerdl/lucas.david/logs/evaluate-%j.out
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 
 
 echo "[sdumont/sequana/classification/train-puzzle] started running at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -89,6 +89,11 @@ run_inference
 # CRF_GT_PROB=0.7
 # run_inference
 
+CRF_T=10
+CRF_GT_PROB=0.7
+# run_inference
+
+TAG=rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra@val@beta=10@exp_times=8@rw
 CRF_T=1
 CRF_GT_PROB=0.9
 run_inference

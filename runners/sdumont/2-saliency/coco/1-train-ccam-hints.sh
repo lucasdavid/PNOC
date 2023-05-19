@@ -120,8 +120,9 @@ run_inference() {
 FG_T=0.4
 # BG_T=0.1
 
-CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
+TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-lr0.05@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
 # run_training
 # run_inference
 
@@ -135,7 +136,8 @@ LR=0.0005
 FG_T=0.3
 BATCH_SIZE=64
 TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-lr0.05@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-run_training
+# run_training
+run_inference
 
 
 ###############

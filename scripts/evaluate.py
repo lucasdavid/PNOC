@@ -15,6 +15,7 @@ from tools.general.io_utils import load_saliency_file
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)
 parser.add_argument("--num_workers", default=48, type=int)
+parser.add_argument("--verbose", default=1, type=int)
 
 parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
 parser.add_argument("--domain", default="train", type=str)
@@ -93,12 +94,13 @@ def compare(dataset, classes, start, step, TP, P, T):
             img = np.asarray(img.convert("RGB"))
           cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
         except ValueError as error:
-          print(
-            f"dCRF inference error for id={image_id} img.size={img.shape} "
-            f"cam={cam.shape} labels={keys}:",
-            error,
-            file=sys.stderr
-          )
+          if args.verbose > 1:
+            print(
+              f"dCRF inference error for id={image_id} img.size={img.shape} "
+              f"cam={cam.shape} labels={keys}:",
+              error,
+              file=sys.stderr
+            )
           corrupted.append(image_id)
 
       y_pred = keys[cam]
@@ -124,11 +126,11 @@ def compare(dataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if missing:
+  if args.verbose > 1 and missing:
     print(f"Missing files: {', '.join(missing)}")
-  if corrupted:
+  if args.verbose > 1 and corrupted:
     print(f"Corrupted files: {', '.join(corrupted)}")
-  if start == 0 and (missing or corrupted):
+  if args.verbose > 0 and start == 0 and (missing or corrupted):
     read = compared + len(missing) + len(corrupted)
     print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
 
@@ -202,7 +204,7 @@ def run(args, dataset):
       args.threshold = t
       r = do_python_eval(dataset, classes, num_workers=args.num_workers)
 
-      print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
+      if args.verbose: print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
 
       fp_history.append(r["fp_all"])
       miou_history.append(r["mIoU"])
@@ -230,7 +232,7 @@ def run(args, dataset):
   except KeyboardInterrupt:
     print("\ninterrupted")
 
-  print(
+  if args.verbose: print(
     f"Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}",
     "-" * 80,
     *(f"{k:<12}\t{v:.5f}" for k, v in iou_.items()),
@@ -249,7 +251,7 @@ def run(args, dataset):
     fp_over = fp_ * a_over
     fp_under = fp_ * a_under
 
-    print("Over FP : {:.4f}, Under FP : {:.4f}".format(fp_over, fp_under))
+    if args.verbose: print("Over FP : {:.4f}, Under FP : {:.4f}".format(fp_over, fp_under))
 
     over_loss_list = [np.abs(FP - fp_over) for FP in fp_history]
     under_loss_list = [np.abs(FP - fp_under) for FP in fp_history]
@@ -264,9 +266,9 @@ def run(args, dataset):
     miou_under = miou_history[under_index]
     fp_under = fp_history[under_index]
 
-    print("Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(threshold_ or 0., miou_, fp_))
-    print("Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_over or 0., miou_over, fp_over))
-    print("Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_under or 0., miou_under, fp_under))
+    if args.verbose: print("Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(threshold_ or 0., miou_, fp_))
+    if args.verbose: print("Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_over or 0., miou_over, fp_over))
+    if args.verbose: print("Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_under or 0., miou_under, fp_under))
 
     wandb.run.summary[f"evaluation/over_t"] = t_over
     wandb.run.summary[f"evaluation/over_miou"] = miou_over

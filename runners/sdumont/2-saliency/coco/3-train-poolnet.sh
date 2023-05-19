@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-pn-%j.out
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -73,14 +73,13 @@ run_inference() {
     --sal_folder ./results/$TAG
 }
 
-TAG=coco14-pn@ccamh-rs269-fg0.2@rs269pnoc-ls0.1
-PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/coco14-ccamh-rs269@rs269pnoc@rs269@b64-fg0.3-lr0.0005-b64@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+TAG=coco14-pn@ccamh-rs269-fg0.25@rs269pnoc-lr0.05-ls0.1
+PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/coco14-ccamh-rs269@rs269pnoc-lr0.05@rs269@b64-fg0.3-lr0.0005-b64@train@scale=0.5,1.0,1.5,2.0@t=0.25@crf=10/
 MODEL_CKPT=./results/run-0/models/epoch_9.pth
 
 # run_training
 run_inference
 
-# cp ./results/run-1/models/epoch_9.pth ../experiments/models/saliency/$TAG.pth
-# mv ./results/$TAG ../experiments/predictions/saliency/
+cp ./results/run-0/models/epoch_9.pth ../experiments/models/saliency/$TAG.pth
+mv ./results/$TAG ../experiments/predictions/saliency/
 
-# --sample_ids      "000000581056"

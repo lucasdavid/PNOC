@@ -96,4 +96,12 @@ BG=0.8
 CRF_T=10
 CRF_GT=0.7
 TAG=affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0.2-ls@pn@an-crf$CRF_T-gt$CRF_GT
+# run_make_affinity_labels
+
+FG=0.25
+BG=0.65
+CAMS_DIR=./experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
+SAL_DIR=./experiments/predictions/saliency/coco14-pn@ccamh-rs269-fg0.25@rs269pnoc-lr0.05-ls0.1
+TAG=affinity/coco14-rs269pnoc-lr0.05@ccamh-rs269-fg0.25-ls@pn@an-crf$CRF_T-gt$CRF_GT
 run_make_affinity_labels
+

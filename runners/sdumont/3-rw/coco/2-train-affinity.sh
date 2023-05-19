@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-aff
 #SBATCH -o /scratch/lerdl/lucas.david/logs/puzzle/affinitynet/train-%j.out
-#SBATCH --time=16:00:00
+#SBATCH --time=20:00:00
 
 ### 48:00:00
 
@@ -101,6 +101,9 @@ LABEL_DIR=./experiments/predictions/affinity/coco14-rs269pnoc-ls@ccamh-rs269-fg0
 # run_training
 # run_inference
 
+#################
+# P-NOC RES 640px
+#################
 
 IMAGE_SIZE=640
 MIN_IMAGE_SIZE=400
@@ -111,5 +114,20 @@ TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra
 
 CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-ls0.1-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r3@val@scale=0.5,1.0,1.5,2.0
 DOMAIN=val2014
+# run_inference
+
+######################
+# P-NOC LR 0.05 (best)
+######################
+
+LABEL_DIR=./experiments/predictions/affinity/coco14-rs269pnoc-lr0.05@ccamh-rs269-fg0.25-ls@pn@an-crf10-gt0.7@aff_fg=0.25_bg=0.65
+TAG=rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra
+# run_training
+
+CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
+DOMAIN=train2014
 run_inference
 
+CAMS_DIR=pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@val@scale=0.5,1.0,1.5,2.0
+DOMAIN=val2014
+run_inference

@@ -56,13 +56,28 @@ run_inference() {
 }
 
 
-TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@train@beta=10@exp_times=8@rw
+## 
 THRESHOLD=0.3
 
+TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@train@beta=10@exp_times=8@rw
 DOMAIN=train2014
 # run_inference
 
 TAG=rw/coco14-an-640@pnoc-ls0.1-ccamh-ls0.1@rs269ra@val@beta=10@exp_times=8@rw
+DOMAIN=val2014
+# run_inference
+
+######################
+# P-NOC LR 0.05 (best)
+######################
+
+THRESHOLD=0.3
+
+TAG=rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra@train@beta=10@exp_times=8@rw
+DOMAIN=train2014
+run_inference
+
+TAG=rw/coco14-an-640@pnoc-lr0.05-ccamh-ls@rs269ra@val@beta=10@exp_times=8@rw
 DOMAIN=val2014
 run_inference
 

@@ -28,22 +28,22 @@ DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 DOMAIN=train2014
 
-TAG=saliency/coco14-pn@ccamh-rs269-fg0.2@rs269pnoc-ls0.1
-CRF_T=0
+# TAG=saliency/coco14-pn@ccamh-rs269-fg0.2@rs269pnoc-ls0.1
+TAG=saliency/coco14-pn@ccamh-rs269-fg0.25@rs269pnoc-lr0.05-ls0.1
+CRF_T=10
 CRF_GT_PROB=0.7
 
-WANDB_RUN_ID=1l3lea3r         \
-WANDB_RESUME=must             \
 WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh" \
 $PY $SOURCE                   \
   --experiment_name $TAG      \
   --dataset         $DATASET  \
   --domain          $DOMAIN   \
-  --min_th          0.4       \
-  --max_th          1.01      \
+  --min_th          0.2       \
+  --max_th          1.0       \
   --mode            png       \
   --eval_mode       segmentation \
   --crf_t           $CRF_T       \
   --crf_gt_prob     $CRF_GT_PROB \
   --data_dir        $DATA_DIR    \
   --num_workers     $WORKERS
+

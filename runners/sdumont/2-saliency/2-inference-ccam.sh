@@ -117,6 +117,6 @@ DATA_DIR=$SCRATCH/datasets/coco14/
 DOMAIN=train2014
 TAG=saliency/coco14-ccamh-rs269@rs269pnoc-lr0.05@rs269@b64-fg0.3-lr0.0005-b64
 PRETRAINED=./experiments/models/$TAG.pth
-T=0.2
-run_inference
+T=0.25
+# run_inference
 run_crf

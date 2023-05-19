@@ -189,7 +189,7 @@ if __name__ == '__main__':
     return miou, iou
 
   train_iterator = Iterator(train_loader)
-  torch.autograd.set_detect_anomaly(True)
+  # torch.autograd.set_detect_anomaly(True)
 
   for step in tqdm(range(step_init, step_max), 'Training'):
     images, targets = train_iterator.get()
