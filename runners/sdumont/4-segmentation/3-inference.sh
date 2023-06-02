@@ -31,12 +31,14 @@ nodeset -e $SLURM_JOB_NODELIST
 cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
 
 
 export PYTHONPATH=$(pwd)
 
-PY=python3.9
+# PY=python3.9
+PY=python3.8
 SOURCE=scripts/segmentation/inference.py
 DEVICES=0,1,2,3
 
@@ -101,4 +103,3 @@ DOMAIN=train
 run_inference
 DOMAIN=val
 run_inference
-
