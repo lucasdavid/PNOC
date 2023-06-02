@@ -77,7 +77,7 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device
-  
+
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 

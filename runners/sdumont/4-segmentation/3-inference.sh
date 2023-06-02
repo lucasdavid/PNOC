@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J inf-dlv3
 #SBATCH -o /scratch/lerdl/lucas.david/logs/dlv3/inf-%j.out
-#SBATCH --time=4:00:00
+#SBATCH --time=16:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -49,6 +49,7 @@ DOMAIN=train
 # DATA_DIR=$SCRATCH/datasets/coco14/
 # DOMAIN=train2014
 
+pip3.9 install -U dill
 
 run_inference() {
   echo "================================================="
@@ -62,6 +63,7 @@ run_inference() {
       --dilated  $DILATED          \
       --use_gn   $GROUP_NORM       \
       --tag      $TAG              \
+      --dataset  $DATASET          \
       --domain   $DOMAIN           \
       --scale    $SCALES           \
       --crf_t    $CRF_T            \
@@ -100,6 +102,20 @@ CRF_GT_PROB=0.7
 
 TAG=segmentation/d3p-ls0.1@pn-ccamh@rs269pnoc-ls0.1
 DOMAIN=train
-run_inference
+# run_inference
 DOMAIN=val
+# run_inference
+
+
+## ====================
+#  MS COCO 2014 Dataset
+## ====================
+
+DATASET=coco14
+DATA_DIR=$SCRATCH/datasets/coco14/
+
+TAG=segmentation/coco14-d3p-lr0.004-ls0.1@pn-ccamh@rs269pnoc-lr0.05
+DOMAIN=train2014
+# run_inference
+DOMAIN=val2014
 run_inference
