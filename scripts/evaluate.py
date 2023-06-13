@@ -68,12 +68,19 @@ def compare(dataset, classes, start, step, TP, P, T):
           corrupted.append(image_id)
           continue
 
-        keys = data["keys"]
+        if "keys" in data:
+          # Affinity/Puzzle/PNOC
+          keys = data["keys"]
 
-        if "hr_cam" in data.keys():
-          cam = data["hr_cam"]
-        elif "rw" in data.keys():
-          cam = data["rw"]
+          if "hr_cam" in data.keys():
+            cam = data["hr_cam"]
+          elif "rw" in data.keys():
+            cam = data["rw"]
+        else:
+          # OC-CSE
+          keys = list(data.keys())
+          cam = np.stack([data[k] for k in keys], 0)
+          keys = np.asarray([0] + [k+1 for k in keys])
 
         if sal_file:
           sal = load_saliency_file(sal_file, args.sal_mode)
