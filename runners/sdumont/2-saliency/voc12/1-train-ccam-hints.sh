@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-ccam
-#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-ccamh-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/tr-ccamh-%j.out
 #SBATCH --time=04:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -33,13 +33,14 @@ nodeset -e $SLURM_JOB_NODELIST
 cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
-
+module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
 
 export PYTHONPATH=$(pwd)
 
-PY=python3.9
+# PY=python3.9
+PY=python3.8
 SOURCE=scripts/ccam/train_hints.py
 DEVICES=0,1,2,3
 
@@ -58,7 +59,7 @@ IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
-MIXED_PRECISION=false
+MIXED_PRECISION=true
 LABELSMOOTHING=0
 
 ARCHITECTURE=resnest269
@@ -73,7 +74,7 @@ HINT_W=1.0
 LR=0.001
 
 run_training() {
-  WANDB_TAGS="ccamh,amp,$DATASET,$ARCH"     \
+  WANDB_TAGS="ccamh,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,ls:$LABELSMOOTHING,lr:$LR"     \
   CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
     --tag             $TAG                  \
     --alpha           $ALPHA                \
@@ -140,7 +141,6 @@ FG_T=0.4
 # run_training
 # run_inference
 
-# MIXED_PRECISION=true
 # BATCH_SIZE=64
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
@@ -164,9 +164,37 @@ FG_T=0.4
 # run_training
 # run_inference
 
-# MIXED_PRECISION=true
+
 # FG_T=0.2
 # CAMS_DIR=$SCRATCH/PuzzleCAM/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
 # run_training
 # run_inference
+
+
+LR=0.001
+MIXED_PRECISION=true
+BATCH_SIZE=128
+ACCUMULATE_STEPS=2
+LABELSMOOTHING=0.1
+
+FG_T=0.3
+BATCH_SIZE=64
+
+# ENS=ra-oc-p-poc-pnoc-avg
+# CAMS_DIR=experiments/predictions/ensemble/$ENS
+# TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# run_training
+# run_inference
+
+# ENS=ra-oc-p-poc-pnoc-learned-a0.25
+# CAMS_DIR=experiments/predictions/ensemble/$ENS
+# TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+# run_training
+# run_inference
+
+ENS=ra-oc-p-poc-pnoc-weighted-a0.25
+CAMS_DIR=experiments/predictions/ensemble/$ENS
+TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+run_training
+run_inference

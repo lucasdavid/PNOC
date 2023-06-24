@@ -73,7 +73,7 @@ HINT_W=1.0
 LR=0.001
 
 run_training() {
-  WANDB_TAGS="ccamh,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg-hints:$FG_T,lr:$LR,ls:$LABELSMOOTHING"     \
+  WANDB_TAGS="ccamh,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,lr:$LR,ls:$LABELSMOOTHING"     \
   CUDA_VISIBLE_DEVICES=$DEVICES $PY $SOURCE \
     --tag             $TAG                  \
     --alpha           $ALPHA                \

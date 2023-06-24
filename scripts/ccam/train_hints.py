@@ -209,7 +209,7 @@ if __name__ == '__main__':
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}")):
+    for step, (images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
 
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))

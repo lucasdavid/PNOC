@@ -115,7 +115,8 @@ DATASET=coco14
 DATA_DIR=$SCRATCH/datasets/coco14/
 
 TAG=segmentation/coco14-d3p-lr0.004-ls0.1@pn-ccamh@rs269pnoc-lr0.05
-DOMAIN=train2014
-# run_inference
 DOMAIN=val2014
 run_inference
+DOMAIN=train2014
+run_inference
+
