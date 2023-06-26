@@ -30,7 +30,6 @@ echo "[sdumont/sequana/saliency/train-ccam-hints] started running at $(date +'%Y
 
 nodeset -e $SLURM_JOB_NODELIST
 
-
 module load sequana/current
 # module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
@@ -82,30 +81,31 @@ INF_FG_T=0.2
 CRF_T=10
 CRF_GT_PROB=0.7
 
+
 ccamh_training() {
-  WANDB_TAGS="ccamh,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,ls:$LABELSMOOTHING,lr:$LR"     \
-  CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/train_hints.py \
-    --tag             $TAG                  \
-    --alpha           $ALPHA                \
-    --hint_w          $HINT_W               \
-    --max_epoch       $EPOCHS               \
-    --batch_size      $BATCH_SIZE           \
-    --lr              $LR                   \
-    --label_smoothing $LABELSMOOTHING       \
-    --accumulate_steps $ACCUMULATE_STEPS    \
-    --mixed_precision $MIXED_PRECISION      \
-    --num_workers     $WORKERS              \
-    --architecture    $ARCHITECTURE         \
-    --stage4_out_features $S4_OUT_FEATURES  \
-    --dilated         $DILATED              \
-    --mode            $MODE                 \
-    --trainable-stem  $TRAINABLE_STEM       \
-    --image_size      $IMAGE_SIZE           \
-    --cams_dir        $CAMS_DIR             \
-    --fg_threshold    $FG_T                 \
-    --dataset         $DATASET              \
-    --data_dir        $DATA_DIR
-    # --bg_threshold    $BG_T                \
+  WANDB_TAGS="ccamh,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,ls:$LABELSMOOTHING,lr:$LR" \
+    CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/train_hints.py \
+    --tag $TAG \
+    --alpha $ALPHA \
+    --hint_w $HINT_W \
+    --max_epoch $EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --lr $LR \
+    --label_smoothing $LABELSMOOTHING \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
+    --num_workers $WORKERS \
+    --architecture $ARCHITECTURE \
+    --stage4_out_features $S4_OUT_FEATURES \
+    --dilated $DILATED \
+    --mode $MODE \
+    --trainable-stem $TRAINABLE_STEM \
+    --image_size $IMAGE_SIZE \
+    --cams_dir $CAMS_DIR \
+    --fg_threshold $FG_T \
+    --dataset $DATASET \
+    --data_dir $DATA_DIR
+  # --bg_threshold    $BG_T                \
 }
 
 ccamh_inference() {
@@ -113,39 +113,39 @@ ccamh_inference() {
   PRETRAINED=./experiments/models/$TAG.pth
 
   CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/inference.py \
-    --tag             $TAG                 \
-    --dataset         $DATASET             \
-    --domain          $DOMAIN              \
-    --architecture    $ARCHITECTURE        \
-    --dilated         $DILATED             \
+    --tag $TAG \
+    --dataset $DATASET \
+    --domain $DOMAIN \
+    --architecture $ARCHITECTURE \
+    --dilated $DILATED \
     --stage4_out_features $S4_OUT_FEATURES \
-    --mode            $MODE                \
-    --weights         $WEIGHTS             \
-    --trainable-stem  $TRAINABLE_STEM      \
-    --pretrained      $PRETRAINED          \
-    --data_dir        $DATA_DIR
+    --mode $MODE \
+    --weights $WEIGHTS \
+    --trainable-stem $TRAINABLE_STEM \
+    --pretrained $PRETRAINED \
+    --data_dir $DATA_DIR
 }
 
 ccamh_pseudo_masks_crf() {
-  $PY scripts/ccam/inference_crf.py                    \
+  $PY scripts/ccam/inference_crf.py \
     --experiment_name $TAG@train@scale=0.5,1.0,1.5,2.0 \
-    --dataset         $DATASET                         \
-    --domain          $DOMAIN                          \
-    --threshold       $INF_FG_T                        \
-    --crf_t           $CRF_T                           \
-    --crf_gt_prob     $CRF_GT_PROB                     \
-    --data_dir        $DATA_DIR
+    --dataset $DATASET \
+    --domain $DOMAIN \
+    --threshold $INF_FG_T \
+    --crf_t $CRF_T \
+    --crf_gt_prob $CRF_GT_PROB \
+    --data_dir $DATA_DIR
 }
 
 poolnet_training() {
   cd $PRJ_DIR/poolnet
 
-  CUDA_VISIBLE_DEVICES=0 $PY main_custom.py  \
-    --arch        "resnet"       \
-    --mode        "train"             \
-    --dataset     $DATASET            \
-    --train_root  $DATA_DIR           \
-    --train_list  $DOMAIN             \
+  CUDA_VISIBLE_DEVICES=0 $PY main_custom.py \
+    --arch "resnet" \
+    --mode "train" \
+    --dataset $DATASET \
+    --train_root $DATA_DIR \
+    --train_list $DOMAIN \
     --pseudo_root $PSEUDO_CUES
 
   cd $PRJ_DIR
@@ -154,14 +154,14 @@ poolnet_training() {
 poolnet_inference() {
   cd $PRJ_DIR/poolnet
 
-  CUDA_VISIBLE_DEVICES=0 $PY main_custom.py  \
-    --arch        "resnet"       \
-    --mode        "test"              \
-    --model       $MODEL_CKPT         \
-    --dataset     $DATASET            \
-    --train_list  $DOMAIN             \
-    --train_root  $DATA_DIR           \
-    --pseudo_root $PSEUDO_CUES        \
+  CUDA_VISIBLE_DEVICES=0 $PY main_custom.py \
+    --arch "resnet" \
+    --mode "test" \
+    --model $MODEL_CKPT \
+    --dataset $DATASET \
+    --train_list $DOMAIN \
+    --train_root $DATA_DIR \
+    --pseudo_root $PSEUDO_CUES \
     --sal_folder ./results/$TAG
 
   cd $PRJ_DIR
@@ -179,7 +179,6 @@ BATCH_SIZE=64
 
 INF_FG_T=0.2
 
-
 # ENS=ra-oc-p-poc-pnoc-avg
 # CAMS_DIR=experiments/predictions/ensemble/$ENS
 # TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
@@ -195,7 +194,6 @@ TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
 ccamh_training
 ccamh_inference
 ccamh_pseudo_masks_crf
-
 
 ## PoolNet Training and Inference
 ## ==============================

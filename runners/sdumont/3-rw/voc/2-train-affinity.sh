@@ -80,7 +80,6 @@ run_training() {
 run_inference() {
   CUDA_VISIBLE_DEVICES=$DEVICES    \
   $PY scripts/rw/inference.py      \
-      --verbose      3             \
       --architecture $ARCHITECTURE \
       --model_name $TAG            \
       --cam_dir $CAMS_DIR          \
@@ -147,24 +146,23 @@ DOMAIN=train
 ## ========
 
 
-TAG=rw/voc12-an@ccamh@ra-oc-p-poc-pnoc-avg
-CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-avg
-LABEL_DIR=./experiments/predictions/voc12-an@ccamh@ra-oc-p-poc-pnoc-avg@crf10-gt0.7@aff_fg=0.30_bg=0.10
+# TAG=rw/voc12-an@ccamh@ra-oc-p-poc-pnoc-avg
+# CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-avg
+# LABEL_DIR=./experiments/predictions/voc12-an@ccamh@ra-oc-p-poc-pnoc-avg@crf10-gt0.7@aff_fg=0.30_bg=0.10
+# # run_training
+# DOMAIN=train
+# run_inference
+# CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-avg@val
+# DOMAIN=val
+# run_inference
+
+
+TAG=rw/ra-oc-p-poc-pnoc-learned-a0.25
+CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-learned-a0.25
+LABEL_DIR=./experiments/predictions/voc12-an@ccamh@ra-oc-p-poc-pnoc-learned-a0.25@crf10-gt0.7@aff_fg=0.30_bg=0.10
 # run_training
 DOMAIN=train
 run_inference
-CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-avg@val
+CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-learned-a0.25@val
 DOMAIN=val
 run_inference
-
-
-# TAG=rw/ra-oc-p-poc-pnoc-learned-a0.25
-# CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-learned-a0.25
-# LABEL_DIR=./experiments/predictions/voc12-an@ccamh@ra-oc-p-poc-pnoc-learned-a0.25@crf10-gt0.7@aff_fg=0.30_bg=0.10
-
-# run_training
-# DOMAIN=train
-# run_inference
-# CAMS_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-learned-a0.25@val
-# DOMAIN=val
-# run_inference

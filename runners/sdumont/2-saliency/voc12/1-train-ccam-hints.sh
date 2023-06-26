@@ -82,6 +82,7 @@ INF_FG_T=0.2
 CRF_T=10
 CRF_GT_PROB=0.7
 
+
 ccamh_training() {
   WANDB_TAGS="ccamh,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,ls:$LABELSMOOTHING,lr:$LR"     \
   CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/train_hints.py \
@@ -107,7 +108,6 @@ ccamh_training() {
     --data_dir        $DATA_DIR
     # --bg_threshold    $BG_T                \
 }
-
 
 ccamh_inference() {
   WEIGHTS=imagenet
@@ -148,7 +148,7 @@ poolnet_training() {
     --train_root  $DATA_DIR           \
     --train_list  $DOMAIN             \
     --pseudo_root $PSEUDO_CUES
-  
+
   cd $PRJ_DIR
 }
 

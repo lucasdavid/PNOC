@@ -181,7 +181,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         raise
       processed += 1
 
-      if args.verbose >= 1:
+      if args.verbose >= 2:
         print(f"{image_id} ok")
 
     if missing: print(f"{len(missing)} files were missing and were not processed:", *missing, sep='\n  - ', flush=True)
