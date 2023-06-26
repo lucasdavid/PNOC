@@ -315,7 +315,9 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log({f"train/{k}": v for k, v in data.items()} | {"train/epoch": epoch}, commit=not do_validation)
+      wb_logs = {f"train/{k}": v for k, v in data.items()}
+      wb_logs["train/epoch"] = epoch
+      wandb.log(wb_logs, commit=not do_validation)
 
       print(
         'iteration    = {iteration:,}\n'

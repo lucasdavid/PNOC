@@ -32,12 +32,13 @@ cd $SCRATCH/PuzzleCAM
 
 # module load sequana/current
 # module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
-module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
+# module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
+module load gcc/7.4 python/3.8.2 cudnn/8.2_cuda-11.1
 
 
 export PYTHONPATH=$(pwd)
 
-PY=python3.9
+PY=python3.8
 SOURCE=scripts/rw/make_affinity_labels.py
 WORKERS=24
 
@@ -80,3 +81,24 @@ run_make_affinity_labels() {
 # CRF_GT=0.7
 # TAG=$DATASET-an@ccamh@rs269pnoc-ls0.1@crf$CRF_T-gt$CRF_GT
 # run_make_affinity_labels
+
+
+PRIORS_TAG=ra-oc-p-poc-pnoc-avg
+CAMS_DIR=./experiments/predictions/ensemble/$PRIORS_TAG
+SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269@$PRIORS_TAG
+FG=0.3
+BG=0.1
+CRF_T=10
+CRF_GT=0.7
+TAG=$DATASET-an@ccamh@$PRIORS_TAG@crf$CRF_T-gt$CRF_GT
+run_make_affinity_labels
+
+PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
+CAMS_DIR=./experiments/predictions/ensemble/$PRIORS_TAG
+SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269@$PRIORS_TAG
+FG=0.3
+BG=0.1
+CRF_T=10
+CRF_GT=0.7
+TAG=$DATASET-an@ccamh@$PRIORS_TAG@crf$CRF_T-gt$CRF_GT
+run_make_affinity_labels

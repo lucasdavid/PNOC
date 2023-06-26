@@ -36,5 +36,5 @@ module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 export PYTHONPATH=$(pwd)
 # export OMP_NUM_THREADS=16
 
-pip3.9 install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
-pip3.9 install -r requirements.txt
+pip3.9 install --user torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
+pip3.9 install --user -r requirements.txt

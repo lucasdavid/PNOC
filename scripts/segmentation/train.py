@@ -227,7 +227,9 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
-      wandb.log({f'train/{k}': v for k, v in data.items()} | {'train/epoch': epoch}, step=step, commit=not do_validation)
+      wb_logs = {f"train/{k}": v for k, v in data.items()}
+      wb_logs["train/epoch"] = epoch
+      wandb.log(wb_logs, commit=not do_validation)
 
       print('step={iteration:,} lr={learning_rate:.4f} loss={loss:.4f} time={time:.0f} sec'.format(**data))
 

@@ -17,6 +17,7 @@ from tools.general.io_utils import load_saliency_file, str2bool
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", default="resnet50@seed=0@nesterov@train@bg=0.20@scale=0.5,1.0,1.5,2.0@png", type=str)
 parser.add_argument("--num_workers", default=48, type=int)
+parser.add_argument("--progbar", default=False, type=str2bool)
 
 parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
 parser.add_argument("--domain", default="train", type=str)
@@ -39,12 +40,13 @@ parser.add_argument("--step_th", default=0.05, type=float)
 
 
 def compare(args, dataset, classes, start, step, TP, P, T):
-  compared = missing = 0
+  compared = 0
   corrupted = []
+  missing = []
 
   indices = range(start, len(dataset), step)
   if start == 0:
-    indices = tqdm(indices, f"Evaluate t={args.threshold:.0%}")
+    indices = tqdm(indices, f"Evaluate t={args.threshold:.0%}", disable=not args.progbar)
 
   try:
     for idx in indices:
@@ -67,7 +69,7 @@ def compare(args, dataset, classes, start, step, TP, P, T):
           s_pred = data["rw"]
         s_pred = s_pred
       else:
-        missing += 1
+        missing.append(image_id)
         continue
 
       if PRED_MODE == "logit":
@@ -132,11 +134,11 @@ def compare(args, dataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if start == 0:
-    read = compared + missing + len(corrupted)
-    print(f"{compared} ({compared/read:.0%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
-  if corrupted:
-    print(f"Corrupted samples: {', '.join(corrupted)}", file=sys.stderr)
+  # if start == 0:
+  #   read = compared + len(missing) + len(corrupted)
+  #   print(f"{compared} ({compared/read:.0%}) predictions evaluated (corrupted={len(corrupted)} missing={missing}).")
+  if corrupted: print(f"{len(corrupted)} corrupted samples: {', '.join(corrupted)}", file=sys.stderr)
+  if missing: print(f"{len(missing)} corrupted samples: {', '.join(missing)}", file=sys.stderr)
 
 
 def do_python_eval(args, dataset, classes, num_workers=8):

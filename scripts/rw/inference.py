@@ -141,11 +141,18 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
           print(f"{image_id} skipped (cam missing)")
         continue
 
-      cams = cam_dict['cam']
+      if "cam" in cam_dict:
+        cams = cam_dict['cam']
+        cams = torch.as_tensor(cams)
+      else:
+        cams = cam_dict['hr_cam']
+        cams = torch.as_tensor(cams)
+        size = cams.shape[1:]
+        print(f"{image_id} hr-cam resized {size} ->", end=" ")
+        cams = resize_for_tensors(cams, get_strided_size(size, 4))
+        print(f"{cams.shape}")
 
       # preprocessing
-      with x:
-        x = np.asarray(x)
       x = normalize_fn(x)
       x = x.transpose((2, 0, 1))
       x = torch.from_numpy(x)
@@ -201,7 +208,7 @@ if __name__ == '__main__':
 
   log_config(vars(args), TAG)
 
-  CAMS_DIR = os.path.join('./experiments/predictions', args.cam_dir)
+  CAMS_DIR = args.cam_dir
   PREDS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
 
   model_path = './experiments/models/' + f'{args.model_name}.pth'

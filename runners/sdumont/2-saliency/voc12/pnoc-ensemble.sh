@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J ccamh
+#SBATCH -J ensemble-ccamh
 #SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/tr-ccamh-%j.out
 #SBATCH --time=04:00:00
 
@@ -169,57 +169,48 @@ poolnet_inference() {
 }
 
 
-## CCAM-H Training and Inference
-## =============================
+LR=0.001
+MIXED_PRECISION=true
+BATCH_SIZE=128
+ACCUMULATE_STEPS=2
+LABELSMOOTHING=0.1
 
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/resnest101@randaug@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@rs101ra@b$BATCH_SIZE-fg$FG_T
-# ccamh_training
-# ccamh_inference
+FG_T=0.3
+BATCH_SIZE=64
 
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/poc/ResNeSt269@PuzzleOc@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
-
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
-
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# LABELSMOOTHING=0.1
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-ls$LABELSMOOTHING-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
-
-# BATCH_SIZE=64
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/poc/voc12-rs269-poc-ls0.1@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269poc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
-# ccamh_training
-# ccamh_inference
-
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
-
-# FG_T=0.3
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
-
-# FG_T=0.25
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR
-# ccamh_training
-# ccamh_inference
+INF_FG_T=0.2
 
 
-# FG_T=0.2
-# CAMS_DIR=$PRJ_DIR/experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-ls0.1-r3@fg$FG_T-h$HINT_W-e$EPOCHS-b$BATCH_SIZE-lr$LR-amp
-# ccamh_training
-# ccamh_inference
-# ccamh_pseudo_masks_crf
+# ENS=ra-oc-p-poc-pnoc-avg
+# CAMS_DIR=experiments/predictions/ensemble/$ENS
+# TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+ENS=ra-oc-p-poc-pnoc-learned-a0.25
+CAMS_DIR=experiments/predictions/ensemble/$ENS
+TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+# ENS=ra-oc-p-poc-pnoc-weighted-a0.25
+# CAMS_DIR=experiments/predictions/ensemble/$ENS
+# TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+ccamh_training
+ccamh_inference
+ccamh_pseudo_masks_crf
+
+
+## PoolNet Training and Inference
+## ==============================
+
+# TAG=$DATASET-pn@ccamh-rs269@ra-oc-p-poc-pnoc-avg
+# PSEUDO_CUES=$PRJ_DIR/experiments/predictions/saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-avg@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+# MODEL_CKPT=$PRJ_DIR/poolnet/results/run-0/models/epoch_9.pth
+
+TAG=$DATASET-pn@ccamh-rs269@ra-oc-p-poc-pnoc-learned-a0.25
+PSEUDO_CUES=$PRJ_DIR/experiments/predictions/saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-learned-a0.25@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
+MODEL_CKPT=$PRJ_DIR/poolnet/results/run-1/models/epoch_9.pth
+
+# poolnet_training
+poolnet_inference
+
+cp $MODEL_CKPT $PRJ_DIR/experiments/models/saliency/$TAG.pth
+mv $PRJ_DIR/poolnet/results/$TAG $PRJ_DIR/experiments/predictions/saliency/

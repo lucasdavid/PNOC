@@ -9,15 +9,15 @@ def main(config):
         run = 0
         while os.path.exists("%s/run-%d" % (config.save_folder, run)):
             run += 1
-        os.mkdir("%s/run-%d" % (config.save_folder, run))
-        os.mkdir("%s/run-%d/models" % (config.save_folder, run))
+        os.makedirs("%s/run-%d" % (config.save_folder, run))
+        os.makedirs("%s/run-%d/models" % (config.save_folder, run))
         config.save_folder = "%s/run-%d" % (config.save_folder, run)
         train = Solver(train_loader, None, config)
         train.train()
     elif config.mode == 'test':
         config.test_root = config.train_root
         test_loader = get_custom_loader(config, mode='test')
-        if not os.path.exists(config.test_fold): os.mkdir(config.test_fold)
+        os.makedirs(config.test_fold, exist_ok=True)
         test = Solver(None, test_loader, config)
         test.test()
     else:
@@ -67,12 +67,9 @@ if __name__ == '__main__':
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
     config = parser.parse_args()
 
-    if not os.path.exists(config.save_folder):
-        os.mkdir(config.save_folder)
-    if not os.path.exists(config.sal_folder):
-        os.mkdir(config.sal_folder)
-    if not os.path.exists(config.test_fold):
-        os.mkdir(config.test_fold)
+    os.makedirs(config.save_folder, exist_ok=True)
+    os.makedirs(config.sal_folder, exist_ok=True)
+    os.makedirs(config.test_fold, exist_ok=True)
 
     # Get test set info
     # test_root, test_list = get_test_info(config.sal_mode)

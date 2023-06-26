@@ -30,13 +30,14 @@ DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
 DOMAIN=train
 
 run_evaluation() {
-  WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh,crf:$CRF_T-$CRF_GT_PROB" \
+  WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh,pn" \
   $PY $SOURCE                   \
-    --experiment_name $TAG      \
+    --experiment_name "$TAG"    \
+    --pred_dir        $PRED_DIR \
     --dataset         $DATASET  \
     --domain          $DOMAIN   \
-    --min_th          0.2       \
-    --max_th          0.8       \
+    --min_th          0.05      \
+    --max_th          0.81      \
     --mode            npy       \
     --eval_mode       saliency  \
     --crf_t           $CRF_T       \
@@ -48,12 +49,27 @@ run_evaluation() {
 CRF_T=10
 CRF_GT_PROB=0.7
 
-TAG=saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-avg@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
+# TAG="rs269@ra-oc-p-poc-pnoc-avg+dCRF"
+# PRED_DIR=./experiments/predictions/saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-avg@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
+# run_evaluation
+
+# TAG="rs269@ra-oc-p-poc-pnoc-learned-a0.25+dCRF"
+# PRED_DIR=./experiments/predictions/saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-learned-a0.25@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
+# run_evaluation
+
+# TAG="rs269@ra-oc-p-poc-pnoc-weighted-a0.25+dCRF"
+# PRED_DIR=./experiments/predictions/saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-weighted-a0.25@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
+# run_evaluation
+
+CRF_T=0
+TAG=voc12-pn@ccamh-rs269@ra-oc-p-poc-pnoc-avg
+PRED_DIR=./experiments/predictions/saliency/$TAG
 run_evaluation
-TAG=saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-learned-a0.25@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
+
+TAG=voc12-pn@ccamh-rs269@ra-oc-p-poc-pnoc-learned-a0.25
+PRED_DIR=./experiments/predictions/saliency/$TAG
 run_evaluation
-TAG=saliency/voc12-ccamh-rs269@ra-oc-p-poc-pnoc-weighted-a0.25@b64-fg0.3-lr0.001-b64@train@scale=0.5,1.0,1.5,2.0
-run_evaluation
+
 
 
 ## ====================

@@ -68,10 +68,18 @@ class Solver(object):
                 image_path = os.path.join(self.config.sal_folder, image_id + '.png')
                 if os.path.isfile(image_path):
                     continue
+
+                if h <= 100 or w <= 100:
+                    x = F.interpolate(x, scale_factor=2, mode='bilinear') # 71 --> 142
+
                 x = Variable(x)
                 if self.config.cuda:
                     x = x.cuda()
                 preds = self.net(x)
+
+                if h <= 100 or w <= 100:
+                    preds = F.interpolate(preds, size=(h, w), mode='bilinear')
+
                 preds = preds[..., :h, :w]
                 pred = np.squeeze(torch.sigmoid(preds).cpu().data.numpy())
                 cv2.imwrite(image_path, 255 * pred)

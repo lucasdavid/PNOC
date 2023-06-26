@@ -31,10 +31,13 @@ class VOCImageDataTrain(data.Dataset):
     sal_image = load_image(os.path.join(self.sal_root, 'JPEGImages', im_name + '.jpg'))
     sal_label = load_sal_label(os.path.join(self.pseudo_root, im_name + '.png'))
     sal_image, sal_label = cv_random_flip(sal_image, sal_label)
+
+    h, w = sal_image.shape[1:]
+
     sal_image = torch.Tensor(sal_image)
     sal_label = torch.Tensor(sal_label)
 
-    return {'sal_image': sal_image, 'sal_label': sal_label, 'image_id': im_name}
+    return {'sal_image': sal_image, 'sal_label': sal_label, 'image_id': im_name, "height": h, "width": w}
 
   def __len__(self):
     return len(self.sal_list)
@@ -50,9 +53,11 @@ class VOCImageDataTest(data.Dataset):
     # sal data loading
     im_name = self.sal_list[item]
     sal_image = load_image(os.path.join(self.sal_root, 'JPEGImages', im_name + '.jpg'))
+    h, w = sal_image.shape[1:]
+
     sal_image = torch.Tensor(sal_image)
 
-    return {'sal_image': sal_image, 'image_id': im_name}
+    return {'sal_image': sal_image, 'image_id': im_name, "height": h, "width": w}
 
   def __len__(self):
     return len(self.sal_list)

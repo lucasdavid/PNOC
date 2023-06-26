@@ -56,25 +56,39 @@ ARCHITECTURE=resnet  # resnet vgg
 # TAG=pn@ccamh-rs269@rs269pnoc-ls0.1
 # PSEUDO_CUES=$SCRATCH/PuzzleCAM/experiments/predictions/saliency/voc12-ccamh-rs269@rs269pnoc-ls0.1-r3@fg0.3-h1.0-e10-b32-lr0.001@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
-CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
-  --arch        $ARCHITECTURE       \
-  --mode        "train"             \
-  --dataset     $DATASET            \
-  --train_root  $DATA_DIR           \
-  --train_list  $DOMAIN             \
-  --pseudo_root $PSEUDO_CUES
+poolnet_training() {
+  cd $SCRATCH/PuzzleCAM/poolnet
+
+  CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
+    --arch        $ARCHITECTURE       \
+    --mode        "train"             \
+    --dataset     $DATASET            \
+    --train_root  $DATA_DIR           \
+    --train_list  $DOMAIN             \
+    --pseudo_root $PSEUDO_CUES
+
+}
+
+
+poolnet_inference() {
+  cd $SCRATCH/PuzzleCAM/poolnet
+
+  CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
+    --arch        $ARCHITECTURE       \
+    --mode        "test"              \
+    --model       $MODEL_CKPT         \
+    --dataset     $DATASET            \
+    --train_list  $DOMAIN             \
+    --train_root  $DATA_DIR           \
+    --pseudo_root $PSEUDO_CUES        \
+    --sal_folder ./results/$TAG
+
+}
+
 
 MODEL_CKPT=./results/run-1/models/epoch_9.pth
-
-CUDA_VISIBLE_DEVICES=0 $PY $SOURCE  \
-  --arch        $ARCHITECTURE       \
-  --mode        "test"              \
-  --model       $MODEL_CKPT         \
-  --dataset     $DATASET            \
-  --train_list  $DOMAIN             \
-  --train_root  $DATA_DIR           \
-  --pseudo_root $PSEUDO_CUES        \
-  --sal_folder ./results/$TAG
+poolnet_training
+poolnet_inference
 
 # cp ./results/run-1/models/epoch_9.pth ../experiments/models/saliency/$TAG.pth
 mv ./results/$TAG ../experiments/predictions/saliency/

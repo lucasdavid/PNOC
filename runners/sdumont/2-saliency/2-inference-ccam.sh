@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J mk-ccam
-#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/mk-%j.out
-#SBATCH --time=16:00:00
+#SBATCH -J inf-ccam
+#SBATCH -o /scratch/lerdl/lucas.david/logs/ccam/inf-%j.out
+#SBATCH --time=04:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -32,13 +32,13 @@ nodeset -e $SLURM_JOB_NODELIST
 cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
 # module load gcc/7.4 python/3.9.1 cudnn/8.2_cuda-11.1
-
 
 export PYTHONPATH=$(pwd)
 
-PY=python3.9
+PY=python3.8
 SOURCE=scripts/ccam/inference.py
 DEVICES=0,1,2,3
 
@@ -84,7 +84,7 @@ run_crf() {
 DOMAIN=train_aug
 
 CRF_T=10
-CRF_GT_PROB=0.9
+CRF_GT_PROB=0.7
 
 # TAG=ccam-h-rs269@rs269-poc-fg0.4-b32-lr0.001
 # PRETRAINED=./experiments/models/saliency/ccam-fg-hints@resnest269@rs269-poc@0.4@h1.0-e10-b32-lr0.001.pth
@@ -108,6 +108,7 @@ CRF_GT_PROB=0.9
 # run_inference
 # run_crf
 
+
 ## =============================================================================
 ## # MS COCO 2014
 ##
@@ -119,4 +120,4 @@ TAG=saliency/coco14-ccamh-rs269@rs269pnoc-lr0.05@rs269@b64-fg0.3-lr0.0005-b64
 PRETRAINED=./experiments/models/$TAG.pth
 T=0.25
 # run_inference
-run_crf
+# run_crf
