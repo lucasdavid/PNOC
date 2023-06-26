@@ -65,7 +65,7 @@ rw_inference() {
         --architecture $ARCHITECTURE \
         --image_size   $IMAGE_SIZE   \
         --model_name   $MODEL_NAME   \
-        --cam_dir      $CAM_DIR      \
+        --cam_dir      $CAMS_DIR     \
         --domain       $DOMAIN       \
         --beta         10            \
         --exp_times    8             \
@@ -111,6 +111,5 @@ AFF_LABELS_DIR=./experiments/predictions/$AFF_LABELS_TAG@aff_fg=$FG_bg=$BG
 MODEL_NAME=rw/voc12-an@ccamh@ra-oc-p-poc-pnoc-avg
 RW_DIR=$MODEL_NAME@$DOMAIN@beta=10@exp_times=8@rw
 
-CAM_DIR=./experiments/predictions/ensemble/ra-oc-p-poc-pnoc-avg
 DOMAIN=train && rw_inference
 # DOMAIN=val && rw_inference
