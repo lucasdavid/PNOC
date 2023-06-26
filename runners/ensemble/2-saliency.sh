@@ -108,7 +108,6 @@ ccamh_training() {
     # --bg_threshold    $BG_T                \
 }
 
-
 ccamh_inference() {
   WEIGHTS=imagenet
   PRETRAINED=./experiments/models/$TAG.pth
@@ -148,7 +147,7 @@ poolnet_training() {
     --train_root  $DATA_DIR           \
     --train_list  $DOMAIN             \
     --pseudo_root $PSEUDO_CUES
-  
+
   cd $PRJ_DIR
 }
 

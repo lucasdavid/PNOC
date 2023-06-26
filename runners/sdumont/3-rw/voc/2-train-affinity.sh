@@ -63,7 +63,7 @@ run_training() {
 
     CUDA_VISIBLE_DEVICES=$DEVICES    \
     WANDB_TAGS="$DATASET,$ARCH,rw"   \
-    $PY $SOURCE                      \
+    $PY scripts/rw/train_affinity.py \
         --architecture $ARCHITECTURE \
         --tag          $TAG       \
         --batch_size   $BATCH_SIZE   \

@@ -39,7 +39,6 @@ module load gcc/7.4 python/3.8.2 cudnn/8.2_cuda-11.1
 export PYTHONPATH=$(pwd)
 
 PY=python3.8
-SOURCE=scripts/rw/make_affinity_labels.py
 WORKERS=24
 
 DATASET=voc12
@@ -48,7 +47,7 @@ DOMAIN=train_aug
 
 
 run_make_affinity_labels() {
-    $PY $SOURCE               \
+    $PY scripts/rw/make_affinity_labels.py \
     --tag          $TAG       \
     --dataset      $DATASET   \
     --domain       $DOMAIN    \
