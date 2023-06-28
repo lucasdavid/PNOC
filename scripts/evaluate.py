@@ -292,12 +292,7 @@ if __name__ == "__main__":
   PRED_DIR = args.pred_dir or f"./experiments/predictions/{args.experiment_name}/"
   SAL_DIR = args.sal_dir
 
-  wb_run = wandb_utils.setup(
-    TAG,
-    args,
-    job_type="evaluation",
-    tags=[args.dataset, f"domain:{args.domain}", f"crf:{args.crf_t}-{args.crf_gt_prob}"]
-  )
+  wb_run = wandb_utils.setup(TAG, args, job_type="evaluation")
   wandb.define_metric("evaluation/t")
 
   dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)

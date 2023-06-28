@@ -3,7 +3,6 @@
 export PYTHONPATH=$(pwd)
 
 PY=python
-SOURCE=scripts/evaluate.py
 WORKERS=8
 
 DATASET=voc12
@@ -22,8 +21,8 @@ MIN_TH=0.15
 MAX_TH=0.51
 
 
-run_inference() {
-  $PY $SOURCE                   \
+run_evaluation() {
+  $PY scripts/evaluate.py       \
     --experiment_name $TAG      \
     --dataset         $DATASET  \
     --domain          $DOMAIN   \
@@ -37,7 +36,7 @@ run_inference() {
 }
 
 run_inference_sal() {
-  $PY $SOURCE                   \
+  $PY scripts/evaluate.py       \
     --experiment_name $TAG      \
     --dataset         $DATASET  \
     --domain          $DOMAIN   \
@@ -55,8 +54,8 @@ TAG=occse/rn38d
 
 CRF_T=0
 CRF_GT_PROB=0.7
-# run_inference
+# run_evaluation
 
 CRF_T=10
 CRF_GT_PROB=0.7
-run_inference
+run_evaluation

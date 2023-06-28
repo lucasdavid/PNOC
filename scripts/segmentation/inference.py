@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch import multiprocessing
 from torch.utils.data import Subset
+from tqdm import tqdm
 
 from core.datasets import *
 from core.networks import *
@@ -41,6 +42,7 @@ parser.add_argument('--use_gn', default=True, type=str2bool)
 
 # Inference parameters
 parser.add_argument('--tag', default='', type=str)
+parser.add_argument("--pred_dir", default="", type=str)
 parser.add_argument('--weights', default=None, type=str)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
@@ -60,7 +62,7 @@ GPUS_COUNT = len(GPUS)
 def run(args):
   print(TAG)
   print(f"Saving predictions for {args.dataset}/{args.domain} to '{PRED_DIR}'.")
-  
+
   scales = [float(scale) for scale in args.scales.split(',')]
 
   dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
@@ -100,6 +102,9 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
   dataset = dataset[process_id]
   length = len(dataset)
 
+  if process_id == 0:
+    dataset = tqdm(dataset, mininterval=5.)
+
   with torch.no_grad(), torch.cuda.device(process_id):
     model = model.cuda()
 
@@ -137,13 +142,6 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
       image.close()
       p.close()
 
-      if process_id == 0:
-        sys.stdout.write('\r# Make CAM [{}/{}] = {:.2f}%'.format(step + 1, length, (step + 1) / length * 100))
-        sys.stdout.flush()
-
-    if process_id == 0:
-      print()
-
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -159,7 +157,7 @@ if __name__ == '__main__':
   PRED_DIR += f'@scale={args.scales}'
   if args.crf_t > 0:
     PRED_DIR += f'@crf_t={args.crf_t}'
-  PRED_DIR = create_directory(f'./experiments/predictions/{PRED_DIR}/')
+  PRED_DIR = create_directory(args.pred_dir or f'./experiments/predictions/{PRED_DIR}/')
   MODELS_DIR = create_directory('./experiments/models/')
   MODEL_PATH = args.weights or os.path.join(MODELS_DIR, f'{TAG}.pth')
 
