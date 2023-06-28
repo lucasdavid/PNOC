@@ -95,7 +95,7 @@ CRF_T=10
 CRF_GT_PROB=0.7
 
 
-ccamh_training() {
+ccam_training() {
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
   WANDB_TAGS="$DATASET,$ARCH,ccam" \
   WANDB_TAGS="ccam,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,lr:$LR" \
