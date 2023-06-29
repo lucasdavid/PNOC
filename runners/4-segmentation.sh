@@ -168,6 +168,7 @@ run_evaluation() {
     --max_th $MAX_TH \
     --crf_t $CRF_T \
     --crf_gt_prob $CRF_GT \
+    --mode $EVAL_MODE \
     --num_workers $WORKERS_INFER
 }
 
@@ -175,8 +176,8 @@ run_evaluation() {
 ## 4.1 Make Pseudo Masks
 ##
 
-# PRIORS_TAG=ra-oc-p-poc-pnoc-avg
-PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
+PRIORS_TAG=ra-oc-p-poc-pnoc-avg
+# PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
 
 THRESHOLD=0.3
 CRF_T=1
@@ -184,17 +185,14 @@ CRF_GT=0.9
 
 AFF_TAG=rw/$DATASET-an@ccamh@$PRIORS_TAG
 
-RW_MASKS=$AFF_TAG@train@beta=10@exp_times=8@rw
-# DOMAIN=train_aug make_pseudo_labels
-
-RW_MASKS=$AFF_TAG@val@beta=10@exp_times=8@rw
-# DOMAIN=val make_pseudo_labels
+DOMAIN=train_aug RW_MASKS=$AFF_TAG@train@beta=10@exp_times=8@rw make_pseudo_labels
+DOMAIN=val       RW_MASKS=$AFF_TAG@val@beta=10@exp_times=8@rw   make_pseudo_labels
 
 # Move everything (train/val) into a single folder.
 RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@beta=10@exp_times=8@rw@crf=$CRF_T
-# mv ./experiments/predictions/$AFF_TAG@train@beta=10@exp_times=8@rw@crf=$CRF_T $RW_MASKS_DIR
-# mv ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T/* $RW_MASKS_DIR/
-# rm -r ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T
+mv ./experiments/predictions/$AFF_TAG@train@beta=10@exp_times=8@rw@crf=$CRF_T $RW_MASKS_DIR
+mv ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T/* $RW_MASKS_DIR/
+rm -r ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T
 
 ## 4.2 DeepLabV3+ Training
 ##
@@ -204,26 +202,25 @@ TAG=segmentation/$DATASET-d3p-lr$LR-ls$LABELSMOOTHING@pn-ccamh@$PRIORS_TAG
 # TAG=segmentation/d3p-ls0.1@pn-ccamh@rs269pnoc-ls0.1
 # TAG=segmentation/coco14-d3p-lr0.004-ls0.1@pn-ccamh@rs269pnoc-lr0.05
 
-# segm_training
+segm_training
 
 ## 4.3 DeepLabV3+ Inference
 ##
-CRF_T=0
-SEGM_PRED_DIR=./experiments/predictions/$TAG
 
-# DOMAIN=train segm_inference
-# DOMAIN=val segm_inference
-CRF_T=1
-DOMAIN=test segm_inference
+CRF_T=0 DOMAIN=train SEGM_PRED_DIR=./experiments/predictions/$TAG      segm_inference
+CRF_T=0 DOMAIN=val   SEGM_PRED_DIR=./experiments/predictions/$TAG      segm_inference
+CRF_T=1 DOMAIN=test  SEGM_PRED_DIR=./experiments/predictions/$TAG@test segm_inference
 
 
 ## 4.4. Evaluation
 ##
+EVAL_MODE=png
+
 CRF_T=1
-CRF_GT=0.7
+CRF_GT=0.9
 MIN_TH=0.05
 MAX_TH=0.81
 
 DOMAIN=val
 W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT"
-# run_evaluation
+run_evaluation

@@ -29,15 +29,17 @@ cd $DATA_DIR
 
 # Download images and labels from http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit:
 wget http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar
-tar -xf VOCtrainval_11-May-2012.tar
+tar xf VOCtrainval_11-May-2012.tar
 
 # Download the augmented segmentation maps from http://home.bharathh.info/pubs/codes/SBD
 # *only if* you are planning on training the fully-suppervised models (for comparison purposes):
 wget http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/semantic_contours/benchmark.tgz
-tar -xzf benchmark.tgz
-
+tar xzf benchmark.tgz
 # Merge them into the VOCdevkit/VOC2012/SegmentationClass folder:
 mv aug_seg/* VOCdevkit/VOC2012/SegmentationClass/
+
+# Download test subset from http://host.robots.ox.ac.uk:8080/eval/downloads/
+tar xf VOC2012test.tar
 ```
 
 ## MS COCO 2014

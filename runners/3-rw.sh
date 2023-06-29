@@ -6,8 +6,6 @@
 #SBATCH -o /scratch/lerdl/lucas.david/logs/aff-%j.out
 #SBATCH --time=24:00:00
 
-### 48:00:00
-
 # Copyright 2021 Lucas Oliveira David
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
