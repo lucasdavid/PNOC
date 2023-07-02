@@ -7,12 +7,12 @@ import os
 
 import numpy as np
 import torch
-import wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import datasets
+import wandb
 from core.ccam import SimMaxLoss, SimMinLoss
-from core.datasets import *
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -36,6 +36,8 @@ parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--cams_dir', default='/experiments/predictions/resnest101@ra/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -59,7 +61,7 @@ parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
 
 parser.add_argument('--image_size', default=448, type=int)
-parser.add_argument('--print_ratio', default=0.2, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -71,6 +73,7 @@ parser.add_argument('--fg_threshold', type=float, default=0.4)
 # parser.add_argument('--bg_threshold', type=float, default=0.1)
 
 import cv2
+
 cv2.setNumThreads(0)
 
 try:
@@ -115,17 +118,16 @@ if __name__ == '__main__':
   print('[i] {}'.format(TAG))
   print()
 
-  tt, tv = get_ccam_transforms(image_size=512, crop_size=args.image_size)
-  train_dataset, valid_dataset = get_hrcams_datasets(
-    args.dataset,
-    args.data_dir,
-    args.cams_dir,
-    train_transforms=tt,
-    valid_transforms=tv,
-  )
-
-  train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True)
-  valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers)
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_ccam_transforms(512, args.image_size)
+  train_dataset = datasets.CAMsDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  # TODO: make this work for cams.
+  # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
+  train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers, drop_last=True)
+  log_dataset(args.dataset, train_dataset, tt, tv)
 
   step_valid = len(train_loader)
   step_log = int(step_valid * args.print_ratio)
@@ -209,7 +211,7 @@ if __name__ == '__main__':
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
+    for step, (image_ids, images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
 
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))

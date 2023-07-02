@@ -13,7 +13,7 @@ from torch import multiprocessing
 from torch.utils.data import Subset
 from tqdm import tqdm
 
-from core.datasets import *
+from datasets import *
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *

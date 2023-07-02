@@ -105,9 +105,9 @@ ccam_training() {
     --max_epoch       $EPOCHS               \
     --batch_size      $BATCH_SIZE           \
     --lr              $LR                   \
-    --accumulate_steps  $ACCUMULATE_STEPS     \
+    --accumulate_steps $ACCUMULATE_STEPS    \
     --mixed_precision $MIXED_PRECISION      \
-    --num_workers     $WORKERS_TRAIN \
+    --num_workers     $WORKERS_TRAIN        \
     --architecture    $ARCHITECTURE         \
     --stage4_out_features $S4_OUT_FEATURES  \
     --dilated         $DILATED              \
@@ -281,7 +281,7 @@ mv $PRJ_DIR/poolnet/results/$PN_TAG $PRJ_DIR/experiments/predictions/saliency/
 ## ==============================
 
 CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_saliency_detection
-CRF_T=0  TAG=saliency/$PN_TAG evaluate_saliency_detection
+CRF_T=0  TAG=saliency/$PN_TAG                       evaluate_saliency_detection
 
 ##
 ## ====================

@@ -13,7 +13,7 @@ from torch.utils.data import Subset
 from pickle import UnpicklingError
 
 from core.aff_utils import propagate_to_edge
-from core.datasets import *
+from datasets import *
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=4, type=int)
+# parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--domain', default='train', type=str)

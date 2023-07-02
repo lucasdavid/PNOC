@@ -5,14 +5,16 @@ import argparse
 import copy
 import os
 import sys
+from typing import List
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import multiprocessing
 from torch.utils.data import Subset
+from tqdm import tqdm
 
-from core.datasets import *
+import datasets
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -36,25 +38,17 @@ parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--sample_ids', default=None, type=str)
-
-###############################################################################
-# Network
-###############################################################################
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
-
-###############################################################################
-# Inference parameters
-###############################################################################
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--weights', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
-
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
@@ -63,11 +57,12 @@ except KeyError:
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
-normalize_fn = Normalize(*imagenet_stats())
+normalize_fn = Normalize(*datasets.imagenet_stats())
 
 
 def run(args):
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
   print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 
   model = Classifier(
@@ -79,11 +74,10 @@ def run(args):
     trainable_stem=args.trainable_stem,
   )
   print(f'Loading weights from {WEIGHTS_PATH}.')
-  load_model(model, WEIGHTS_PATH)
+  load_model(model, WEIGHTS_PATH, map_location=torch.device(DEVICE))
   model.eval()
 
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
-
   scales = [float(scale) for scale in args.scales.split(',')]
 
   if GPUS_COUNT > 1:
@@ -92,19 +86,32 @@ def run(args):
     _work(0, model, dataset, scales, PREDS_DIR, DEVICE)
 
 
-def _work(process_id, model, dataset, scales, preds_dir, device):
+def _work(
+    process_id: int,
+    model: Classifier,
+    dataset: List[datasets.PathsDataset],
+    scales: List[float],
+    preds_dir: str,
+    device: str,
+):
   dataset = dataset[process_id]
-  length = len(dataset)
+  data_source = dataset.dataset.data_source
+
+  if process_id == 0:
+    dataset = tqdm(dataset, mininterval=2.0)
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for step, (image, image_id, label) in enumerate(dataset):
-      W, H = image.size
-
+    for image_id, image_path, _ in dataset:
       npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue
+
+      image = data_source.get_image(image_id)
+      label = data_source.get_label(image_id)
+
+      W, H = image.size
 
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
@@ -118,21 +125,18 @@ def _work(process_id, model, dataset, scales, preds_dir, device):
       cams_hr = torch.sum(torch.stack(cams_hr), dim=0)[:, :H, :W]
 
       keys = torch.nonzero(torch.from_numpy(label))[:, 0]
-
       cams_st = cams_st[keys]
       cams_st /= F.adaptive_max_pool2d(cams_st, (1, 1)) + 1e-5
-
       cams_hr = cams_hr[keys]
       cams_hr /= F.adaptive_max_pool2d(cams_hr, (1, 1)) + 1e-5
-
-      # save cams
       keys = np.pad(keys + 1, (1, 0), mode='constant')
-      np.save(npy_path, {"keys": keys, "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
 
-      if process_id == 0:
-        sys.stdout.write(f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}, ({(H, W)}, {tuple(cams_hr.shape)})')
-        sys.stdout.flush()
-    if process_id == 0: print()
+      try:
+        np.save(npy_path, {"keys": keys, "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
+      except:
+        if os.path.exists(npy_path):
+          os.remove(npy_path)
+        raise
 
 
 def forward_tta(model, ori_image, scale, DEVICE):

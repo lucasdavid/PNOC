@@ -11,7 +11,7 @@ import numpy as np
 from torch import multiprocessing
 from torch.utils.data import Subset
 
-from core.datasets import *
+from datasets import *
 from tools.ai.demo_utils import *
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import *

@@ -115,22 +115,24 @@ def get_learning_rate_from_optimizer(optimizer):
   return optimizer.param_groups[0]['lr']
 
 
-def set_layers_require_grad(model, klass):
+def set_trainable_layers(model, klass=None, trainable=False):
   for m in model.modules():
-    if isinstance(m, klass):
-      m.weight.requires_grad = False
-      m.bias.requires_grad = False
+    if klass is None or isinstance(m, klass):
+      for w in ("weight", "bias"):
+        w = getattr(m, w, None)
+        if w is not None:
+          w.requires_grad = trainable
 
 
 def to_numpy(tensor):
   return tensor.cpu().detach().numpy()
 
 
-def load_model(model, model_path, parallel=False):
+def load_model(model, model_path, parallel=False, map_location=None):
   if parallel:
-    model.module.load_state_dict(torch.load(model_path))
+    model.module.load_state_dict(torch.load(model_path, map_location=map_location))
   else:
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=map_location))
 
 
 def save_model(model, model_path, parallel=False):

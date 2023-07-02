@@ -341,17 +341,24 @@ class ResizeMask:
 
 # region MixUp
 
+class AugmentedDataset(torch.utils.data.Dataset):
+  dataset: torch.utils.data.Dataset
 
-class MixUp(torch.utils.data.Dataset):
+  def __len__(self):
+    return len(self.dataset)
+
+  @property
+  def info(self):
+    return self.dataset.info
+
+
+class MixUp(AugmentedDataset):
 
   def __init__(self, dataset, num_mix=1, beta=1., prob=1.0):
     self.dataset = dataset
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
-
-  def __len__(self):
-    return len(self.dataset)
 
   def __getitem__(self, index):
     x, y = self.dataset[index]
@@ -393,7 +400,7 @@ def rand_bbox(h, w, lam):
   return h1, w1, h2, w2
 
 
-class CutMix(torch.utils.data.Dataset):
+class CutMix(AugmentedDataset):
 
   def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0, segmentation=False):
     self.dataset = dataset
@@ -402,9 +409,6 @@ class CutMix(torch.utils.data.Dataset):
     self.prob = prob
     self.segmentation_mode = segmentation
     self.random_crop = RandomCrop(crop, channels_last=False)
-
-  def __len__(self):
-    return len(self.dataset)
 
   def do_cutmix(self, image_a, target_a, image_b, target_b, alpha):
     # Cut random bbox.

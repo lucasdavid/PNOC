@@ -10,7 +10,7 @@ import wandb
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from core.datasets import *
+from datasets import *
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *

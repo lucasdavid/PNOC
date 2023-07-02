@@ -7,11 +7,11 @@ import os
 
 import numpy as np
 import torch
-import wandb
 from torch.utils.data import DataLoader
 
+import datasets
+import wandb
 from core.ccam import SimMaxLoss, SimMinLoss
-from core.datasets import *
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -34,6 +34,8 @@ parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -58,7 +60,7 @@ parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
 
 parser.add_argument('--image_size', default=448, type=int)
-parser.add_argument('--print_ratio', default=0.2, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -68,6 +70,7 @@ parser.add_argument('--mixup_prob', default=1.0, type=float)
 parser.add_argument('--alpha', type=float, default=0.25)
 
 import cv2
+
 cv2.setNumThreads(0)
 
 try:
@@ -104,13 +107,13 @@ if __name__ == '__main__':
 
   set_seed(SEED)
 
-  tt, tv = get_classification_transforms(512, 512, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
-  )
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(512, 512, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size_val, num_workers=args.num_workers, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
@@ -142,9 +145,6 @@ if __name__ == '__main__':
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
     model = torch.nn.DataParallel(model)
-
-  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   # Loss, Optimizer
   criterion = [
@@ -195,8 +195,7 @@ if __name__ == '__main__':
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (images, labels) in enumerate(train_loader):
-
+    for step, (_, images, labels) in enumerate(train_loader):
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
@@ -289,7 +288,7 @@ if __name__ == '__main__':
     )
 
     print(f'saving weights `{model_path}`')
-    save_model_fn()
+    save_model(model, model_path, parallel=GPUS_COUNT > 1)
     # endregion
 
   print(TAG)

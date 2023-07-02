@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from torchvision import models
 
-from tools.ai.torch_utils import set_layers_require_grad, gap2d, resize_for_tensors
+from tools.ai.torch_utils import set_trainable_layers, gap2d, resize_for_tensors
 
 from . import ccam, regularizers
 from .aff_utils import PathIndex
@@ -123,21 +123,20 @@ class Backbone(nn.Module):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    out_features, model, stages = build_backbone(
+    out_features, backbone, stages = build_backbone(
       name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights
     )
 
-    self.model = model
+    self.model = backbone
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
 
     if self.mode == "fix":
-      set_layers_require_grad(model, torch.nn.BatchNorm2d)
-      self.not_training.extend([
-        m for m in model.modules() if isinstance(m, torch.nn.BatchNorm2d)
-      ])
+      set_trainable_layers(backbone, torch.nn.BatchNorm2d, trainable=False)
+      self.not_training.extend([m for m in backbone.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
     if not self.trainable_stem:
+      set_trainable_layers(self.stage1, trainable=False)
       self.not_training.extend([self.stage1])
 
   def initialize(self, modules):

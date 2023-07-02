@@ -11,9 +11,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from core.training import validation_step
 
+import datasets
 from core import occse
-from core.datasets import *
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -35,6 +36,8 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -64,7 +67,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.3, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -103,20 +106,17 @@ if __name__ == '__main__':
   log()
 
   # Transform, Dataset, DataLoader
-  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
-  )
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
-
-  log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
-  log('[i] train_transform is {}'.format(tt))
-  log('[i] test_transform is {}'.format(tv))
-  log()
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
+  log_dataset(args.dataset, train_dataset, tt, tv)
 
   val_iteration = len(train_loader)
   log_iteration = int(val_iteration * args.print_ratio)
@@ -159,7 +159,9 @@ if __name__ == '__main__':
     ckpt = torch.load(args.oc_pretrained)
     oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
   else:
-    oc_nn = Classifier(args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization)
+    oc_nn = Classifier(
+      args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization
+    )
     oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
   oc_nn = oc_nn.cuda()
@@ -173,14 +175,11 @@ if __name__ == '__main__':
   except KeyError:
     use_gpu = '0'
 
-  the_number_of_gpu = len(use_gpu.split(','))
-  if the_number_of_gpu > 1:
-    log('[i] the number of gpu : {}'.format(the_number_of_gpu))
+  GPUS_COUNT = len(use_gpu.split(','))
+  if GPUS_COUNT > 1:
+    log('[i] the number of gpu : {}'.format(GPUS_COUNT))
     model = nn.DataParallel(model)
     oc_nn = nn.DataParallel(oc_nn)
-
-  load_model_fn = lambda: load_model(model, model_path, parallel=the_number_of_gpu > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=the_number_of_gpu > 1)
 
   # Loss, Optimizer
   class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
@@ -203,69 +202,17 @@ if __name__ == '__main__':
   train_timer = Timer()
   eval_timer = Timer()
 
-  train_meter = MetricsContainer([
-    'loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'
-  ])
+  train_meter = MetricsContainer(['loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'])
 
   best_train_mIoU = -1
-  thresholds = list(np.arange(0.10, 0.50, 0.05))
+  DEVICE = "cuda"
+  THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
-  def evaluate(loader):
-    imagenet_mean, imagenet_std = imagenet_stats()
-    
-    model.eval()
-    eval_timer.tik()
-
-    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
-
-    with torch.no_grad():
-      length = len(loader)
-      for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.cuda()
-        labels = labels.cuda()
-
-        _, features = model(images, with_cam=True)
-
-        # features = resize_for_tensors(features, images.size()[-2:])
-        # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
-
-        mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = (make_cam(features) * mask)
-
-        for batch_index in range(images.size()[0]):
-          # c, h, w -> h, w, c
-          cam = to_numpy(cams[batch_index]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[batch_index])
-
-          h, w, c = cam.shape
-          gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-          for th in thresholds:
-            bg = np.ones_like(cam[:, :, 0]) * th
-            pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
-
-            meter_dic[th].add(pred_mask, gt_mask)
-
-    model.train()
-
-    best_th = 0.0
-    best_mIoU = 0.0
-
-    for th in thresholds:
-      mIoU, mIoU_foreground = meter_dic[th].get(clear=True)
-      if best_mIoU < mIoU:
-        best_th = th
-        best_mIoU = mIoU
-
-    return best_th, best_mIoU
-
-  train_iterator = Iterator(train_loader)
-
   for step in range(step_init, step_max):
-    images, targets = train_iterator.get()
+    _, images, targets = train_iterator.get()
 
     images = images.cuda()
     targets = targets.float()
@@ -276,10 +223,7 @@ if __name__ == '__main__':
 
     logits, features = model(images, with_cam=True)
 
-    c_loss = class_loss_fn(
-      logits,
-      label_smoothing(targets, args.label_smoothing).to(logits)
-    ).mean()
+    c_loss = class_loss_fn(logits, label_smoothing(targets, args.label_smoothing).to(logits)).mean()
 
     # OC-CSE
     labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
@@ -289,10 +233,7 @@ if __name__ == '__main__':
     labels_oc_sm = label_smoothing(labels_oc, args.label_smoothing)
     o_loss = class_loss_fn(cl_logits, labels_oc_sm.to(cl_logits)).mean()
 
-    loss = (
-      c_loss
-      + ao * o_loss
-    )
+    loss = (c_loss + ao * o_loss)
 
     optimizer.zero_grad()
     loss.backward()
@@ -308,29 +249,11 @@ if __name__ == '__main__':
     )
 
     # region logging
-    train_meter.update({
-      'loss': loss.item(),
-      'c_loss': c_loss.item(),
-      # 'p_loss': p_loss.item(),
-      # 're_loss': re_loss.item(),
-      'o_loss': o_loss.item(),
-      # 'alpha': ap,
-      'oc_alpha': ao,
-      'k': k
-    })
+    train_meter.update({'loss': loss.item(), 'c_loss': c_loss.item(), 'o_loss': o_loss.item(), 'oc_alpha': ao, 'k': k})
 
     if (step + 1) % log_iteration == 0:
-      (
-        loss,
-        c_loss,
-        # p_loss,
-        # re_loss,
-        o_loss,
-        # ap,
-        ao,
-        k
-      ) = train_meter.get(clear=True)
-      
+      (loss, c_loss, o_loss, ao, k) = train_meter.get(clear=True)
+
       lr = float(get_learning_rate_from_optimizer(optimizer))
 
       data = {
@@ -362,25 +285,24 @@ if __name__ == '__main__':
         'o_loss       = {o_loss:.4f}\n'
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
-        'focal_factor = {focal_factor}'
-        .format(**data)
+        'focal_factor = {focal_factor}'.format(**data)
       )
 
       # endregion
 
     # region evaluation
     if (step + 1) % val_iteration == 0:
-      threshold, mIoU = evaluate(valid_loader)
+      threshold, miou, iou, val_time = validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
 
-      if best_train_mIoU == -1 or best_train_mIoU < mIoU:
-        best_train_mIoU = mIoU
+      if best_train_mIoU == -1 or best_train_mIoU < miou:
+        best_train_mIoU = miou
 
       data = {
         'iteration': step + 1,
         'threshold': threshold,
-        'train_mIoU': mIoU,
+        'train_mIoU': miou,
         'best_train_mIoU': best_train_mIoU,
-        'time': eval_timer.tok(clear=True),
+        'time': val_time,
       }
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
@@ -390,8 +312,7 @@ if __name__ == '__main__':
         'time            = {time:.0f} sec\n'
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
-        'best_train_mIoU = {best_train_mIoU:.2f}%\n'
-        .format(**data)
+        'best_train_mIoU = {best_train_mIoU:.2f}%\n'.format(**data)
       )
 
     # endregion
@@ -399,4 +320,4 @@ if __name__ == '__main__':
   write_json(data_path, data_dic)
 
   log(f'[i] {args.tag} saved at {model_path}')
-  save_model_fn()
+  save_model(model, model_path, parallel=GPUS_COUNT > 1)

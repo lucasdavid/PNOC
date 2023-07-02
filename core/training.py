@@ -1,0 +1,56 @@
+import time
+from typing import List
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
+from tools.ai.evaluate_utils import (MIoUCalculator, accumulate_batch_iou,
+                                     result_miou_from_thresholds)
+from tools.ai.torch_utils import make_cam, to_numpy
+from tools.general import wandb_utils
+
+
+def validation_step(
+      model: torch.nn.Module,
+      loader: DataLoader,
+      classes: List[str],
+      thresholds: List[float],
+      device: str,
+  ):
+  """Run Validation Step.
+
+  Evaluate CAMs priors produced by a classification `model`,
+  when presented with samples from a `loader`.
+
+  """
+
+  iou_meters = {th: MIoUCalculator(classes) for th in thresholds}
+
+  start = time.time()
+
+  with torch.no_grad():
+    for step, (ids, inputs, targets, masks) in enumerate(loader):
+      targets = to_numpy(targets)
+      masks = to_numpy(masks)
+      logits, features = model(inputs.to(device), with_cam=True)
+
+      labels_mask = targets[..., np.newaxis, np.newaxis]
+      cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
+      cams = cams.transpose(0, 2, 3, 1)
+
+      if step == 0:
+        inputs = to_numpy(inputs)
+        preds = to_numpy(torch.sigmoid(logits).float())  # TODO: check if `to_numpy(...).astype(np.float32)` is better.
+        wandb_utils.log_cams(classes, inputs, targets, cams, preds)
+
+      accumulate_batch_iou(masks, cams, iou_meters)
+
+  val_time = time.time() - start
+
+  return (*result_miou_from_thresholds(iou_meters, classes), val_time)
+
+  # preds_ = np.concatenate(preds_, axis=0)
+  # targets_ = np.concatenate(targets_, axis=0)
+  # rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
+  # rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')

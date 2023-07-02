@@ -13,7 +13,7 @@ import imageio
 import numpy as np
 from PIL import Image
 
-from core.datasets import get_paths_dataset
+from datasets import get_paths_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.log_utils import log_config
 from tools.ai.torch_utils import set_seed

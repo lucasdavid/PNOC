@@ -25,27 +25,52 @@
 # task over Pascal VOC 2012 using OC-CSE strategy.
 #
 
-echo "[puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
+# export OMP_NUM_THREADS=4
 
-nodeset -e $SLURM_JOB_NODELIST
+# Environment
 
-cd $SCRATCH/PuzzleCAM
+## Local
+PY=python
+DEVICES=""
+WORKERS_TRAIN=8
+WORKERS_INFER=8
+WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+DATA_DIR=/home/ldavid/workspace/datasets
 
-module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+### Sdumont
+# nodeset -e $SLURM_JOB_NODELIST
+# module load sequana/current
+# module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+# PY=python3.8
+# DEVICES=0,1,2,3
+# WORKERS_TRAIN=8
+# WORKERS_INFER=48
+# WORK_DIR=$SCRATCH/PuzzleCAM
+# DATA_DIR=$SCRATCH/datasets
 
+DEVICE="cpu"
+
+cd $WORK_DIR
 export PYTHONPATH=$(pwd)
-# export OMP_NUM_THREADS=16
 
-PY=python3.9
-SOURCE=scripts/cam/train_vanilla.py
-WORKERS=16
-DEVICES=0,1,2,3
-
+# Dataset
+## Pascal VOC 2012
 DATASET=voc12
-DATA_DIR=$SCRATCH/datasets/VOCdevkit/VOC2012/
+DOMAIN=train_aug
+DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
+
+# IMAGE_SIZE=512
+# MIN_IMAGE_SIZE=320
+# MAX_IMAGE_SIZE=640
+
+### MS COCO 2014
 # DATASET=coco14
-# DATA_DIR=$SCRATCH/datasets/coco14/
+# DOMAIN=train2014
+# DATA_DIR=$DATA_DIR/coco14/
+
+# IMAGE_SIZE=640
+# MIN_IMAGE_SIZE=400
+# MAX_IMAGE_SIZE=800
 
 ARCH=rs269
 ARCHITECTURE=resnest269
@@ -70,9 +95,8 @@ run_experiment () {
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR"   \
   WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla"     \
   CUDA_VISIBLE_DEVICES=$DEVICES        \
-  $PY $SOURCE                          \
+  $PY scripts/cam/train_vanilla.py     \
     --tag             $TAG             \
-    --num_workers     $WORKERS         \
     --lr              $LR              \
     --batch_size      $BATCH           \
     --architecture    $ARCHITECTURE    \
@@ -89,7 +113,9 @@ run_experiment () {
     --label_smoothing $LABELSMOOTHING  \
     --max_epoch       $EPOCHS          \
     --dataset         $DATASET         \
-    --data_dir        $DATA_DIR
+    --data_dir        $DATA_DIR        \
+    --device          $DEVICE          \
+    --num_workers     $WORKERS_TRAIN
 }
 
 
@@ -125,10 +151,20 @@ run_experiment () {
 # TAG=$DATASET-$ARCH-ls$LABELSMOOTHING-ra
 # run_experiment
 
+# LR=0.01
+# ARCH=rn38d
+# ARCHITECTURE=resnet38d
+# AUGMENT=randaugment
+# TAG=vanilla/$DATASET-$ARCH-ra
+# run_experiment
 
-LR=0.01
-ARCH=rn38d
-ARCHITECTURE=resnet38d
+
+IMAGE_SIZE=128
+MIN_IMAGE_SIZE=100
+MAX_IMAGE_SIZE=224
+BATCH=4
+ARCH=rn50
+ARCHITECTURE=resnet50
 AUGMENT=randaugment
-TAG=vanilla/$DATASET-$ARCH-ra
+TAG=$DATASET-$ARCH-ra
 run_experiment

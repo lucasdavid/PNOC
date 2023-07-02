@@ -6,6 +6,7 @@ import argparse
 import copy
 import os
 import sys
+from typing import List
 
 import numpy as np
 import PIL
@@ -13,8 +14,9 @@ import torch
 import torch.nn.functional as F
 from torch import multiprocessing
 from torch.utils.data import Subset
+from tqdm import tqdm
 
-from core.datasets import *
+import datasets
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -49,15 +51,16 @@ parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--activation', default='relu', type=str, choices=['relu', 'sigmoid'])
 
-
 GPUS_VISIBLE = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
 GPUS_COUNT = len(GPUS_VISIBLE.split(','))
 
-normalize_fn = Normalize(*imagenet_stats())
+normalize_fn = Normalize(*datasets.imagenet_stats())
 
 
 def run(args):
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
+
   print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 
   model = CCAM(
@@ -74,25 +77,41 @@ def run(args):
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE, args), join=True)
+  multiprocessing.spawn(
+    _work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDICTIONS_DIR, DEVICE, args), join=True
+  )
 
 
-def _work(process_id, model, dataset, scales, preds_dir, device, args):
+def _work(
+    process_id: int,
+    model: CCAM,
+    dataset: List[datasets.PathsDataset],
+    scales: List[float],
+    preds_dir: str,
+    device: str,
+    args,
+  ):
   dataset = dataset[process_id]
-  length = len(dataset)
+  data_source = dataset.dataset.data_source
+
+  if process_id == 0:
+    dataset = tqdm(dataset, mininterval=2.0)
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for step, (ori_image, image_id, _) in enumerate(dataset):
-      W, H = ori_image.size
+    for image_id, _, _ in dataset:
       npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue
+
+      image = data_source.get_image(image_id)
+      W, H = image.size
+
       strided_size = get_strided_size((H, W), 4)
       strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams = [forward_tta(model, ori_image, scale, device, args) for scale in scales]
+      cams = [forward_tta(model, image, scale, device, activation=args.activation) for scale in scales]
 
       cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
       cams_st = torch.mean(torch.stack(cams_st), dim=0)  # (1, 1, H, W)
@@ -103,16 +122,15 @@ def _work(process_id, model, dataset, scales, preds_dir, device, args):
       cams_st = make_cam(cams_st.unsqueeze(1)).squeeze(1)
       cams_hr = make_cam(cams_hr.unsqueeze(1)).squeeze(1)
 
-      np.save(npy_path, {"keys": [0, 1], "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
+      try:
+        np.save(npy_path, {"keys": [0, 1], "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
+      except:
+        if os.path.exists(npy_path):
+          os.remove(npy_path)
+        raise
 
-      if process_id == 0:
-        sys.stdout.write(f'\r# Make CAM [{step + 1}/{length}] = {(step + 1) / length:.2%}, ({(H, W)}, {tuple(cams_hr.shape)})')
-        sys.stdout.flush()
 
-    if process_id == 0: print()
-
-
-def forward_tta(model, image, scale, device, args):
+def forward_tta(model, image, scale, device, activation: str = "relu"):
   W, H = image.size
 
   # preprocessing
@@ -130,7 +148,7 @@ def forward_tta(model, image, scale, device, args):
   # inferenece
   _, _, cam = model(images)
 
-  if args.activation == 'relu':
+  if activation == 'relu':
     cams = F.relu(cam)
   else:
     cams = torch.sigmoid(cam)

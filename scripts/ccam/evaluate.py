@@ -9,7 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 
 import wandb
-from core.datasets import get_paths_dataset
+from datasets import get_paths_dataset
 from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file, str2bool

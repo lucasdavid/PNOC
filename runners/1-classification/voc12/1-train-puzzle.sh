@@ -50,10 +50,10 @@ DOMAIN=train
 # DOMAIN=train2014
 
 
-run_experiment() {
+train_puzzle() {
   echo "Running $TAG experiment"
   CUDA_VISIBLE_DEVICES=$DEVICES        \
-  $PY $SOURCE                          \
+  $PY scripts/cam/train_puzzle.py      \
     --tag             $TAG             \
     --num_workers     $WORKERS         \
     --batch_size      $BATCH           \
@@ -115,7 +115,7 @@ AUGMENT=colorjitter
 # ARCHITECTURE=resnest269
 # AUGMENT=colorjitter
 TAG=$DATASET-$ARCH-p-r3
-run_experiment
+train_puzzle
 run_inference
 
 # ARCH=rs101
@@ -125,7 +125,7 @@ run_inference
 # CUTMIX=1.0
 # AUGMENT=randaugment_cutormixup
 # TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-cutormixup
-# run_experiment
+# train_puzzle
 
 # ARCH=rs101
 # ARCHITECTURE=resnest101
@@ -136,4 +136,4 @@ run_inference
 # MIN_IMAGE_SIZE=512
 # MAX_IMAGE_SIZE=512
 # TAG=$DATASET-$ARCH-p-ls$LABELSMOOTHING-ra-mixup
-# run_experiment
+# train_puzzle

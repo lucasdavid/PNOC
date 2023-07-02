@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-def accumulate_batch_iou_lowres(masks, cams, meters):
+def accumulate_batch_iou(masks, cams, meters):
   for b in range(len(masks)):
     cam = cams[b]
     gt_mask = masks[b]
@@ -48,7 +48,7 @@ def result_miou_from_thresholds(iou_meters, classes):
   return th_, miou_, iou_
 
 
-class Calculator_For_mIoU:
+class MIoUCalculator:
 
   def __init__(self, classes):
     if isinstance(classes, np.ndarray):
@@ -131,7 +131,7 @@ class Calculator_For_mIoU:
       self.T.append(0)
 
 
-class MIoUCalcFromNames(Calculator_For_mIoU):
+class MIoUCalcFromNames(MIoUCalculator):
 
   def __init__(self, class_names):
     self.class_names = class_names

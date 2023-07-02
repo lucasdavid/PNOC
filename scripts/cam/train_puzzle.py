@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from core.datasets import *
+import datasets
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -37,6 +37,8 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 ###############################################################################
 # Network
@@ -108,15 +110,17 @@ if __name__ == '__main__':
   ###################################################################################
   # Transform, Dataset, DataLoader
   ###################################################################################
-  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
-  )
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
+  log_dataset(args.dataset, train_dataset, tt, tv)
 
   log('[i] The number of class is {}'.format(train_dataset.info.num_classes))
   log('[i] train_transform is {}'.format(tt))
@@ -198,12 +202,12 @@ if __name__ == '__main__':
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
   def evaluate(loader):
-    imagenet_mean, imagenet_std = imagenet_stats()
+    imagenet_mean, imagenet_std = datasets.imagenet_stats()
 
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in thresholds}
+    meter_dic = {th: MIoUCalculator(train_dataset.info.classes) for th in thresholds}
 
     with torch.no_grad():
       for step, (images, labels, gt_masks) in enumerate(loader):
@@ -247,12 +251,12 @@ if __name__ == '__main__':
 
     return best_th, best_mIoU, best_iou
 
-  train_iterator = Iterator(train_loader)
+  train_iterator = datasets.Iterator(train_loader)
 
   loss_option = args.loss_option.split('_')
 
   for iteration in range(max_iteration):
-    images, targets = train_iterator.get()
+    _, images, targets = train_iterator.get()
     images = images.cuda()
 
     ###############################################################################

@@ -3,11 +3,13 @@ import os
 
 import numpy as np
 import torch
-import wandb
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from core.datasets import *
+import datasets
+import wandb
 from core.networks import *
+from core.training import validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -17,7 +19,6 @@ from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.json_utils import *
 from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
@@ -28,6 +29,8 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -50,7 +53,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.5, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -58,6 +61,7 @@ parser.add_argument('--cutmix_prob', default=1.0, type=float)
 parser.add_argument('--mixup_prob', default=1.0, type=float)
 
 import cv2
+
 cv2.setNumThreads(0)
 
 try:
@@ -83,27 +87,20 @@ if __name__ == '__main__':
   model_dir = create_directory('./experiments/models/')
 
   log_path = log_dir + f'{TAG}.txt'
-  data_path = data_dir + f'{TAG}.json'
   model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
 
-  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset,
-    args.data_dir,
-    args.augment,
-    args.image_size,
-    args.cutmix_prob,
-    args.mixup_prob,
-    tt,
-    tv,
-  )
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
   step_val = len(train_loader)
@@ -134,9 +131,6 @@ if __name__ == '__main__':
     print(f"GPUs={GPUS_COUNT}")
     model = torch.nn.DataParallel(model)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
-
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
@@ -144,53 +138,20 @@ if __name__ == '__main__':
   log_opt_params("Vanilla", param_groups)
 
   # Train
-  data_dic = {'train': [], 'validation': []}
-
-  train_timer = Timer()
-  eval_timer = Timer()
-
   train_meter = MetricsContainer(['loss', 'class_loss'])
-
+  train_timer = Timer()
   best_train_mIoU = -1
 
-  def evaluate(loader, classes):
-    eval_timer.tik()
-
-    iou_meters = {th: Calculator_For_mIoU(train_dataset.info.classes) for th in THRESHOLDS}
-
-    with torch.no_grad():
-      for step, (inputs, targets, masks) in enumerate(loader):
-        targets = to_numpy(targets)
-        masks = to_numpy(masks)
-        logits, features = model(inputs.to(DEVICE), with_cam=True)
-
-        labels_mask = targets[..., np.newaxis, np.newaxis]
-        cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
-        cams = cams.transpose(0, 2, 3, 1)
-
-        if step == 0:
-          inputs = to_numpy(inputs)
-          preds = to_numpy(torch.sigmoid(logits).float())
-          wandb_utils.log_cams(classes, inputs, targets, cams, preds)
-
-        accumulate_batch_iou_lowres(masks, cams, iou_meters)
-
-    return result_miou_from_thresholds(iou_meters, classes)
-
-  train_iterator = Iterator(train_loader)
-
-  for step in range(step_max):
-    images, labels = train_iterator.get()
+  for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
+    image_ids, images, labels = train_iterator.get()
 
     optimizer.zero_grad()
 
-    #################################################################################################
     logits = model(images.to(DEVICE))
 
     labels = label_smoothing(labels, args.label_smoothing)
     class_loss = class_loss_fn(logits, labels.to(DEVICE)).mean()
     loss = class_loss
-    #################################################################################################
 
     loss.backward()
     optimizer.step()
@@ -215,8 +176,6 @@ if __name__ == '__main__':
         'class_loss': class_loss,
         'time': train_timer.tok(clear=True),
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
@@ -235,7 +194,7 @@ if __name__ == '__main__':
     #################################################################################################
     if (step + 1) % step_val == 0:
       model.eval()
-      threshold, miou, iou = evaluate(valid_loader, train_dataset.info.classes)
+      threshold, miou, iou, val_time = validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
       model.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
@@ -249,10 +208,8 @@ if __name__ == '__main__':
         'threshold': threshold,
         'train_mIoU': miou,
         'best_train_mIoU': best_train_mIoU,
-        'time': eval_timer.tok(clear=True),
+        'time': val_time,
       }
-      data_dic['validation'].append(data)
-      write_json(data_path, data_dic)
       wandb.log({f"val/{k}": v for k, v in data.items()})
 
       print(
@@ -264,8 +221,7 @@ if __name__ == '__main__':
       )
 
       print(f'saving weights `{model_path}`')
-      save_model_fn()
+      save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
-  write_json(data_path, data_dic)
   print(TAG)
   wb_run.finish()

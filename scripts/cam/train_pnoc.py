@@ -8,11 +8,12 @@ from torch import multiprocessing
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import datasets
 import wandb
 from core import occse
-from core.datasets import *
 from core.networks import *
 from core.puzzle_utils import *
+from core.training import validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -22,7 +23,6 @@ from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.json_utils import *
 from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
@@ -35,6 +35,8 @@ parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -46,6 +48,7 @@ parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-regularization', default=None, type=str)
+parser.add_argument('--oc-trainable-stem', default=True, type=str2bool)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
@@ -71,7 +74,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.015, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -98,12 +101,13 @@ parser.add_argument('--ow', default=0.5, type=float)
 parser.add_argument('--ow-init', default=0, type=float)
 parser.add_argument('--ow-schedule', default=1.0, type=float)
 parser.add_argument('--oc-train-interval-steps', default=1, type=int)
-parser.add_argument('--oc-train-masks', default='features', choices=['features', 'cams'], type=str)
+parser.add_argument('--oc-train-masks', default='cams', choices=['features', 'cams'], type=str)
 parser.add_argument('--oc_train_mask_t', default=0.2, type=float)
 
 # endregion
 
 import cv2
+
 cv2.setNumThreads(0)
 
 try:
@@ -116,7 +120,7 @@ THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
 
 
 def train_step(train_iterator, step):
-  inputs, targets = train_iterator.get()
+  _, inputs, targets = train_iterator.get()
 
   images = inputs.to(DEVICE)
   targets = targets.float()
@@ -237,47 +241,6 @@ def train_step_oc(step, images_mask, targets_sm, ow):
   return {'ot_loss': ot_loss.item()}
 
 
-def evaluate(loader, classes):
-  eval_timer.tik()
-
-  iou_meters = {th: Calculator_For_mIoU(classes) for th in THRESHOLDS}
-
-  # targets_, preds_ = [], []
-
-  with torch.no_grad():
-    for step, (inputs, targets, masks) in enumerate(loader):
-      inputs = inputs.to(DEVICE)
-      targets = to_numpy(targets)
-      masks = to_numpy(masks)
-
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-        logits, features = cgnet(inputs, with_cam=True)
-        # oc_preds_batch = to_numpy(torch.sigmoid(ocnet(inputs)))
-
-      # targets_ += [targets]
-      # preds_ += [oc_preds_batch]
-
-      labels_mask = targets[..., np.newaxis, np.newaxis]
-      cams = to_numpy(make_cam(features.cpu().float())) * labels_mask
-      cams = cams.transpose(0, 2, 3, 1)
-
-      if step == 0:
-        inputs = to_numpy(inputs)
-        preds = to_numpy(torch.sigmoid(logits))
-        wandb_utils.log_cams(classes, inputs, targets, cams, preds)
-
-      accumulate_batch_iou_lowres(masks, cams, iou_meters)
-
-  # preds_ = np.concatenate(preds_, axis=0)
-  # targets_ = np.concatenate(targets_, axis=0)
-  # rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
-  # rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
-
-  t, miou, iou = result_miou_from_thresholds(iou_meters, classes)
-
-  return t, miou, iou  # , rm, rw
-
-
 if __name__ == '__main__':
   try:
     multiprocessing.set_start_method('spawn')
@@ -293,31 +256,22 @@ if __name__ == '__main__':
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
-  data_path = os.path.join('./experiments/data', f'{TAG}.json')
   model_path = os.path.join('./experiments/models', f'{TAG}.pth')
   oc_model_path = os.path.join('./experiments/models', f'{TAG}-oc.pth')
 
-  create_directory(os.path.dirname(data_path))
   create_directory(os.path.dirname(model_path))
   set_seed(SEED)
 
-  # torch.autograd.set_detect_anomaly(True)
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
-  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset,
-    args.data_dir,
-    args.augment,
-    args.image_size,
-    args.cutmix_prob,
-    args.mixup_prob,
-    tt,
-    tv,
-  )
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
   step_val = len(train_loader)
@@ -347,6 +301,7 @@ if __name__ == '__main__':
     train_dataset.info.num_classes,
     mode="fix",
     regularization=args.oc_regularization,
+    trainable_stem=args.oc_trainable_stem,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=True)
 
@@ -378,8 +333,8 @@ if __name__ == '__main__':
   cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
   oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
-  # Train
-  data_dic = {'train': [], 'validation': []}
+  ## Train
+  # torch.autograd.set_detect_anomaly(True)
 
   train_timer = Timer()
   eval_timer = Timer()
@@ -393,9 +348,7 @@ if __name__ == '__main__':
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
-  train_iterator = Iterator(train_loader)
-
-  for step in tqdm(range(step_init, step_max), 'Training'):
+  for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
     metrics_values = train_step(train_iterator, step)
     train_metrics.update(metrics_values)
 
@@ -427,8 +380,6 @@ if __name__ == '__main__':
         'focal_factor': ffs,
         'time': train_timer.tok(clear=True),
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
@@ -454,7 +405,8 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      threshold, miou, iou = evaluate(valid_loader, train_dataset.info.classes)
+      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        threshold, miou, iou, val_time = validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
@@ -471,11 +423,9 @@ if __name__ == '__main__':
         'train_mIoU': miou,
         'train_iou': iou,
         'best_train_mIoU': best_train_mIoU,
-        'time': eval_timer.tok(clear=True),
+        'time': val_time,
       }
       # data = data | rm | rw
-      data_dic['validation'].append(data)
-      write_json(data_path, data_dic)
       wandb.log({f'val/{k}': v for k, v in data.items()})
 
       print(
@@ -499,6 +449,5 @@ if __name__ == '__main__':
       if args.oc_persist:
         save_model(ocnet, oc_model_path, parallel=GPUS_COUNT > 1)
 
-  write_json(data_path, data_dic)
   print(TAG)
   wb_run.finish()

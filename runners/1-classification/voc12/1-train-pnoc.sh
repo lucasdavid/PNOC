@@ -91,7 +91,7 @@ CUTMIX=0.5
 MIXUP=1.
 LABELSMOOTHING=0  # 0.1
 
-run_training () {
+train_pnoc () {
     echo "============================================================"
     echo "Experiment $TAG"
     echo "============================================================"
@@ -140,7 +140,7 @@ run_training () {
         --data_dir          $DATA_DIR
 }
 
-run_inference () {
+cam_inference () {
     CUDA_VISIBLE_DEVICES=$DEVICES        \
     $PY scripts/cam/inference.py         \
     --architecture      $ARCHITECTURE    \
@@ -163,14 +163,14 @@ OW_INIT=0.3
 OW_SCHEDULE=0.5
 OC_TRAIN_MASKS=features
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r1
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r2
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-amp@$OC_NAME-r3
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 
 # OC_NAME=rs269ra
 # OC_PRETRAINED=experiments/models/resnest269@randaug.pth
@@ -182,11 +182,11 @@ OC_TRAIN_MASKS=features
 # OC_TRAIN_MASKS=features
 # OC_TRAIN_INT_STEPS=5
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
-# run_training
+# train_pnoc
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r2
-# run_training
+# train_pnoc
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-octrint$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r3
-# run_training
+# train_pnoc
 
 OC_NAME=rs269ra
 OC_PRETRAINED=experiments/models/cam/resnest269@randaug.pth
@@ -200,8 +200,8 @@ OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
 # TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
 # W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 
 ## =============================
 ## Alternatives
@@ -209,34 +209,34 @@ OC_TRAIN_INT_STEPS=1
 # OW=1.0
 # OC_TRAIN_MASK_T=0.2
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
+# train_pnoc
 
 # OW=1.0
 # OC_TRAIN_INT_STEPS=5
 # OC_TRAIN_MASK_T=0.2
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-octis$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r4
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 
 # OC_TRAIN_MASK_T=0.3
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
 # W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 
 # OC_TRAIN_MASK_T=0.4
 # TAG=$DATASET-$ARCH-pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-$OC_TRAIN_MASKS-$OC_TRAIN_MASK_T-amp@$OC_NAME-r1
 # W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference
 
 
 OW=1.0
 OC_TRAIN_MASK_T=0.2
 ACCUMULATE_STEPS=2
 TAG="pnoc/$DATASET-${ARCH}pnoc-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T@$OC_NAME-r6"
-run_training
-run_inference
+train_pnoc
+cam_inference
 
 # LR=0.01
 # BATCH=32
@@ -255,5 +255,5 @@ run_inference
 # OC_TRAIN_INT_STEPS=1
 # TAG=pnoc/$DATASET-$ARCH-pnoc-b$BATCH-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T-is$OC_TRAIN_INT_STEPS-amp@$OC_NAME-r1
 # W_GROUP=pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T
-# run_training
-# run_inference
+# train_pnoc
+# cam_inference

@@ -3,7 +3,7 @@ import os
 import cv2
 
 import wandb
-from core.datasets import imagenet_stats
+from datasets import imagenet_stats
 from tools.ai.demo_utils import colormap, denormalize
 from tools.general.txt_utils import add_txt
 

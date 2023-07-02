@@ -138,21 +138,6 @@ rw_inference() {
     --data_dir $DATA_DIR
 }
 
-make_pseudo_labels() {
-  echo "=================================================================="
-  echo "[rw make pseudo labels] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
-
-  $PY scripts/segmentation/make_pseudo_labels.py \
-    --experiment_name $AFF_TAG \
-    --dataset $DATASET \
-    --domain $DOMAIN \
-    --threshold $THRESHOLD \
-    --crf_t $CRF_T \
-    --crf_gt_prob $CRF_GT \
-    --data_dir $DATA_DIR
-}
-
 run_evaluation() {
   CUDA_VISIBLE_DEVICES="" \
   WANDB_RUN_GROUP="$W_GROUP" \

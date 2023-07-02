@@ -3,13 +3,14 @@ import os
 
 import numpy as np
 import torch
-import wandb
 from torch.utils.data import DataLoader
 
+import datasets
+import wandb
 from core import occse
-from core.datasets import *
 from core.networks import *
 from core.puzzle_utils import *
+from core.training import validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -19,7 +20,6 @@ from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.json_utils import *
 from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
@@ -30,6 +30,8 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -61,7 +63,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=1.0, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -104,20 +106,20 @@ if __name__ == '__main__':
 
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-
-  data_path = data_dir + f'{TAG}.json'
   model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
 
-  tt, tv = get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_classification_datasets(
-    args.dataset, args.data_dir, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, tt, tv
-  )
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, drop_last=True)
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
+
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
   step_valid = len(train_loader)
@@ -143,7 +145,10 @@ if __name__ == '__main__':
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
   ocnet = Classifier(
-    args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization
+    model_name=args.oc_architecture,
+    num_classes=train_dataset.info.num_classes,
+    mode=args.mode,
+    regularization=args.oc_regularization,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
@@ -163,9 +168,6 @@ if __name__ == '__main__':
     cgnet = torch.nn.DataParallel(cgnet)
     ocnet = torch.nn.DataParallel(ocnet)
 
-  load_model_fn = lambda: load_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
-
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
@@ -179,53 +181,15 @@ if __name__ == '__main__':
   log_opt_params("CGNet", cg_param_groups)
 
   # Train
-  data_dic = {'train': [], 'validation': []}
-
-  train_timer = Timer()
-  eval_timer = Timer()
-
   train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
-
+  train_timer = Timer()
   best_train_mIoU = -1
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
 
-  def evaluate(loader):
-    classes = train_dataset.info.classes
-
-    cgnet.eval()
-    eval_timer.tik()
-
-    iou_meters = {th: Calculator_For_mIoU(classes) for th in THRESHOLDS}
-
-    with torch.no_grad():
-      for step, (images_batch, targets_batch, masks_batch) in enumerate(loader):
-        images_batch = images_batch.to(DEVICE)
-        targets_batch = to_numpy(targets_batch)
-        masks_batch = to_numpy(masks_batch)
-
-        _, features = cgnet(images_batch, with_cam=True)
-
-        labels_mask = targets_batch[..., np.newaxis, np.newaxis]
-        cams_batch = to_numpy(make_cam(features.cpu().float())) * labels_mask
-        cams_batch = cams_batch.transpose(0, 2, 3, 1)
-
-        if step == 0:
-          images_batch = to_numpy(images_batch)
-          preds_batch = to_numpy(torch.sigmoid(logits))
-          wandb_utils.log_cams(classes, images_batch, targets_batch, cams_batch, preds_batch)
-
-        accumulate_batch_iou_lowres(masks_batch, cams_batch, iou_meters)
-
-    cgnet.train()
-
-    return result_miou_from_thresholds(iou_meters, classes)
-
-  train_iterator = Iterator(train_loader)
-
   for step in range(step_init, step_max):
-    images, targets = train_iterator.get()
+    _, images, targets = train_iterator.get()
 
     images = images.to(DEVICE)
     targets = targets.float()
@@ -312,8 +276,6 @@ if __name__ == '__main__':
         'focal_factor': ffs,
         'time': train_timer.tok(clear=True),
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
@@ -336,24 +298,24 @@ if __name__ == '__main__':
       )
 
     if do_validation:
-      threshold, mIoU, iou = evaluate(valid_loader)
+      cgnet.eval()
+      threshold, miou, iou, val_time = validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+      cgnet.train()
 
-      if best_train_mIoU == -1 or best_train_mIoU < mIoU:
-        best_train_mIoU = mIoU
+      if best_train_mIoU == -1 or best_train_mIoU < miou:
+        best_train_mIoU = miou
         wandb.run.summary["train/best_t"] = threshold
-        wandb.run.summary["train/best_miou"] = mIoU
+        wandb.run.summary["train/best_miou"] = miou
         wandb.run.summary["train/best_iou"] = iou
 
       data = {
         'iteration': step + 1,
         'threshold': threshold,
-        'train_mIoU': mIoU,
+        'train_mIoU': miou,
         'train_iou': iou,
         'best_train_mIoU': best_train_mIoU,
-        'time': eval_timer.tok(clear=True),
+        'time': val_time,
       }
-      data_dic['validation'].append(data)
-      write_json(data_path, data_dic)
       wandb.log({f"val/{k}": v for k, v in data.items()})
 
       print(
@@ -366,7 +328,7 @@ if __name__ == '__main__':
       )
 
       print(f'saving weights `{model_path}`')
-      save_model_fn()
+      save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()

@@ -14,7 +14,7 @@ from torch import multiprocessing
 from torch.utils.data import Subset
 from pickle import UnpicklingError
 
-from core.datasets import get_inference_dataset
+from datasets import get_inference_dataset
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import create_directory, load_saliency_file

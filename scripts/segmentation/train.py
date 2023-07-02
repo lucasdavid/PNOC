@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import wandb
-from core.datasets import *
+from datasets import *
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -56,7 +56,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=256, type=int)
 parser.add_argument('--max_image_size', default=1024, type=int)
 
-parser.add_argument('--print_ratio', default=0.5, type=float)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -164,7 +164,7 @@ if __name__ == '__main__':
   def evaluate(loader, classes):
     eval_timer.tik()
 
-    iou_meter = Calculator_For_mIoU(train_dataset.info.classes)
+    iou_meter = MIoUCalculator(train_dataset.info.classes)
 
     with torch.no_grad():
       for images, labels in loader:
