@@ -118,8 +118,8 @@ def get_learning_rate_from_optimizer(optimizer):
 def set_trainable_layers(model, klass=None, trainable=False):
   for m in model.modules():
     if klass is None or isinstance(m, klass):
-      for w in ("weight", "bias"):
-        w = getattr(m, w, None)
+      for prop in ("weight", "bias"):
+        w = getattr(m, prop, None)
         if w is not None:
           w.requires_grad = trainable
 

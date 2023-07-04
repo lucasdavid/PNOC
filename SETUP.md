@@ -65,3 +65,9 @@ unzip coco_annotations_semantic.zip
 mv coco_annotations_semantic/coco_seg_anno .
 rm coco_annotations_semantic -r
 ```
+
+## DeepGlobe Land Cover Classification
+
+```shell
+# Download the DeepGlobe dataset from here https://zenodo.org/record/3902506
+```

@@ -1,0 +1,12 @@
+{
+  "classes": 7,
+  "class_names": [
+    "urban_land",
+    "agriculture_land",
+    "rangeland",
+    "forest_land",
+    "water",
+    "barren_land",
+    "unknown"
+  ]
+}

@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=24, type=int)
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
+parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
 parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 

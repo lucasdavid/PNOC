@@ -19,12 +19,6 @@ def _decode_id(sample_id):
   return s
 
 
-def _load_images_list(domain):
-  with open(os.path.join(DATA_DIR, f"{domain}.txt")) as f:
-    sample_ids = (_id.strip() for _id in f.readlines())
-    return [_decode_id(_id) for _id in sample_ids if _id]
-
-
 def _load_labels_from_npy(sample_ids, root_dir):
   filepath = os.path.join(root_dir, 'cls_labels_coco.npy')
   data = np.load(filepath, allow_pickle=True).item()
@@ -39,6 +33,8 @@ class COCO14DataSource(base.CustomDataSource):
     "valid": "val2014",
   }
 
+  UNKNOWN_CLASS = 81
+
   def __init__(
     self,
     root_dir: str,
@@ -48,10 +44,7 @@ class COCO14DataSource(base.CustomDataSource):
     masks_dir: Optional[str] = None,
     sample_ids: Union[str, List[str]] = None,
   ):
-    if sample_ids is None:
-      sample_ids = _load_images_list(domain)
-
-    domain = domain or split and self.DOMAINS.get(split, "train2014")
+    domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
     super().__init__(
       images_dir=images_dir or os.path.join(root_dir, domain),
@@ -69,6 +62,10 @@ class COCO14DataSource(base.CustomDataSource):
 
   def get_label(self, sample_id) -> np.ndarray:
     return self.sample_labels[sample_id]
+
+  def get_sample_ids(self, domain) -> List[str]:
+    sample_ids = super().get_sample_ids(domain)
+    return [_decode_id(_id) for _id in sample_ids if _id]
 
 
 base.DATASOURCES[COCO14DataSource.NAME] = COCO14DataSource

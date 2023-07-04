@@ -16,10 +16,10 @@ DATASOURCES: Dict[str, "CustomDataSource"] = {}
 
 class DatasetInfo:
 
-  def __init__(self, meta, classes, num_classes):
+  def __init__(self, meta, classes, num_classes: int = None):
     self.meta = meta
     self.classes = classes
-    self.num_classes = num_classes
+    self.num_classes = num_classes or len(classes)
 
   @classmethod
   def from_metafile(cls, dataset):
@@ -32,12 +32,15 @@ class DatasetInfo:
 
 class CustomDataSource(metaclass=ABCMeta):
 
-  NAME = None
+  NAME: str = "custom"
+  DEFAULT_SPLIT = "train"
   DOMAINS = {
     "train": "train",
     "valid": "valid",
     "test": "test",
   }
+
+  UNKNOWN_CLASS: int = None
 
   def __init__(
     self,
@@ -47,38 +50,20 @@ class CustomDataSource(metaclass=ABCMeta):
     masks_dir: Optional[str] = None,
     sample_ids: Optional[Union[str, List[str]]] = None,
   ):
-    domain = domain or split and self.DOMAINS.get(split, None)
+    domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
+
+    if sample_ids is None:
+      sample_ids = self.get_sample_ids(domain)
 
     self.images_dir = images_dir
     self.masks_dir = masks_dir
-    self.domain = domain
     self.split = split
+    self.domain = domain
     self.sample_ids = np.asarray(
       sample_ids.split(",")
       if isinstance(sample_ids, str)
       else sample_ids
     )
-
-  def __len__(self) -> int:
-    return len(self.sample_ids)
-
-  def get_image_path(self, sample_id) -> str:
-    return os.path.join(self.images_dir, sample_id + '.jpg')
-
-  def get_mask_path(self, sample_id) -> str:
-    return os.path.join(self.masks_dir, sample_id + '.png')
-
-  def get_image(self, sample_id) -> Image.Image:
-    return Image.open(self.get_image_path(sample_id)).convert('RGB')
-
-  def get_mask(self, sample_id) -> Image.Image:
-    return Image.open(self.get_mask_path(sample_id))
-    # if not os.path.isfile(mask_path):
-    #   return None
-
-  @abstractmethod
-  def get_label(self, sample_id) -> np.ndarray:
-    raise NotImplementedError
 
   _info: DatasetInfo = None
 
@@ -87,6 +72,44 @@ class CustomDataSource(metaclass=ABCMeta):
     if self._info is None:
       self._info = DatasetInfo.from_metafile(self.NAME)
     return self._info
+
+  def __len__(self) -> int:
+    return len(self.sample_ids)
+
+  def get_sample_ids_path(self, domain) -> str:
+    return os.path.join(DATA_DIR, self.NAME, f"{domain}.txt")
+
+  def get_image_path(self, sample_id) -> str:
+    return os.path.join(self.images_dir, sample_id + '.jpg')
+
+  def get_mask_path(self, sample_id) -> str:
+    return os.path.join(self.masks_dir, sample_id + '.png')
+
+  def get_sample_ids(self, domain) -> List[str]:
+    with open(self.get_sample_ids_path(domain)) as f:
+      return [sid.strip() for sid in f.readlines()]
+
+  def get_image(self, sample_id) -> Image.Image:
+    return Image.open(self.get_image_path(sample_id)).convert('RGB')
+
+  def get_mask(self, sample_id) -> Image.Image:
+    mask = Image.open(self.get_mask_path(sample_id))
+
+    if mask.mode == "RGB":  # Correction for SBD dataset.
+      with mask:
+        mask = np.array(mask)
+
+      mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
+      mask = np.argmax(mask[..., np.newaxis] == self.color_ids, axis=-1)
+      mask[mask == self.UNKNOWN_CLASS] = 255
+      mask = Image.fromarray(mask.astype('uint8'))
+
+    return mask
+
+  @abstractmethod
+  def get_label(self, sample_id) -> np.ndarray:
+    raise NotImplementedError
+
 
 # region Datasets
 
@@ -116,9 +139,9 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
     if self.ignore_bg_images and label.sum() == 0:
       return self.get_valid_sample(index+1)
-    
+
     return sample_id, label
-  
+
   def __getitem__(self, index):
     sample_id, label = self.get_valid_sample(index)
     image = self.data_source.get_image(sample_id)
@@ -187,9 +210,9 @@ class CAMsDataset(ClassificationDataset):
 
     image = self.data_source.get_image(sample_id)
 
-    mask_path = os.path.join(self.masks_dir, f'{sample_id}.npy')
-    mask_pack = np.load(mask_path, allow_pickle=True).item()
-    cams = torch.from_numpy(mask_pack['hr_cam'].max(0, keepdims=True))
+    cams_path = os.path.join(self.masks_dir, f'{sample_id}.npy')
+    cams = np.load(cams_path, allow_pickle=True).item()
+    cams = torch.from_numpy(cams['hr_cam'].max(0, keepdims=True))
 
     if self.transform is not None:
       data = self.transform({'image': image, 'mask': cams})

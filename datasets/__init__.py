@@ -6,7 +6,7 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import RandAugmentMC
 
 from .base import *
-from . import base, voc12, coco14
+from . import base, voc12, coco14, deepglobe
 
 
 class Iterator:

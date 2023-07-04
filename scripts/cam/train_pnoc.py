@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 import numpy as np
 import torch
@@ -27,14 +26,15 @@ from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
 
+
 # region Arguments
 
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
+parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--train_domain', default=None, type=str)
 parser.add_argument('--valid_domain', default=None, type=str)
 

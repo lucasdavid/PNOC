@@ -38,30 +38,30 @@ WORKERS_INFER=4
 WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 DATA_DIR=/home/ldavid/workspace/datasets
 
-### Sdumont
-nodeset -e $SLURM_JOB_NODELIST
-module load sequana/current
-module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
-PY=python3.8
-DEVICE="cuda"
-DEVICES=0,1,2,3
-WORKERS_TRAIN=8
-WORKERS_INFER=48
-WORK_DIR=$SCRATCH/PuzzleCAM
-DATA_DIR=$SCRATCH/datasets
+#### Sdumont
+# nodeset -e $SLURM_JOB_NODELIST
+# module load sequana/current
+# module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+# PY=python3.8
+# DEVICE="cuda"
+# DEVICES=0,1,2,3
+# WORKERS_TRAIN=8
+# WORKERS_INFER=48
+# WORK_DIR=$SCRATCH/PuzzleCAM
+# DATA_DIR=$SCRATCH/datasets
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
 # Dataset
 ## Pascal VOC 2012
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
+# DATASET=voc12
+# DOMAIN=train_aug
+# DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
 
-IMAGE_SIZE=512
-MIN_IMAGE_SIZE=320
-MAX_IMAGE_SIZE=640
+# IMAGE_SIZE=512
+# MIN_IMAGE_SIZE=320
+# MAX_IMAGE_SIZE=640
 
 ### MS COCO 2014
 # DATASET=coco14
@@ -73,17 +73,17 @@ MAX_IMAGE_SIZE=640
 # MAX_IMAGE_SIZE=800
 
 ## DeepGlobe Land Cover Classification
-# DATASET=deepglobe
-# DOMAIN=train75
-# DATA_DIR=$DATA_DIR/DGdevkit
+DATASET=deepglobe
+DOMAIN=train75
+DATA_DIR=$DATA_DIR/DGdevkit
 
-# IMAGE_SIZE=320
-# MIN_IMAGE_SIZE=300
-# MAX_IMAGE_SIZE=340
+IMAGE_SIZE=320
+MIN_IMAGE_SIZE=300
+MAX_IMAGE_SIZE=340
 
 # Architecture
-ARCH=rs269
-ARCHITECTURE=resnest269
+ARCH=rn50
+ARCHITECTURE=resnet50
 TRAINABLE_STEM=true
 DILATED=false
 MODE=normal
@@ -97,7 +97,7 @@ EPOCHS=15
 BATCH_SIZE=32
 LR=0.1
 
-PERFORM_VALIDATION=true
+PERFORM_VALIDATION=false
 
 train_vanilla() {
   echo "=================================================================="
@@ -281,7 +281,7 @@ TRAINABLE_STEM=false
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-TAG_VANILLA=vanilla/$DATASET-$ARCH-ra-ls-lr$LR
+TAG_VANILLA=vanilla/$DATASET-$ARCH-ra-ls-fix-lr$LR
 
 train_vanilla
 
@@ -315,6 +315,6 @@ OC_TRAIN_INT_STEPS=1
 AUGMENT=colorjitter
 LABELSMOOTHING=0.1
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING@$OC_NAME"
-train_pnoc
-inference_priors
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-ls$LABELSMOOTHING@$OC_NAME-r10"
+# train_pnoc
+# inference_priors

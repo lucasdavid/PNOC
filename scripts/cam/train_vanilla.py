@@ -27,8 +27,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
+parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--train_domain', default=None, type=str)
 parser.add_argument('--valid_domain', default=None, type=str)
 
@@ -44,6 +44,7 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--validate', default=True, type=str2bool)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -163,7 +164,7 @@ if __name__ == '__main__':
     #################################################################################################
     epoch = step // step_val
     do_logging = (step + 1) % step_log == 0
-    do_validation = (step + 1) % step_val == 0
+    do_validation = args.validate and (step + 1) % step_val == 0
 
     if (step + 1) % step_log == 0:
       loss, class_loss = train_meter.get(clear=True)
@@ -192,7 +193,7 @@ if __name__ == '__main__':
     #################################################################################################
     # Evaluation
     #################################################################################################
-    if (step + 1) % step_val == 0:
+    if do_validation:
       model.eval()
       threshold, miou, iou, val_time = priors_validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
       model.train()

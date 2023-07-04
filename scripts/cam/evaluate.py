@@ -18,8 +18,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
-parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
-parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
+parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--max_steps', default=None, type=int)
 
 parser.add_argument('--image_size', default=512, type=int)
@@ -107,13 +107,13 @@ def main(args):
 
     targs += [to_numpy(y)]
     probs += [to_numpy(p)]
-    
+
     if (step + 1) % logg_steps == 0:
       print(f'{(step + 1) / total_steps:.0%}', flush=True)
 
     if step >= total_steps:
       break
-  
+
   targs = np.concatenate(targs, 0)
   probs = np.concatenate(probs, 0)
   preds = probs.round()
