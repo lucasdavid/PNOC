@@ -10,8 +10,9 @@ import imageio
 import numpy as np
 from torch import multiprocessing
 from torch.utils.data import Subset
+from tqdm import tqdm
 
-from datasets import *
+import datasets
 from tools.ai.demo_utils import *
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import *
@@ -25,6 +26,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 ###############################################################################
 # Inference parameters
@@ -43,18 +45,23 @@ def split_dataset(dataset, n_splits):
 
 
 def _work(process_id, dataset, args):
-  subset = dataset[process_id]
-  length = len(subset)
+  dataset = dataset[process_id]
+  data_source = dataset.dataset.data_source
+
+  if process_id == 0:
+    dataset = tqdm(dataset, mininterval=2.0)
 
   ccam_dir = f'./experiments/predictions/{args.experiment_name}/'
   pred_dir = f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_t}/'
 
-  for step, (image, _id, _) in enumerate(subset):
-    png_path = pred_dir + _id + '.png'
+  for image_id, _, _ in dataset:
+    png_path = os.path.join(pred_dir, image_id + '.png')
     if os.path.isfile(png_path):
       continue
 
-    pack = np.load(ccam_dir + _id + '.npy', allow_pickle=True).item()
+    image = data_source.get_image(image_id)
+
+    pack = np.load(ccam_dir + image_id + '.npy', allow_pickle=True).item()
     cams = pack['hr_cam']
 
     if args.activation == 'relu':
@@ -71,14 +78,6 @@ def _work(process_id, dataset, args):
 
     imageio.imwrite(png_path, (cams * 255).clip(0, 255).astype(np.uint8))
 
-    if process_id == args.num_workers - 1 and step % max(1, length // 20) == 0:
-      sys.stdout.write(
-        '\r# CAMs CRF Inference [{}/{}] = {:.2f}%, ({}, {})'.format(
-          step + 1, length, (step + 1) / length * 100, tuple(reversed(image.size)), cams.shape
-        )
-      )
-      sys.stdout.flush()
-
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -87,7 +86,11 @@ if __name__ == '__main__':
 
   create_directory(f'./experiments/predictions/{args.experiment_name}@t={args.threshold}@crf={args.crf_t}/')
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
   dataset = split_dataset(dataset, args.num_workers)
 
-  multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)
+  if args.num_workers > 1:
+    multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)
+  else:
+    _work(0, dataset, args)

@@ -13,7 +13,7 @@ import wandb
 from core import occse
 from core.networks import *
 from core.puzzle_utils import *
-from core.training import validation_step
+from core.training import priors_validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -406,7 +406,7 @@ if __name__ == '__main__':
     if do_validation:
       cgnet.eval()
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-        threshold, miou, iou, val_time = validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+        threshold, miou, iou, val_time = priors_validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:

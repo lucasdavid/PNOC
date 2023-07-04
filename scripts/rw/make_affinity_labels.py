@@ -13,7 +13,7 @@ import imageio
 import numpy as np
 from PIL import Image
 
-from datasets import get_paths_dataset
+import datasets
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.log_utils import log_config
 from tools.ai.torch_utils import set_seed
@@ -161,7 +161,8 @@ if __name__ == '__main__':
     f'./experiments/predictions/{TAG}@aff_fg={args.fg_threshold:.2f}_bg={args.bg_threshold:.2f}/'
   )
 
-  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
 
   if args.num_workers > 1:
     multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args, work_dir), join=True)

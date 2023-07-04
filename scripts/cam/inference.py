@@ -103,7 +103,7 @@ def _work(
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for image_id, image_path, _ in dataset:
+    for image_id, _, _ in dataset:
       npy_path = os.path.join(preds_dir, image_id + '.npy')
       if os.path.isfile(npy_path):
         continue

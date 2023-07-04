@@ -3,17 +3,16 @@
 
 import argparse
 import copy
-import sys
 
-from PIL import Image
 import numpy as np
 import torch
 import torch.nn.functional as F
+from PIL import Image
 from torch import multiprocessing
 from torch.utils.data import Subset
 from tqdm import tqdm
 
-from datasets import *
+import datasets
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -65,8 +64,11 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain)
-  normalize_fn = Normalize(*imagenet_stats())
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds)
+  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+
+  normalize_fn = Normalize(*datasets.imagenet_stats())
 
   # Network
   model = DeepLabV3Plus(
@@ -100,15 +102,16 @@ def forward_tta(model, images, image_size, device):
 
 def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, args):
   dataset = dataset[process_id]
-  length = len(dataset)
+  data_source = dataset.dataset.data_source
 
   if process_id == 0:
-    dataset = tqdm(dataset, mininterval=5.)
+    dataset = tqdm(dataset, mininterval=5.0)
 
   with torch.no_grad(), torch.cuda.device(process_id):
     model = model.cuda()
 
-    for step, (image, image_id, _) in enumerate(dataset):
+    for image_id, _, _ in dataset:
+      image = data_source.get_image(image_id)
       W, H = image.size
 
       ps = []
@@ -138,9 +141,8 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
 
       p = Image.fromarray(p.astype(np.uint8))
       p.save(os.path.join(preds_dir, image_id + '.png'))
-
-      image.close()
       p.close()
+      image.close()
 
 
 if __name__ == '__main__':

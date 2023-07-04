@@ -1,22 +1,25 @@
 import time
 from typing import List
 
+import cv2
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from tools.ai.evaluate_utils import (MIoUCalculator, accumulate_batch_iou,
+from tools.ai.evaluate_utils import (MIoUCalcFromNames, MIoUCalculator,
+                                     accumulate_batch_iou,
+                                     accumulate_batch_iou_saliency,
                                      result_miou_from_thresholds)
-from tools.ai.torch_utils import make_cam, to_numpy
+from tools.ai.torch_utils import make_cam, resize_for_tensors, to_numpy
 from tools.general import wandb_utils
 
 
-def validation_step(
-      model: torch.nn.Module,
-      loader: DataLoader,
-      classes: List[str],
-      thresholds: List[float],
-      device: str,
+def priors_validation_step(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    classes: List[str],
+    thresholds: List[float],
+    device: str,
   ):
   """Run Validation Step.
 
@@ -54,3 +57,64 @@ def validation_step(
   # targets_ = np.concatenate(targets_, axis=0)
   # rm = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='macro')
   # rw = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average='weighted')
+
+def segmentation_validation_step(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    classes: List[str],
+    device: str,
+):
+  start = time.time()
+
+  iou_meter = MIoUCalculator(classes)
+
+  with torch.no_grad():
+    for _, images, _, masks in loader:
+      logits = model(images.to(device))
+      preds = torch.argmax(logits, dim=1)
+
+      masks = to_numpy(masks)
+      preds = to_numpy(preds)
+
+      for i in range(images.shape[0]):
+        pred_mask = preds[i]
+        gt_mask = masks[i]
+
+        h, w = pred_mask.shape
+        gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+
+        iou_meter.add(pred_mask, gt_mask)
+
+  miou, _, iou, *_ = iou_meter.get(clear=True, detail=True)
+  iou = [round(iou[c], 2) for c in classes]
+
+  val_time = time.time() - start
+
+  return miou, iou, val_time
+
+def saliency_validation_step(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    thresholds: List[float],
+    device: str,
+):
+  start = time.time()
+
+  classes = ['background', 'foreground']
+  iou_meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
+
+  with torch.no_grad():
+    for _, (_, images, _, masks) in enumerate(loader):
+      B, C, H, W = images.size()
+
+      _, _, ccams = model(images.to(device))
+
+      ccams = resize_for_tensors(ccams.cpu().float(), (H, W))
+      ccams = to_numpy(make_cam(ccams).squeeze())
+      masks = to_numpy(masks)
+
+      accumulate_batch_iou_saliency(masks, ccams, iou_meters)
+
+  val_time = time.time() - start
+
+  return (*result_miou_from_thresholds(iou_meters, classes), val_time)

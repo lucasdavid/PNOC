@@ -3,18 +3,17 @@
 
 import argparse
 import os
-import sys
+from pickle import UnpicklingError
+from typing import List
 
 import imageio
 import numpy as np
-from tqdm import tqdm
-
 import torch
 from torch import multiprocessing
 from torch.utils.data import Subset
-from pickle import UnpicklingError
+from tqdm import tqdm
 
-from datasets import get_inference_dataset
+import datasets
 from tools.ai.demo_utils import crf_inference_label
 from tools.ai.torch_utils import set_seed
 from tools.general.io_utils import create_directory, load_saliency_file
@@ -42,8 +41,16 @@ def split_dataset(dataset, n_splits):
   return [Subset(dataset, np.arange(i, len(dataset), n_splits)) for i in range(n_splits)]
 
 
-def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
+def _work(
+    process_id: int,
+    dataset: List[datasets.PathsDataset],
+    args: argparse.Namespace,
+    CAM_DIR: str,
+    SAL_DIR: str,
+    PRED_DIR: str,
+):
   subset = dataset[process_id]
+  data_source = subset.dataset.data_source
   processed = 0
   missing = []
   errors = []
@@ -52,13 +59,18 @@ def _work(process_id, dataset, args, CAM_DIR, SAL_DIR, PRED_DIR):
     subset = tqdm(subset, mininterval=5.)
 
   with torch.no_grad():
-    for image, image_id, label in subset:
+
+
+    for image_id, image_path, mask_path in subset:
       png_path = os.path.join(PRED_DIR, image_id + '.png')
       cam_path = os.path.join(CAM_DIR, image_id + '.npy')
       sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None
 
       if os.path.isfile(png_path):
         continue
+
+      image = data_source.get_image(image_id)
+      label = data_source.get_label(image_id)
 
       W, H = image.size
 
@@ -120,7 +132,8 @@ if __name__ == '__main__':
 
   set_seed(args.seed)
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=False)
   dataset = split_dataset(dataset, args.num_workers)
 
   multiprocessing.spawn(

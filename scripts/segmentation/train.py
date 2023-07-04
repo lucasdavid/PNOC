@@ -9,9 +9,10 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import datasets
 import wandb
-from datasets import *
 from core.networks import *
+from core.training import segmentation_validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -21,7 +22,6 @@ from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.json_utils import *
 from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
@@ -33,6 +33,8 @@ parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
 parser.add_argument('--masks_dir', default='../VOCtrainval_11-May-2012/SegmentationMasks/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--valid_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnest269', type=str)
@@ -91,21 +93,16 @@ if __name__ == '__main__':
 
   set_seed(SEED)
 
-  tt, tv = get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
-  train_dataset, valid_dataset = get_segmentation_datasets(
-    args.dataset,
-    args.data_dir,
-    args.augment,
-    args.image_size,
-    args.masks_dir,
-    train_transforms=tt,
-    valid_transforms=tv
-  )
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, masks_dir=args.masks_dir, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, masks_dir=args.masks_dir, split="valid")
+  tt, tv = datasets.get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  train_dataset = datasets.ClassificationDataset(ts, transform=tt)
+  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, segmentation=True)
 
-  train_loader = DataLoader(
-    train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True
-  )
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=1, shuffle=False, drop_last=True)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
   step_val = len(train_loader)
@@ -138,9 +135,6 @@ if __name__ == '__main__':
     # for sync bn
     # patch_replication_callback(model)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
-
   # Loss, Optimizer
   class_loss_fn = nn.CrossEntropyLoss(ignore_index=255, label_smoothing=args.label_smoothing).to(DEVICE)
 
@@ -150,49 +144,14 @@ if __name__ == '__main__':
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
-  data_dic = {
-    'train': [],
-    'validation': [],
-  }
-
   train_timer = Timer()
-  eval_timer = Timer()
-
   train_meter = MetricsContainer(['loss'])
   miou_best_ = -1
 
-  def evaluate(loader, classes):
-    eval_timer.tik()
-
-    iou_meter = MIoUCalculator(train_dataset.info.classes)
-
-    with torch.no_grad():
-      for images, labels in loader:
-        images = images.to(DEVICE)
-
-        with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-          logits = model(images)
-          predictions = torch.argmax(logits, dim=1)
-
-        for batch_index in range(images.size()[0]):
-          pred_mask = to_numpy(predictions[batch_index])
-          gt_mask = to_numpy(labels[batch_index])
-
-          h, w = pred_mask.shape
-          gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-          iou_meter.add(pred_mask, gt_mask)
-
-    miou, _, iou, *_ = iou_meter.get(clear=True, detail=True)
-    iou = [round(iou[c], 2) for c in classes]
-
-    return miou, iou
-
-  train_iterator = Iterator(train_loader)
   # torch.autograd.set_detect_anomaly(True)
 
-  for step in tqdm(range(step_init, step_max), 'Training'):
-    images, targets = train_iterator.get()
+  for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
+    _, images, _, targets = train_iterator.get()
     images, targets = images.to(DEVICE), targets.to(DEVICE)
 
     with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
@@ -206,9 +165,7 @@ if __name__ == '__main__':
       scaler.update()
       opt.zero_grad()
 
-    train_meter.update({
-      'loss': loss.item(),
-    })
+    train_meter.update({'loss': loss.item()})
 
     epoch = step // step_val
     do_logging = (step + 1) % step_log == 0
@@ -224,8 +181,6 @@ if __name__ == '__main__':
         'loss': loss,
         'time': train_timer.tok(clear=True),
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
@@ -235,7 +190,8 @@ if __name__ == '__main__':
 
     if do_validation:
       model.eval()
-      miou, iou = evaluate(valid_loader, train_dataset.info.classes)
+      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        miou, iou, val_time = segmentation_validation_step(model, valid_loader, train_dataset.info.classes, DEVICE)
       model.train()
 
       if miou_best_ < miou:
@@ -243,24 +199,20 @@ if __name__ == '__main__':
         wandb.run.summary['val/best_miou'] = miou
         wandb.run.summary['val/best_iou'] = iou
 
-        print(f'saving weights `{model_path}`\n')
-        save_model_fn()
+        save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
       data = {
         'iteration': step + 1,
         'mIoU': miou,
         'iou': iou,
         'best_valid_mIoU': miou_best_,
-        'time': eval_timer.tok(clear=True),
+        'time': val_time,
       }
-      data_dic['validation'].append(data)
-      write_json(data_path, data_dic)
       wandb.log({f'val/{k}': v for k, v in data.items()})
 
       print(
         'step={iteration:,} mIoU={mIoU:.2f}% best_valid_mIoU={best_valid_mIoU:.2f}% time={time:.0f}sec'.format(**data)
       )
 
-  write_json(data_path, data_dic)
   print(TAG)
   wb_run.finish()

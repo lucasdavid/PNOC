@@ -35,6 +35,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)

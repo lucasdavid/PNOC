@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from core.training import validation_step
+from core.training import priors_validation_step
 
 import datasets
 from core import occse
@@ -292,7 +292,7 @@ if __name__ == '__main__':
 
     # region evaluation
     if (step + 1) % val_iteration == 0:
-      threshold, miou, iou, val_time = validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+      threshold, miou, iou, val_time = priors_validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
         best_train_mIoU = miou

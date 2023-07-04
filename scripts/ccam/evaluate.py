@@ -9,7 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 
 import wandb
-from datasets import get_paths_dataset
+import datasets
 from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file, str2bool
@@ -22,6 +22,7 @@ parser.add_argument("--progbar", default=False, type=str2bool)
 parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
 parser.add_argument("--domain", default="train", type=str)
 parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=str)
+parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 parser.add_argument("--max_iterations", default=None, type=int)
 
 parser.add_argument("--threshold", default=None, type=float)
@@ -281,7 +282,8 @@ if __name__ == "__main__":
   )
   wandb.define_metric("evaluation/t")
 
-  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=)
   run(args, dataset)
 
   wb_run.finish()

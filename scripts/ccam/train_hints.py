@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 import datasets
 import wandb
+from core.training import saliency_validation_step
 from core.ccam import SimMaxLoss, SimMinLoss
 from core.networks import *
 from tools.ai.augment_utils import *
@@ -84,7 +85,7 @@ GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
 IS_POSITIVE = True
-IOU_THRESHOLDS = np.arange(0.05, 0.51, 0.05).astype(float).tolist()
+THRESHOLDS = np.arange(0.05, 0.51, 0.05).astype(float).tolist()
 
 if __name__ == '__main__':
   args = parser.parse_args()
@@ -158,9 +159,6 @@ if __name__ == '__main__':
     print('[i] the number of gpu : {}'.format(GPUS_COUNT))
     model = torch.nn.DataParallel(model)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
-
   # Loss, Optimizer
   hint_loss_fn = torch.nn.BCEWithLogitsLoss(reduction='none').to(DEVICE)
 
@@ -174,44 +172,14 @@ if __name__ == '__main__':
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train
-  data_dic = {'train': [], 'validation': []}
-
+  miou_best = -1
   train_timer = Timer()
-  eval_timer = Timer()
-
-  best_train_mIoU = -1
-
-  def evaluate(loader):
-    length = len(loader)
-
-    print(f'Evaluating over {length} batches...')
-
-    eval_timer.tik()
-
-    classes = ['background', 'foreground']
-    iou_meters = {th: MIoUCalcFromNames(classes) for th in IOU_THRESHOLDS}
-
-    with torch.no_grad():
-      for _, (images, _, masks) in enumerate(loader):
-        B, C, H, W = images.size()
-
-        with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-          _, _, ccams = model(images.to(DEVICE))
-
-        ccams = resize_for_tensors(ccams.cpu().float(), (H, W))
-        ccams = to_numpy(make_cam(ccams).squeeze())
-        masks = to_numpy(masks)
-
-        accumulate_batch_iou_saliency(masks, ccams, iou_meters)
-
-    return result_miou_from_thresholds(iou_meters, classes)
-
   train_metrics = MetricsContainer(['loss', 'positive_loss', 'negative_loss', 'hint_loss'])
 
   for epoch in range(args.max_epoch):
     model.train()
 
-    for step, (image_ids, images, targets, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
+    for step, (_, images, _, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
 
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
@@ -283,8 +251,6 @@ if __name__ == '__main__':
           'hint_loss': loss_h,
           'time': train_timer.tok(clear=True),
         }
-        data_dic['train'].append(data)
-
         wandb.log({f"train/{k}": v for k, v in data.items()}, commit=not do_validation)
 
         print(
@@ -299,24 +265,23 @@ if __name__ == '__main__':
 
     model.eval()
 
-    save_model_fn()
+    save_model(model, model_path, parallel=GPUS_COUNT > 1)
     print('[i] save model')
 
-    threshold, mIoU, iou = evaluate(valid_loader)
+    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      threshold, miou, iou, val_time = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
 
-    if best_train_mIoU == -1 or best_train_mIoU < mIoU:
-      best_train_mIoU = mIoU
+    if miou_best < miou:
+      miou_best = miou
 
     data = {
       'iteration': step + 1,
       'threshold': threshold,
-      'train_sal_mIoU': mIoU,
+      'train_sal_mIoU': miou,
       'train_sal_iou': iou,
-      'best_train_sal_mIoU': best_train_mIoU,
-      'time': eval_timer.tok(clear=True),
+      'best_train_sal_mIoU': miou_best,
+      'time': val_time,
     }
-    data_dic['validation'].append(data)
-    write_json(data_path, data_dic)
     wandb.log({f"val/{k}": v for k, v in data.items()})
 
     print(

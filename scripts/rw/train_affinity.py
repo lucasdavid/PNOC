@@ -4,13 +4,11 @@
 import argparse
 import os
 
-import numpy as np
 import torch
-import wandb
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
-from datasets import *
+import datasets
+import wandb
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
@@ -32,6 +30,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=['voc12', 'coco14'])
 parser.add_argument('--data_dir', default='../VOCtrainval_11-May-2012/', type=str)
+parser.add_argument('--train_domain', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -59,6 +58,7 @@ parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--label_dir', default='./experiments/predictions/rn50@train_aug@aff', type=str)
 
 import cv2
+
 cv2.setNumThreads(0)
 
 try:
@@ -87,11 +87,14 @@ if __name__ == '__main__':
 
   set_seed(args.seed)
 
-  tt = get_affinity_transforms(args.min_image_size, args.max_image_size, args.image_size)
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
-  train_dataset = get_affinity_datasets(args.dataset, args.data_dir, args.label_dir, path_index, tt)
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, masks_dir=args.label_dir, split="train")
+  tt = datasets.get_affinity_transforms(args.min_image_size, args.max_image_size, args.image_size)
+  train_dataset = datasets.AffinityDataset(ts, path_index=path_index, transform=tt)
+
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
+  train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, None)
 
   step_valid = len(train_loader)
@@ -121,9 +124,6 @@ if __name__ == '__main__':
     print(f"GPUs={GPUS_COUNT}")
     model = torch.nn.DataParallel(model)
 
-  load_model_fn = lambda: load_model(model, model_path, parallel=GPUS_COUNT > 1)
-  save_model_fn = lambda: save_model(model, model_path, parallel=GPUS_COUNT > 1)
-
   # Loss, Optimizer
   optimizer = PolyOptimizer(
     [{
@@ -134,18 +134,8 @@ if __name__ == '__main__':
   )
 
   # Train
-  data_dic = {'train': []}
-
   train_timer = Timer()
-
-  train_metrics = MetricsContainer([
-    'loss',
-    'bg_loss',
-    'fg_loss',
-    'neg_loss',
-  ])
-
-  train_iterator = Iterator(train_loader)
+  train_metrics = MetricsContainer(['loss', 'bg_loss', 'fg_loss', 'neg_loss'])
 
   torch.autograd.set_detect_anomaly(True)
 
@@ -204,8 +194,6 @@ if __name__ == '__main__':
         'neg_loss': neg_loss,
         'time': train_timer.tok(clear=True),
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
@@ -222,12 +210,10 @@ if __name__ == '__main__':
       )
 
     if do_validation:
-      save_model_fn()
+      save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   print(f'saving weights `{model_path}`')
-  save_model_fn()
-
-  write_json(data_path, data_dic)
+  save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()
