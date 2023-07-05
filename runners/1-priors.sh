@@ -144,9 +144,9 @@ train_vanilla() {
   echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ra" \
-    WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
-    CUDA_VISIBLE_DEVICES=$DEVICES \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,randaug" \
+  WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
+  CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
     --tag $TAG_VANILLA \
     --lr $LR \

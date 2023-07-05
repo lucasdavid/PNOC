@@ -81,7 +81,7 @@ if __name__ == '__main__':
   SEED = args.seed
   DEVICE = args.device
 
-  wb_run = wandb_utils.setup(TAG, args, tags=[args.dataset, args.architecture, f"ls:{args.label_smoothing}"])
+  wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
   log_dir = create_directory(f'./experiments/logs/')
