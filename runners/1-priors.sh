@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J coco-priors-ra
-#SBATCH -o /scratch/lerdl/lucas.david/logs/priors-%j.out
+#SBATCH -J coco-p
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-coco-p.out
 #SBATCH --time=96:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -53,6 +53,8 @@ DATA_DIR=$SCRATCH/datasets
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
+# region Configuration
+
 # Dataset
 ## Pascal VOC 2012
 # DATASET=voc12
@@ -65,7 +67,7 @@ export PYTHONPATH=$(pwd)
 
 # MAX_VAL_STEPS=0
 
-### MS COCO 2014
+## MS COCO 2014
 DATASET=coco14
 DOMAIN=train2014
 DATA_DIR=$DATA_DIR/coco14
@@ -88,6 +90,7 @@ MAX_VAL_STEPS=620  # too many train samples
 # MAX_VAL_STEPS=0
 
 # Architecture
+## Priors
 ARCH=rs269
 ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
@@ -95,29 +98,59 @@ DILATED=false
 MODE=normal
 REGULAR=none
 
-CUTMIX=0.5
-MIXUP=1.0
-LABELSMOOTHING=0 # 0.1
-
+# Training
+LR=0.1
 EPOCHS=15
 BATCH_SIZE=32
-LR=0.1
 
+MIXED_PRECISION=true
 PERFORM_VALIDATION=true
+
+## Augmentation
+CUTMIX=0.5
+MIXUP=1.0
+LABELSMOOTHING=0
+
+## OC-CSE
+OC_ARCHITECTURE=$ARCHITECTURE
+OC_REGULAR=none
+OC_MASK_GN=true  # originally done in OC-CSE
+OC_TRAINABLE_STEM=true
+OC_STRATEGY=random
+OC_F_MOMENTUM=0.9
+OC_F_GAMMA=2.0
+
+## Schedule
+P_INIT=0.0
+P_ALPHA=4.0
+P_SCHEDULE=0.5
+
+OC_INIT=0.3
+OC_ALPHA=1.0
+OC_SCHEDULE=1.0
+
+OW=1.0
+OW_INIT=0.0
+OW_SCHEDULE=0.5
+OC_TRAIN_MASKS=cams
+OC_TRAIN_MASK_T=0.2
+OC_TRAIN_INT_STEPS=1
+
+# regionend
+
 
 train_vanilla() {
   echo "=================================================================="
   echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,ac:$ACCUMULATE_STEPS,b:$BATCH_SIZE,ra" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ra" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
     --tag $TAG_VANILLA \
     --lr $LR \
     --batch_size $BATCH_SIZE \
-    --accumulate_steps $ACCUMULATE_STEPS \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
@@ -139,9 +172,46 @@ train_vanilla() {
     --num_workers $WORKERS_TRAIN
 }
 
+train_puzzle() {
+  echo "=================================================================="
+  echo "[train puzzle:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
+  CUDA_VISIBLE_DEVICES=$DEVICES \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,puzzle" \
+    WANDB_RUN_GROUP=$DATASET-$ARCH-p \
+    $PY scripts/cam/train_puzzle.py \
+    --tag $TAG \
+    --lr $LR \
+    --num_workers $WORKERS_TRAIN \
+    --max_epoch $EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --architecture $ARCHITECTURE \
+    --dilated $DILATED \
+    --mode $MODE \
+    --trainable-stem $TRAINABLE_STEM \
+    --regularization $REGULAR \
+    --re_loss_option masking \
+    --re_loss L1_Loss \
+    --alpha_schedule 0.50 \
+    --alpha 4.00 \
+    --image_size $IMAGE_SIZE \
+    --min_image_size $MIN_IMAGE_SIZE \
+    --max_image_size $MAX_IMAGE_SIZE \
+    --augment $AUGMENT \
+    --cutmix_prob $CUTMIX \
+    --mixup_prob $MIXUP \
+    --label_smoothing $LABELSMOOTHING \
+    --validate $PERFORM_VALIDATION \
+    --max_val_steps $MAX_VAL_STEPS \
+    --dataset $DATASET \
+    --data_dir $DATA_DIR
+}
+
 train_poc() {
   echo "=================================================================="
-  echo "[train vanilla:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "[train poc:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,poc" \
@@ -178,42 +248,6 @@ train_poc() {
     --oc-strategy $OC_STRATEGY \
     --oc-focal-momentum $OC_F_MOMENTUM \
     --oc-focal-gamma $OC_F_GAMMA \
-    --validate $PERFORM_VALIDATION \
-    --max_val_steps $MAX_VAL_STEPS \
-    --dataset $DATASET \
-    --data_dir $DATA_DIR
-}
-
-train_puzzle() {
-  echo "=================================================================="
-  echo "[train pnoc:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
-
-  CUDA_VISIBLE_DEVICES=$DEVICES \
-    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,puzzle" \
-    WANDB_RUN_GROUP=$DATASET-$ARCH-p \
-    $PY scripts/cam/train_puzzle.py \
-    --tag $TAG \
-    --lr $LR \
-    --num_workers $WORKERS_TRAIN \
-    --max_epoch $EPOCHS \
-    --batch_size $BATCH_SIZE \
-    --architecture $ARCHITECTURE \
-    --dilated $DILATED \
-    --mode $MODE \
-    --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
-    --re_loss_option masking \
-    --re_loss L1_Loss \
-    --alpha_schedule 0.50 \
-    --alpha 4.00 \
-    --image_size $IMAGE_SIZE \
-    --min_image_size $MIN_IMAGE_SIZE \
-    --max_image_size $MAX_IMAGE_SIZE \
-    --augment $AUGMENT \
-    --cutmix_prob $CUTMIX \
-    --mixup_prob $MIXUP \
-    --label_smoothing $LABELSMOOTHING \
     --validate $PERFORM_VALIDATION \
     --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
@@ -299,35 +333,14 @@ LABELSMOOTHING=0.1
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra
 # train_vanilla
 
-MIXED_PRECISION=true
+
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
+LABELSMOOTHING=0.1
+AUGMENT=colorjitter
 
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
-OC_ARCHITECTURE=$ARCHITECTURE
-OC_REGULAR=none
-OC_TRAINABLE_STEM=false  # true
-OC_STRATEGY=random
-
-# Schedule
-P_INIT=0.0
-P_ALPHA=4.0
-P_SCHEDULE=0.5
-
-OC_INIT=0.3
-OC_ALPHA=1.0
-OC_SCHEDULE=1.0
-
-OW=1.0
-OW_INIT=0.0
-OW_SCHEDULE=0.5
-OC_TRAIN_MASKS=cams
-OC_TRAIN_MASK_T=0.2
-OC_TRAIN_INT_STEPS=1
-
-AUGMENT=colorjitter
-LABELSMOOTHING=0.1
 
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls"
 # train_puzzle

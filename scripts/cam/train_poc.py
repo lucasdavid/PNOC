@@ -106,9 +106,7 @@ if __name__ == '__main__':
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
-  data_dir = create_directory(f'./experiments/data/')
-  model_dir = create_directory('./experiments/models/')
-  model_path = model_dir + f'{TAG}.pth'
+  MODEL_PATH = os.path.join('./experiments/models/', f"{TAG}.pth")
 
   set_seed(SEED)
 
@@ -332,8 +330,8 @@ if __name__ == '__main__':
         'train_iou       = {train_iou}\n'.format(**data)
       )
 
-      print(f'saving weights `{model_path}`')
-      save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
+      print(f'saving weights `{MODEL_PATH}`')
+      save_model(cgnet, MODEL_PATH, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()

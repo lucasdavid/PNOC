@@ -95,13 +95,17 @@ if __name__ == '__main__':
   ###################################################################################
   args = parser.parse_args()
 
-  log_dir = create_directory(f'./experiments/logs/')
-  data_dir = create_directory(f'./experiments/data/')
-  model_dir = create_directory('./experiments/models/')
+  log_dir = f'./experiments/logs/'
+  data_dir = f'./experiments/data/'
+  model_dir = './experiments/models/'
 
   log_path = log_dir + f'{args.tag}.txt'
   data_path = data_dir + f'{args.tag}.json'
   model_path = model_dir + f'{args.tag}.pth'
+
+  create_directory(os.path.dirname(log_path))
+  create_directory(os.path.dirname(data_path))
+  create_directory(os.path.dirname(model_path))
 
   set_seed(args.seed)
   log = lambda string='': log_print(string, log_path)
