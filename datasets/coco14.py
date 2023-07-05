@@ -48,7 +48,7 @@ class COCO14DataSource(base.CustomDataSource):
 
     super().__init__(
       images_dir=images_dir or os.path.join(root_dir, domain),
-      masks_dir=masks_dir or os.path.join(self.root_dir, "coco_seg_anno"),
+      masks_dir=masks_dir or os.path.join(root_dir, "coco_seg_anno"),
       sample_ids=sample_ids,
       domain=domain,
       split=split,

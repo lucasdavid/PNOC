@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J tr-aff
-#SBATCH -o /scratch/lerdl/lucas.david/logs/aff-%j.out
-#SBATCH --time=24:00:00
+#SBATCH -J coco-priors-ra
+#SBATCH -o /scratch/lerdl/lucas.david/logs/priors-%j.out
+#SBATCH --time=96:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -55,22 +55,26 @@ export PYTHONPATH=$(pwd)
 
 # Dataset
 ## Pascal VOC 2012
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
+# DATASET=voc12
+# DOMAIN=train_aug
+# DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
 
-IMAGE_SIZE=512
-MIN_IMAGE_SIZE=320
-MAX_IMAGE_SIZE=640
+# IMAGE_SIZE=512
+# MIN_IMAGE_SIZE=320
+# MAX_IMAGE_SIZE=640
+
+# MAX_VAL_STEPS=0
 
 ### MS COCO 2014
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$DATA_DIR/coco14/
+DATASET=coco14
+DOMAIN=train2014
+DATA_DIR=$DATA_DIR/coco14
 
-# IMAGE_SIZE=640
-# MIN_IMAGE_SIZE=400
-# MAX_IMAGE_SIZE=800
+IMAGE_SIZE=640
+MIN_IMAGE_SIZE=400
+MAX_IMAGE_SIZE=800
+
+MAX_VAL_STEPS=620  # too many train samples
 
 ## DeepGlobe Land Cover Classification
 # DATASET=deepglobe
@@ -80,6 +84,8 @@ MAX_IMAGE_SIZE=640
 # IMAGE_SIZE=320
 # MIN_IMAGE_SIZE=300
 # MAX_IMAGE_SIZE=340
+
+# MAX_VAL_STEPS=0
 
 # Architecture
 ARCH=rs269
@@ -104,13 +110,14 @@ train_vanilla() {
   echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,ac:$ACCUMULATE_STEPS,b:$BATCH_SIZE,ra" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
     --tag $TAG_VANILLA \
     --lr $LR \
     --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
@@ -127,6 +134,7 @@ train_vanilla() {
     --dataset $DATASET \
     --data_dir $DATA_DIR \
     --validate $PERFORM_VALIDATION \
+    --max_val_steps $MAX_VAL_STEPS \
     --device $DEVICE \
     --num_workers $WORKERS_TRAIN
 }
@@ -143,6 +151,7 @@ train_poc() {
     --tag $TAG \
     --num_workers $WORKERS_TRAIN \
     --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
@@ -169,6 +178,8 @@ train_poc() {
     --oc-strategy $OC_STRATEGY \
     --oc-focal-momentum $OC_F_MOMENTUM \
     --oc-focal-gamma $OC_F_GAMMA \
+    --validate $PERFORM_VALIDATION \
+    --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
     --data_dir $DATA_DIR
 }
@@ -179,7 +190,7 @@ train_puzzle() {
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,puzzle" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,puzzle" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-p \
     $PY scripts/cam/train_puzzle.py \
     --tag $TAG \
@@ -203,6 +214,8 @@ train_puzzle() {
     --cutmix_prob $CUTMIX \
     --mixup_prob $MIXUP \
     --label_smoothing $LABELSMOOTHING \
+    --validate $PERFORM_VALIDATION \
+    --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
     --data_dir $DATA_DIR
 }
@@ -253,6 +266,7 @@ train_pnoc() {
     --oc_train_mask_t $OC_TRAIN_MASK_T \
     --oc-train-interval-steps $OC_TRAIN_INT_STEPS \
     --validate $PERFORM_VALIDATION \
+    --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
     --data_dir $DATA_DIR
 }
@@ -275,25 +289,25 @@ inference_priors() {
     --device $DEVICE
 }
 
-MODE=fix
+# LR=0.1
+# MODE=fix
+# TRAINABLE_STEM=false
 LR=0.05
-TRAINABLE_STEM=false
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-TAG_VANILLA=vanilla/$DATASET-$ARCH-ra-ls-lr$LR
-
-train_vanilla
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra
+# train_vanilla
 
 MIXED_PRECISION=true
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
 
-OC_NAME="$ARCH"-rals
+OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_REGULAR=none
-OC_TRAINABLE_STEM=true
+OC_TRAINABLE_STEM=false  # true
 OC_STRATEGY=random
 
 # Schedule
@@ -315,6 +329,13 @@ OC_TRAIN_INT_STEPS=1
 AUGMENT=colorjitter
 LABELSMOOTHING=0.1
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls$LABELSMOOTHING@$OC_NAME"
-train_pnoc
-inference_priors
+# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls"
+# train_puzzle
+
+TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls@$OC_NAME"
+train_poc
+
+# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls@$OC_NAME"
+# train_pnoc
+
+# inference_priors

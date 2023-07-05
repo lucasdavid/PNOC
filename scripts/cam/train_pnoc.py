@@ -63,6 +63,7 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--max_val_steps', default=None, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -406,7 +407,10 @@ if __name__ == '__main__':
     if do_validation:
       cgnet.eval()
       with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
-        threshold, miou, iou, val_time = priors_validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+        threshold, miou, iou, val_time = priors_validation_step(
+          cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
+          max_steps=args.max_val_steps,
+        )
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:

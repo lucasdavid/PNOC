@@ -54,6 +54,8 @@ parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--max_val_steps', default=None, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -239,7 +241,7 @@ if __name__ == '__main__':
 
     epoch = step // step_valid
     do_logging = (step + 1) % step_log == 0
-    do_validation = (step + 1) % step_valid == 0
+    do_validation = args.validate and (step + 1) % step_valid == 0
 
     train_metrics.update(
       {
@@ -299,7 +301,10 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      threshold, miou, iou, val_time = priors_validation_step(cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+      threshold, miou, iou, val_time = priors_validation_step(
+        cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
+        max_steps=args.max_val_steps,
+      )
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:

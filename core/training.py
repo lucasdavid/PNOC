@@ -1,5 +1,5 @@
 import time
-from typing import List
+from typing import List, Optional
 
 import cv2
 import numpy as np
@@ -20,6 +20,7 @@ def priors_validation_step(
     classes: List[str],
     thresholds: List[float],
     device: str,
+    max_steps: Optional[int] = None,
   ):
   """Run Validation Step.
 
@@ -48,6 +49,9 @@ def priors_validation_step(
         wandb_utils.log_cams(classes, inputs, targets, cams, preds)
 
       accumulate_batch_iou(masks, cams, iou_meters)
+
+      if max_steps and step >= max_steps:
+        break
 
   val_time = time.time() - start
 

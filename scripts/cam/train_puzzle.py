@@ -56,6 +56,8 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--max_val_steps', default=None, type=int)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -236,6 +238,9 @@ if __name__ == '__main__':
 
             meter_dic[th].add(pred_mask, gt_mask)
 
+        if args.max_val_steps and step >= args.max_val_steps:
+          break
+
     model.train()
 
     best_th = 0.0
@@ -373,7 +378,7 @@ if __name__ == '__main__':
     #################################################################################################
     # Evaluation
     #################################################################################################
-    if (iteration + 1) % val_iteration == 0:
+    if args.validate and (iteration + 1) % val_iteration == 0:
       threshold, mIoU, iou = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
