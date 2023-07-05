@@ -59,7 +59,7 @@ class VOC12DataSource(base.CustomDataSource):
 
   def get_label(self, sample_id) -> np.ndarray:
     _, tags = read_xml(self.xml_dir + sample_id + '.xml')
-    label = one_hot_embedding([self.class_dic[tag] for tag in tags], self.classes)
+    label = one_hot_embedding([self.class_dic[tag] for tag in tags], 20)
 
     return label
 

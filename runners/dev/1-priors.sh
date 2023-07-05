@@ -59,27 +59,27 @@ export PYTHONPATH=$(pwd)
 # DOMAIN=train_aug
 # DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
 
-# IMAGE_SIZE=512
-# MIN_IMAGE_SIZE=320
-# MAX_IMAGE_SIZE=640
+# IMAGE_SIZE=320
+# MIN_IMAGE_SIZE=300
+# MAX_IMAGE_SIZE=340
 
 ### MS COCO 2014
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$DATA_DIR/coco14/
-
-# IMAGE_SIZE=640
-# MIN_IMAGE_SIZE=400
-# MAX_IMAGE_SIZE=800
-
-## DeepGlobe Land Cover Classification
-DATASET=deepglobe
-DOMAIN=train75
-DATA_DIR=$DATA_DIR/DGdevkit
+DATASET=coco14
+DOMAIN=train2014
+DATA_DIR=$DATA_DIR/coco14
 
 IMAGE_SIZE=320
 MIN_IMAGE_SIZE=300
 MAX_IMAGE_SIZE=340
+
+## DeepGlobe Land Cover Classification
+# DATASET=deepglobe
+# DOMAIN=train75
+# DATA_DIR=$DATA_DIR/DGdevkit
+
+# IMAGE_SIZE=320
+# MIN_IMAGE_SIZE=300
+# MAX_IMAGE_SIZE=340
 
 # Architecture
 ARCH=rn50
@@ -275,9 +275,9 @@ inference_priors() {
     --device $DEVICE
 }
 
-MODE=fix
-LR=0.05
-TRAINABLE_STEM=false
+# MODE=fix
+# LR=0.05
+# TRAINABLE_STEM=false
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1

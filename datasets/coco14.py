@@ -58,7 +58,7 @@ class COCO14DataSource(base.CustomDataSource):
     self.sample_labels = _load_labels_from_npy(self.sample_ids, root_dir)
 
   def get_image_path(self, sample_id) -> str:
-    return os.path.join(self.image_dir, f"COCO_{self.domain}_{sample_id}.jpg")
+    return os.path.join(self.images_dir, f"COCO_{self.domain}_{sample_id}.jpg")
 
   def get_label(self, sample_id) -> np.ndarray:
     return self.sample_labels[sample_id]
