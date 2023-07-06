@@ -56,6 +56,8 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
+parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
 parser.add_argument('--max_val_steps', default=None, type=int)
 
@@ -88,6 +90,8 @@ parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
 import cv2
 cv2.setNumThreads(0)
+
+DEVICE = "cuda"
 
 if __name__ == '__main__':
   ###################################################################################
@@ -154,7 +158,7 @@ if __name__ == '__main__':
   )
   param_groups = model.get_parameter_groups()
 
-  model = model.cuda()
+  model = model.to(DEVICE)
   model.train()
 
   log('[i] Architecture is {}'.format(args.architecture))
@@ -180,7 +184,7 @@ if __name__ == '__main__':
   ###################################################################################
   # Loss, Optimizer
   ###################################################################################
-  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
   if args.re_loss == 'L1_Loss':
     re_loss_fn = L1_Loss
@@ -193,6 +197,7 @@ if __name__ == '__main__':
   log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
 
   optimizer = get_optimizer(args.lr, args.wd, int(max_iteration // args.accumulate_steps), param_groups)
+  scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   #################################################################################################
   # Train
@@ -208,8 +213,6 @@ if __name__ == '__main__':
   thresholds = list(np.arange(0.10, 0.50, 0.05))
 
   def evaluate(loader):
-    imagenet_mean, imagenet_std = datasets.imagenet_stats()
-
     model.eval()
     eval_timer.tik()
 
@@ -217,16 +220,17 @@ if __name__ == '__main__':
 
     with torch.no_grad():
       for step, (images, labels, gt_masks) in enumerate(loader):
-        images = images.cuda()
-        labels = labels.cuda()
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
 
-        _, features = model(images, with_cam=True)
+        with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+          _, features = model(images, with_cam=True)
 
         # features = resize_for_tensors(features, images.size()[-2:])
         # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
 
         mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = (make_cam(features) * mask)
+        cams = (make_cam(features.float()) * mask)
 
         for b in range(images.size()[0]):
           # c, h, w -> h, w, c
@@ -266,73 +270,78 @@ if __name__ == '__main__':
 
   for iteration in range(max_iteration):
     _, images, targets = train_iterator.get()
-    images = images.cuda()
+    images = images.to(DEVICE)
 
-    ###############################################################################
-    # Normal
-    ###############################################################################
-    logits, features = model(images, with_cam=True)
+    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      ###############################################################################
+      # Normal
+      ###############################################################################
+      logits, features = model(images, with_cam=True)
 
-    ###############################################################################
-    # Puzzle Module
-    ###############################################################################
-    tiled_images = tile_features(images, args.num_pieces)
-    tiled_logits, tiled_features = model(tiled_images, with_cam=True)
-    re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
+      ###############################################################################
+      # Puzzle Module
+      ###############################################################################
+      tiled_images = tile_features(images, args.num_pieces)
+      tiled_logits, tiled_features = model(tiled_images, with_cam=True)
+      re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
-    ###############################################################################
-    # Losses
-    ###############################################################################
-    if args.level == 'cam':
-      features = make_cam(features, inplace=False)
-      re_features = make_cam(re_features, inplace=False)
+      ###############################################################################
+      # Losses
+      ###############################################################################
+      if args.level == 'cam':
+        features = make_cam(features, inplace=False)
+        re_features = make_cam(re_features, inplace=False)
 
-    labels_sm = label_smoothing(targets, args.label_smoothing).to(logits)
-    class_loss = class_loss_fn(logits, labels_sm).mean()
+      labels_sm = label_smoothing(targets, args.label_smoothing).to(logits)
+      class_loss = class_loss_fn(logits, labels_sm).mean()
 
-    if 'pcl' in loss_option:
-      p_class_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
-    else:
-      p_class_loss = torch.zeros(1, dtype=logits.device)
-
-    if 're' in loss_option:
-      if args.re_loss_option == 'masking':
-        class_mask = targets.unsqueeze(2).unsqueeze(3)
-        re_loss = re_loss_fn(features, re_features) * class_mask.to(features)
-        re_loss = re_loss.mean()
-      elif args.re_loss_option == 'selection':
-        re_loss = 0.
-        for b_index in range(targets.size()[0]):
-          class_indices = targets[b_index].nonzero(as_tuple=True)
-          selected_features = features[b_index][class_indices]
-          selected_re_features = re_features[b_index][class_indices]
-
-          re_loss_per_feature = re_loss_fn(selected_features, selected_re_features).mean()
-          re_loss += re_loss_per_feature
-        re_loss /= targets.size()[0]
+      if 'pcl' in loss_option:
+        p_class_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
       else:
-        re_loss = re_loss_fn(features, re_features).mean()
-    else:
-      re_loss = torch.zeros(1).cuda()
+        p_class_loss = torch.zeros(1, dtype=logits.device)
 
-    if 'conf' in loss_option:
-      conf_loss = shannon_entropy_loss(tiled_logits)
-    else:
-      conf_loss = torch.zeros(1).cuda()
+      if 're' in loss_option:
+        if args.re_loss_option == 'masking':
+          class_mask = targets.unsqueeze(2).unsqueeze(3)
+          re_loss = re_loss_fn(features, re_features) * class_mask.to(features)
+          re_loss = re_loss.mean()
+        elif args.re_loss_option == 'selection':
+          re_loss = 0.
+          for b_index in range(targets.size()[0]):
+            class_indices = targets[b_index].nonzero(as_tuple=True)
+            selected_features = features[b_index][class_indices]
+            selected_re_features = re_features[b_index][class_indices]
 
-    if args.alpha_schedule == 0.0:
-      alpha = args.alpha
-    else:
-      alpha = min(args.alpha * iteration / (max_iteration * args.alpha_schedule), args.alpha)
+            re_loss_per_feature = re_loss_fn(selected_features, selected_re_features).mean()
+            re_loss += re_loss_per_feature
+          re_loss /= targets.size()[0]
+        else:
+          re_loss = re_loss_fn(features, re_features).mean()
+      else:
+        re_loss = torch.zeros(1).to(DEVICE)
 
-    loss = class_loss + p_class_loss + alpha * re_loss + conf_loss
-    #################################################################################################
+      if 'conf' in loss_option:
+        conf_loss = shannon_entropy_loss(tiled_logits)
+      else:
+        conf_loss = torch.zeros(1).to(DEVICE)
 
-    loss.backward()
+      if args.alpha_schedule == 0.0:
+        alpha = args.alpha
+      else:
+        alpha = min(args.alpha * iteration / (max_iteration * args.alpha_schedule), args.alpha)
+
+      loss = class_loss + p_class_loss + alpha * re_loss + conf_loss
+      #################################################################################################
+
+    scaler.scale(loss).backward()
 
     if (iteration + 1) % args.accumulate_steps == 0:
-      optimizer.step()
-      optimizer.zero_grad()
+      optimizer.step(optimizer)
+      optimizer.update()
+      optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
+
+      if args.amp_min_scale and optimizer._scale < args.amp_min_scale:
+          optimizer._scale = torch.as_tensor(args.amp_min_scale, dtype=optimizer._scale.dtype, device=optimizer._scale.device)
 
     train_meter.update(
       {

@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J coco-p
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-coco-p.out
-#SBATCH --time=96:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -65,6 +65,7 @@ export PYTHONPATH=$(pwd)
 # MIN_IMAGE_SIZE=320
 # MAX_IMAGE_SIZE=640
 
+# LR=0.1
 # MAX_VAL_STEPS=0
 
 ## MS COCO 2014
@@ -76,6 +77,7 @@ IMAGE_SIZE=640
 MIN_IMAGE_SIZE=400
 MAX_IMAGE_SIZE=800
 
+LR=0.05
 MAX_VAL_STEPS=620  # too many train samples
 
 ## DeepGlobe Land Cover Classification
@@ -144,7 +146,7 @@ train_vanilla() {
   echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,randaug" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
   WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
   CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
@@ -187,6 +189,7 @@ train_puzzle() {
     --max_epoch $EPOCHS \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
@@ -323,16 +326,10 @@ inference_priors() {
     --device $DEVICE
 }
 
-# LR=0.1
-# MODE=fix
-# TRAINABLE_STEM=false
-LR=0.05
-
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra
-# train_vanilla
-
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-r4
+train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -345,10 +342,10 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls"
 # train_puzzle
 
-TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls@$OC_NAME"
-train_poc
+# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME"
+# train_poc
 
-# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-a$ACCUMULATE_STEPS-lr$LR-ls@$OC_NAME"
-# train_pnoc
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-r4"
+train_pnoc
 
-# inference_priors
+inference_priors
