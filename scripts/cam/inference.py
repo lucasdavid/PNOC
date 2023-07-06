@@ -73,7 +73,6 @@ def run(args):
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
-  print(f'Loading weights from {WEIGHTS_PATH}.')
   load_model(model, WEIGHTS_PATH, map_location=torch.device(DEVICE))
   model.eval()
 

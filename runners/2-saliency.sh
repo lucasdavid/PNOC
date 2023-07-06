@@ -24,50 +24,17 @@
 # Saliency Detection with C²AM-H.
 #
 
-# export OMP_NUM_THREADS=4
+ENV=sdumont # local
+# Dataset
+# DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-# Environment
-
-## Local
-PY=python
-DEVICES=0
-WORKERS_TRAIN=8
-WORKERS_INFER=8
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
-DATA_DIR=/home/ldavid/workspace/datasets
-
-### Sdumont
-nodeset -e $SLURM_JOB_NODELIST
-module load sequana/current
-module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
-PY=python3.8
-DEVICES=0,1,2,3
-WORKERS_TRAIN=8
-WORKERS_INFER=48
-WORK_DIR=$SCRATCH/PuzzleCAM
-DATA_DIR=$SCRATCH/datasets
+. config/env.sh
+. config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
-
-# Dataset
-## Pascal VOC 2012
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
-
-# IMAGE_SIZE=512
-# MIN_IMAGE_SIZE=320
-# MAX_IMAGE_SIZE=640
-
-### MS COCO 2014
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$DATA_DIR/coco14/
-
-# IMAGE_SIZE=640
-# MIN_IMAGE_SIZE=400
-# MAX_IMAGE_SIZE=800
 
 IMAGE_SIZE=448
 EPOCHS=10
@@ -94,28 +61,27 @@ INF_FG_T=0.2
 CRF_T=10
 CRF_GT_PROB=0.7
 
-
 ccam_training() {
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
-  WANDB_TAGS="$DATASET,$ARCH,ccam" \
-  WANDB_TAGS="ccam,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,lr:$LR" \
-  $PY scripts/ccam/train.py \
-    --tag             $TAG                  \
-    --alpha           $ALPHA                \
-    --max_epoch       $EPOCHS               \
-    --batch_size      $BATCH_SIZE           \
-    --lr              $LR                   \
-    --accumulate_steps $ACCUMULATE_STEPS    \
-    --mixed_precision $MIXED_PRECISION      \
-    --num_workers     $WORKERS_TRAIN        \
-    --architecture    $ARCHITECTURE         \
-    --stage4_out_features $S4_OUT_FEATURES  \
-    --dilated         $DILATED              \
-    --mode            $MODE                 \
-    --weights         $WEIGHTS              \
-    --trainable-stem  $TRAINABLE_STEM       \
-    --image_size      $IMAGE_SIZE           \
-    --data_dir        $DATA_DIR
+    WANDB_TAGS="$DATASET,$ARCH,ccam" \
+    WANDB_TAGS="ccam,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,lr:$LR" \
+    $PY scripts/ccam/train.py \
+    --tag $TAG \
+    --alpha $ALPHA \
+    --max_epoch $EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --lr $LR \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
+    --num_workers $WORKERS_TRAIN \
+    --architecture $ARCHITECTURE \
+    --stage4_out_features $S4_OUT_FEATURES \
+    --dilated $DILATED \
+    --mode $MODE \
+    --weights $WEIGHTS \
+    --trainable-stem $TRAINABLE_STEM \
+    --image_size $IMAGE_SIZE \
+    --data_dir $DATA_DIR
 }
 
 ccamh_training() {
@@ -205,21 +171,20 @@ poolnet_inference() {
 
 evaluate_saliency_detection() {
   WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh,pn" \
-  $PY scripts/ccam/evaluate.py      \
-    --experiment_name "$TAG"    \
-    --pred_dir        $PRED_DIR \
-    --dataset         $DATASET  \
-    --domain          $DOMAIN   \
-    --min_th          0.05      \
-    --max_th          0.81      \
-    --mode            npy       \
-    --eval_mode       saliency  \
-    --crf_t           $CRF_T       \
-    --crf_gt_prob     $CRF_GT_PROB \
-    --data_dir        $DATA_DIR    \
-    --num_workers     $WORKERS_INFER
+    $PY scripts/ccam/evaluate.py \
+    --experiment_name "$TAG" \
+    --pred_dir $PRED_DIR \
+    --dataset $DATASET \
+    --domain $DOMAIN \
+    --min_th 0.05 \
+    --max_th 0.81 \
+    --mode npy \
+    --eval_mode saliency \
+    --crf_t $CRF_T \
+    --crf_gt_prob $CRF_GT_PROB \
+    --data_dir $DATA_DIR \
+    --num_workers $WORKERS_INFER
 }
-
 
 ## Pascal VoC 2012
 ##
@@ -254,14 +219,12 @@ PN_CKPT=$PRJ_DIR/poolnet/results/run-1/models/epoch_9.pth
 # CAMS_DIR=experiments/predictions/ensemble/$ENS
 PN_CKPT=$PRJ_DIR/poolnet/results/run-2/models/epoch_9.pth
 
-
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
 PN_TAG=$DATASET-pn@ccamh-rs269@$ENS
 SAL_PRIORS_DIR=$PRJ_DIR/experiments/predictions/saliency/$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
 
 ##
 ## ================================================
-
 
 ccamh_training
 ccamh_inference
@@ -276,12 +239,11 @@ poolnet_inference
 cp $PN_CKPT $PRJ_DIR/experiments/models/saliency/$PN_TAG.pth
 mv $PRJ_DIR/poolnet/results/$PN_TAG $PRJ_DIR/experiments/predictions/saliency/
 
-
 ## Evaluation
 ## ==============================
 
 CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_saliency_detection
-CRF_T=0  TAG=saliency/$PN_TAG                       evaluate_saliency_detection
+CRF_T=0 TAG=saliency/$PN_TAG evaluate_saliency_detection
 
 ##
 ## ====================

@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J coco-p
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-coco-p.out
-#SBATCH --time=48:00:00
+#SBATCH -J dg-priors
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-priors.out
+#SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -21,78 +21,23 @@
 # limitations under the License.
 
 #
-# Train a model to perform multilabel classification over
-# a weakly supervisedsemantic segmentation dataset.
+# Train a model to perform multilabel classification over a WSSS dataset.
 #
 
-# export OMP_NUM_THREADS=4
+ENV=sdumont # local
+# Dataset
+# DATASET=voc12  # Pascal VOC 2012
+DATASET=coco14  # MS COCO 2014
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-# Environment
-
-## Local
-PY=python
-DEVICE="cuda"
-DEVICES="0"
-WORKERS_TRAIN=4
-WORKERS_INFER=4
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
-DATA_DIR=/home/ldavid/workspace/datasets
-
-### Sdumont
-nodeset -e $SLURM_JOB_NODELIST
-module load sequana/current
-module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
-PY=python3.8
-DEVICE="cuda"
-DEVICES=0,1,2,3
-WORKERS_TRAIN=8
-WORKERS_INFER=48
-WORK_DIR=$SCRATCH/PuzzleCAM
-DATA_DIR=$SCRATCH/datasets
+. config/env.sh
+. config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
-# region Configuration
-
-# Dataset
-## Pascal VOC 2012
-# DATASET=voc12
-# DOMAIN=train_aug
-# DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
-
-# IMAGE_SIZE=512
-# MIN_IMAGE_SIZE=320
-# MAX_IMAGE_SIZE=640
-
-# LR=0.1
-# MAX_VAL_STEPS=0
-
-## MS COCO 2014
-DATASET=coco14
-DOMAIN=train2014
-DATA_DIR=$DATA_DIR/coco14
-
-IMAGE_SIZE=640
-MIN_IMAGE_SIZE=400
-MAX_IMAGE_SIZE=800
-
-LR=0.05
-MAX_VAL_STEPS=620  # too many train samples
-
-## DeepGlobe Land Cover Classification
-# DATASET=deepglobe
-# DOMAIN=train75
-# DATA_DIR=$DATA_DIR/DGdevkit
-
-# IMAGE_SIZE=320
-# MIN_IMAGE_SIZE=300
-# MAX_IMAGE_SIZE=340
-
-# MAX_VAL_STEPS=0
-
-# Architecture
-## Priors
+## Architecture
+### Priors
 ARCH=rs269
 ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
@@ -101,7 +46,7 @@ MODE=normal
 REGULAR=none
 
 # Training
-LR=0.1
+# LR=0.1  # defined in dataset.sh
 EPOCHS=15
 BATCH_SIZE=32
 
@@ -116,7 +61,7 @@ LABELSMOOTHING=0
 ## OC-CSE
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_REGULAR=none
-OC_MASK_GN=true  # originally done in OC-CSE
+OC_MASK_GN=true # originally done in OC-CSE
 OC_TRAINABLE_STEM=true
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.9
@@ -140,15 +85,14 @@ OC_TRAIN_INT_STEPS=1
 
 # regionend
 
-
 train_vanilla() {
   echo "=================================================================="
   echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
-  WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
-  CUDA_VISIBLE_DEVICES=$DEVICES \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
     --tag $TAG_VANILLA \
     --lr $LR \
@@ -217,7 +161,7 @@ train_poc() {
   echo "[train poc:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,poc" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,poc" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-poc" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_poc.py \
@@ -225,6 +169,7 @@ train_poc() {
     --num_workers $WORKERS_TRAIN \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
@@ -328,7 +273,8 @@ inference_priors() {
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-r4
+EID=r1
+TAG_VANILLA=vanilla/$DATASET-$IMAGE_SIZE-$ARCH-lr$LR-ls-ra-$EID
 train_vanilla
 
 BATCH_SIZE=16
@@ -339,13 +285,11 @@ AUGMENT=colorjitter
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
-# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls"
-# train_puzzle
-
-# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME"
-# train_poc
-
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-r4"
+TAG="puzzle/$DATASET-$IMAGE_SIZE-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
+train_puzzle
+TAG="poc/$DATASET-$IMAGE_SIZE-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+train_poc
+TAG="pnoc/$DATASET-$IMAGE_SIZE-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
-inference_priors
+# inference_priors

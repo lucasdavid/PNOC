@@ -24,50 +24,17 @@
 # Random Walk.
 #
 
-# export OMP_NUM_THREADS=4
+ENV=sdumont # local
+# Dataset
+# DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-# Environment
-
-## Local
-PY=python
-DEVICES=0
-WORKERS_TRAIN=8
-WORKERS_INFER=8
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
-DATA_DIR=/home/ldavid/workspace/datasets
-
-### Sdumont
-nodeset -e $SLURM_JOB_NODELIST
-module load sequana/current
-module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
-PY=python3.8
-DEVICES=0,1,2,3
-WORKERS_TRAIN=8
-WORKERS_INFER=48
-WORK_DIR=$SCRATCH/PuzzleCAM
-DATA_DIR=$SCRATCH/datasets
+. config/env.sh
+. config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
-
-# Dataset
-## Pascal VOC 2012
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
-
-IMAGE_SIZE=512
-MIN_IMAGE_SIZE=320
-MAX_IMAGE_SIZE=640
-
-### MS COCO 2014
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$DATA_DIR/coco14/
-
-# IMAGE_SIZE=640
-# MIN_IMAGE_SIZE=400
-# MAX_IMAGE_SIZE=800
 
 # Architecture
 ARCHITECTURE=resnest269
@@ -77,7 +44,6 @@ LR=0.1
 
 # Infrastructure
 MIXED_PRECISION=true # false
-
 
 rw_make_affinity_labels() {
   echo "=================================================================="
@@ -138,22 +104,32 @@ rw_inference() {
     --data_dir $DATA_DIR
 }
 
-run_evaluation() {
-  CUDA_VISIBLE_DEVICES="" \
-  WANDB_RUN_GROUP="$W_GROUP" \
-  WANDB_TAGS="$W_TAGS" \
-  $PY scripts/evaluate.py       \
+make_pseudo_labels() {
+  $PY scripts/rw/make_pseudo_labels.py \
     --experiment_name $RW_MASKS \
-    --dataset         $DATASET  \
-    --domain          $DOMAIN   \
-    --data_dir        $DATA_DIR \
-    --min_th          $MIN_TH   \
-    --max_th          $MAX_TH   \
-    --crf_t           $CRF_T    \
-    --crf_gt_prob     $CRF_GT   \
-    --num_workers     $WORKERS_INFER
+    --domain $DOMAIN \
+    --threshold $THRESHOLD \
+    --crf_t $CRF_T \
+    --crf_gt_prob $CRF_GT \
+    --data_dir $DATA_DIR \
+    --num_workers $WORKERS_INFER
 }
 
+run_evaluation() {
+  CUDA_VISIBLE_DEVICES="" \
+    WANDB_RUN_GROUP="$W_GROUP" \
+    WANDB_TAGS="$W_TAGS" \
+    $PY scripts/evaluate.py \
+    --experiment_name $RW_MASKS \
+    --dataset $DATASET \
+    --domain $DOMAIN \
+    --data_dir $DATA_DIR \
+    --min_th $MIN_TH \
+    --max_th $MAX_TH \
+    --crf_t $CRF_T \
+    --crf_gt_prob $CRF_GT \
+    --num_workers $WORKERS_INFER
+}
 
 ## 3.1 Make Affinity Labels
 ##
@@ -182,7 +158,7 @@ rw_training
 RW_BETA=10
 RW_EXP=8
 
-DOMAIN=train_aug  # train2014 for COCO14
+DOMAIN=train_aug # train2014 for COCO14
 rw_inference
 DOMAIN=val
 rw_inference
@@ -200,3 +176,24 @@ DOMAIN=val
 RW_MASKS=$AFF_TAG@$DOMAIN@beta=$RW_BETA@exp_times=$RW_EXP@rw
 W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,crf:$CRF_T-$CRF_GT"
 run_evaluation
+
+## 3.4 Make Pseudo Masks
+##
+
+PRIORS_TAG=ra-oc-p-poc-pnoc-avg
+# PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
+
+THRESHOLD=0.3
+CRF_T=1
+CRF_GT=0.9
+
+AFF_TAG=rw/$DATASET-an@ccamh@$PRIORS_TAG
+
+DOMAIN=$DOMAIN_TRAIN RW_MASKS=$AFF_TAG@train@beta=10@exp_times=8@rw make_pseudo_labels
+DOMAIN=$DOMAIN_VALID RW_MASKS=$AFF_TAG@val@beta=10@exp_times=8@rw make_pseudo_labels
+
+# Move everything (train/val) into a single folder.
+RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@beta=10@exp_times=8@rw@crf=$CRF_T
+mv ./experiments/predictions/$AFF_TAG@train@beta=10@exp_times=8@rw@crf=$CRF_T $RW_MASKS_DIR
+mv ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T/* $RW_MASKS_DIR/
+rm -r ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T

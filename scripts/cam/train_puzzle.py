@@ -336,12 +336,12 @@ if __name__ == '__main__':
     scaler.scale(loss).backward()
 
     if (iteration + 1) % args.accumulate_steps == 0:
-      optimizer.step(optimizer)
-      optimizer.update()
+      scaler.step(optimizer)
+      scaler.update()
       optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
-      if args.amp_min_scale and optimizer._scale < args.amp_min_scale:
-          optimizer._scale = torch.as_tensor(args.amp_min_scale, dtype=optimizer._scale.dtype, device=optimizer._scale.device)
+      if args.amp_min_scale and scaler._scale < args.amp_min_scale:
+          scaler._scale = torch.as_tensor(args.amp_min_scale, dtype=scaler._scale.dtype, device=scaler._scale.device)
 
     train_meter.update(
       {
@@ -417,7 +417,6 @@ if __name__ == '__main__':
         'time={time:.0f}sec'.format(**data)
       )
 
-      log(f'saving weights `{model_path}`')
       save_model_fn()
 
   write_json(data_path, data_dic)

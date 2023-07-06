@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J segm
-#SBATCH -o /scratch/lerdl/lucas.david/logs/segm-%j.out
+#SBATCH -J dg-segm
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-segm.out
 #SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
@@ -24,50 +24,17 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-# export OMP_NUM_THREADS=4
+ENV=sdumont # local
+# Dataset
+# DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-# Environment
-
-## Local
-PY=python
-DEVICES=0
-WORKERS_TRAIN=8
-WORKERS_INFER=8
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
-DATA_DIR=/home/ldavid/workspace/datasets
-
-### Sdumont
-nodeset -e $SLURM_JOB_NODELIST
-module load sequana/current
-module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
-PY=python3.8
-DEVICES=0,1,2,3
-WORKERS_TRAIN=8
-WORKERS_INFER=48
-WORK_DIR=$SCRATCH/PuzzleCAM
-DATA_DIR=$SCRATCH/datasets
+. config/env.sh
+. config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
-
-# Dataset
-## Pascal VOC 2012
-DATASET=voc12
-DOMAIN=train_aug
-DATA_DIR=$DATA_DIR/VOCdevkit/VOC2012
-
-IMAGE_SIZE=512
-MIN_IMAGE_SIZE=256
-MAX_IMAGE_SIZE=1024
-
-### MS COCO 2014
-# DATASET=coco14
-# DOMAIN=train2014
-# DATA_DIR=$DATA_DIR/coco14
-
-# IMAGE_SIZE=640
-# MIN_IMAGE_SIZE=320
-# MAX_IMAGE_SIZE=1024
 
 # Architecture
 ARCH=rs269
@@ -76,7 +43,8 @@ GROUP_NORM=true
 DILATED=false
 MODE=normal
 
-LR=0.007
+LR=0.007  # voc12
+# LR=0.004  # coco14
 
 EPOCHS=50
 BATCH_SIZE=32
@@ -90,17 +58,11 @@ LABELSMOOTHING=0 # 0.1
 # Infrastructure
 MIXED_PRECISION=true # false
 
+CRF_T=0
+CRF_GT=0.9
 
-make_pseudo_labels() {
-  $PY scripts/segmentation/make_pseudo_labels.py \
-    --experiment_name $RW_MASKS \
-    --domain $DOMAIN \
-    --threshold $THRESHOLD \
-    --crf_t $CRF_T \
-    --crf_gt_prob $CRF_GT \
-    --data_dir $DATA_DIR \
-    --num_workers $WORKERS_INFER
-}
+# RESTORE=/path/to/weights
+# RESTORE_STRICT=true
 
 segm_training() {
   echo "================================================="
@@ -130,7 +92,9 @@ segm_training() {
     --label_smoothing $LABELSMOOTHING \
     --dataset $DATASET \
     --data_dir $DATA_DIR \
-    --masks_dir $RW_MASKS_DIR \
+    --masks_dir "$MASKS_DIR" \
+    --train_domain $DOMAIN_TRAIN \
+    --valid_domain $DOMAIN_VALID \
     --num_workers $WORKERS_TRAIN
 }
 
@@ -155,12 +119,12 @@ segm_inference() {
     --num_workers $WORKERS_TRAIN
 }
 
-run_evaluation() {
+evaluate_masks() {
   CUDA_VISIBLE_DEVICES="" \
-  WANDB_RUN_GROUP="$W_GROUP" \
-  WANDB_TAGS="$W_TAGS" \
+    WANDB_RUN_GROUP="$W_GROUP" \
+    WANDB_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT" \
     $PY scripts/evaluate.py \
-    --experiment_name $TAG  \
+    --experiment_name $TAG \
     --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
@@ -172,55 +136,29 @@ run_evaluation() {
     --num_workers $WORKERS_INFER
 }
 
-
-## 4.1 Make Pseudo Masks
-##
-
-PRIORS_TAG=ra-oc-p-poc-pnoc-avg
-# PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
-
-THRESHOLD=0.3
-CRF_T=1
-CRF_GT=0.9
-
-AFF_TAG=rw/$DATASET-an@ccamh@$PRIORS_TAG
-
-DOMAIN=train_aug RW_MASKS=$AFF_TAG@train@beta=10@exp_times=8@rw make_pseudo_labels
-DOMAIN=val       RW_MASKS=$AFF_TAG@val@beta=10@exp_times=8@rw   make_pseudo_labels
-
-# Move everything (train/val) into a single folder.
-RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@beta=10@exp_times=8@rw@crf=$CRF_T
-mv ./experiments/predictions/$AFF_TAG@train@beta=10@exp_times=8@rw@crf=$CRF_T $RW_MASKS_DIR
-mv ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T/* $RW_MASKS_DIR/
-rm -r ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T
-
-## 4.2 DeepLabV3+ Training
-##
 LABELSMOOTHING=0.1
-TAG=segmentation/$DATASET-d3p-lr$LR-ls$LABELSMOOTHING@pn-ccamh@$PRIORS_TAG
-# TAG=segmentation/d3p-normal-gn-sup
-# TAG=segmentation/d3p-ls0.1@pn-ccamh@rs269pnoc-ls0.1
-# TAG=segmentation/coco14-d3p-lr0.004-ls0.1@pn-ccamh@rs269pnoc-lr0.05
 
+## For supervised segmentation:
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-ls-supervised
+MASKS_DIR=""
+
+## For custom masks (pseudo masks from WSSS):
+# PRIORS=pn-ccamh@rs269pnoc-ls0.1
+# MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc@beta=10@exp_times=8@rw@crf=$CRF_T
+
+## 4.1 DeepLabV3+ Training
+##
+# TAG=segmentation/$DATASET-d3p-ls@$PRIORS_TAG
 segm_training
 
-## 4.3 DeepLabV3+ Inference
+## 4.2 DeepLabV3+ Inference
 ##
 
-CRF_T=0 DOMAIN=train SEGM_PRED_DIR=./experiments/predictions/$TAG      segm_inference
-CRF_T=0 DOMAIN=val   SEGM_PRED_DIR=./experiments/predictions/$TAG      segm_inference
-CRF_T=1 DOMAIN=test  SEGM_PRED_DIR=./experiments/predictions/$TAG@test segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_TRAIN SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
+CRF_T=1 DOMAIN=$DOMAIN_VALID SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
 
-
-## 4.4. Evaluation
+## 4.3. Evaluation
 ##
-EVAL_MODE=png
 
-CRF_T=1
-CRF_GT=0.9
-MIN_TH=0.05
-MAX_TH=0.81
-
-DOMAIN=val
-W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT"
-run_evaluation
+DOMAIN=$DOMAIN_VALID EVAL_MODE=png evaluate_masks

@@ -42,6 +42,7 @@ parser.add_argument('--mode', default='normal', type=str)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
+parser.add_argument('--restore_strict', default=True, type=str2bool)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)
@@ -121,7 +122,7 @@ if __name__ == '__main__':
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
-    model.load_state_dict(torch.load(args.restore), strict=True)
+    model.load_state_dict(torch.load(args.restore), strict=args.restore_strict)
   log_model('DeepLabV3+', model, args)
 
   param_groups = model.get_parameter_groups()

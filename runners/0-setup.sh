@@ -31,10 +31,14 @@ nodeset -e $SLURM_JOB_NODELIST
 cd $SCRATCH/PuzzleCAM
 
 module load sequana/current
-module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+# module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana
+module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+
+PY=python3.8
+PIP=pip3.8
 
 export PYTHONPATH=$(pwd)
 # export OMP_NUM_THREADS=16
 
-pip3.9 install --user torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
-pip3.9 install --user -r requirements.txt
+$PIP install --user torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
+$PIP install --user -r requirements.txt

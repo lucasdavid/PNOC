@@ -70,4 +70,8 @@ rm coco_annotations_semantic -r
 
 ```shell
 # Download the DeepGlobe dataset from here https://zenodo.org/record/3902506
+wget https://zenodo.org/record/3902506/files/database.zip?download=1
+unzip database.zip "DGdevkit/*"
+mv database/DGdevkit .
+rm database database.zip -r
 ```

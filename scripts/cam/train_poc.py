@@ -54,6 +54,8 @@ parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
+parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
 parser.add_argument('--max_val_steps', default=None, type=int)
 
@@ -177,6 +179,7 @@ if __name__ == '__main__':
     r_loss_fn = L2_Loss
 
   optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups)
+  scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   log_opt_params("CGNet", cg_param_groups)
 
@@ -198,35 +201,37 @@ if __name__ == '__main__':
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
     k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
-    # Normal
-    logits, features = cgnet(images, with_cam=True)
+    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      # Normal
+      logits, features = cgnet(images, with_cam=True)
 
-    # Puzzle Module
-    tiled_images = tile_features(images, args.num_pieces)
-    tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
-    re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
+      # Puzzle Module
+      tiled_images = tile_features(images, args.num_pieces)
+      tiled_logits, tiled_features = cgnet(tiled_images, with_cam=True)
+      re_features = merge_features(tiled_features, args.num_pieces, args.batch_size)
 
-    labels_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
-    c_loss = class_loss_fn(logits, labels_sm).mean()
-    p_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
+      labels_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
+      c_loss = class_loss_fn(logits, labels_sm).mean()
+      p_loss = class_loss_fn(gap2d(re_features), labels_sm).mean()
 
-    re_mask = targets.unsqueeze(2).unsqueeze(3)
-    re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
+      re_mask = targets.unsqueeze(2).unsqueeze(3)
+      re_loss = (r_loss_fn(features, re_features) * re_mask.to(features)).mean()
 
-    # OC-CSE
-    labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-    labels_oc = (targets - labels_mask).clip(min=0)
+      # OC-CSE
+      labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
+      labels_oc = (targets - labels_mask).clip(min=0)
 
-    cl_logits = ocnet(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
-    o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
+      cl_logits = ocnet(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
+      o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
 
-    loss = (c_loss + p_loss + ap * re_loss + ao * o_loss)
+      loss = (c_loss + p_loss + ap * re_loss + ao * o_loss)
 
-    loss.backward()
+    scaler.scale(loss).backward()
 
     if (step + 1) % args.accumulate_steps == 0:
-      optimizer.step()
-      optimizer.zero_grad()
+      scaler.step(optimizer)
+      scaler.update()
+      optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     occse.update_focal(
       targets,
@@ -299,10 +304,11 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      threshold, miou, iou, val_time = priors_validation_step(
-        cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-        max_steps=args.max_val_steps,
-      )
+      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        threshold, miou, iou, val_time = priors_validation_step(
+          cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
+          max_steps=args.max_val_steps,
+        )
       cgnet.train()
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
@@ -330,7 +336,6 @@ if __name__ == '__main__':
         'train_iou       = {train_iou}\n'.format(**data)
       )
 
-      print(f'saving weights `{MODEL_PATH}`')
       save_model(cgnet, MODEL_PATH, parallel=GPUS_COUNT > 1)
 
   print(TAG)

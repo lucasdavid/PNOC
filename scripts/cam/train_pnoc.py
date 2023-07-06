@@ -154,7 +154,7 @@ def train_step(train_iterator, step):
   else:
     oc_metrics = {}
 
-  return cg_metrics | oc_metrics | schedules
+  return dict(**cg_metrics, **oc_metrics, **schedules)
 
 
 def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
@@ -448,7 +448,6 @@ if __name__ == '__main__':
         .format(**data)
       )
 
-      print(f'saving weights `{model_path}`\n')
       save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
       if args.oc_persist:
         save_model(ocnet, oc_model_path, parallel=GPUS_COUNT > 1)

@@ -212,7 +212,6 @@ if __name__ == '__main__':
     if do_validation:
       save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
-  print(f'saving weights `{model_path}`')
   save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)

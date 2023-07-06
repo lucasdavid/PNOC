@@ -1,0 +1,38 @@
+# Dataset
+
+if [[ $DATASET == voc12 ]]; then
+  DOMAIN_TRAIN=train_aug
+  DOMAIN_VALID=val
+  DATA_DIR=$DATASETS_DIR/VOCdevkit/VOC2012
+
+  IMAGE_SIZE=512
+  MIN_IMAGE_SIZE=320
+  MAX_IMAGE_SIZE=640
+
+  LR=0.1
+  MAX_VAL_STEPS=0
+fi
+if [[ $DATASET == coco14 ]]; then
+  DOMAIN_TRAIN=train2014
+  DOMAIN_VALID=valid2014
+  DATA_DIR=$DATASETS_DIR/coco14
+
+  IMAGE_SIZE=640
+  MIN_IMAGE_SIZE=400
+  MAX_IMAGE_SIZE=800
+
+  LR=0.05
+  MAX_VAL_STEPS=620  # too many valid samples
+fi
+if [[ $DATASET == deepglobe ]]; then
+  DOMAIN_TRAIN=train75
+  DOMAIN_VALID=test
+  DATA_DIR=$DATASETS_DIR/DGdevkit
+
+  IMAGE_SIZE=512
+  MIN_IMAGE_SIZE=320
+  MAX_IMAGE_SIZE=640
+
+  LR=0.1
+  MAX_VAL_STEPS=0
+fi

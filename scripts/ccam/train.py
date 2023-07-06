@@ -255,7 +255,6 @@ if __name__ == '__main__':
       'time={time:.0f}sec'.format(**data)
     )
 
-    print(f'saving weights `{model_path}`')
     save_model(model, model_path, parallel=GPUS_COUNT > 1)
     # endregion
 

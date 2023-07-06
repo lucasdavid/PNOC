@@ -129,6 +129,8 @@ def to_numpy(tensor):
 
 
 def load_model(model, model_path, parallel=False, map_location=None):
+  print(f'loading weights from `{model_path}`.')
+
   if parallel:
     model.module.load_state_dict(torch.load(model_path, map_location=map_location))
   else:
@@ -136,7 +138,7 @@ def load_model(model, model_path, parallel=False, map_location=None):
 
 
 def save_model(model, model_path, parallel=False):
-  print(f'saving weights to `{model_path}`\n')
+  print(f'saving weights to `{model_path}`.')
 
   if parallel:
     torch.save(model.module.state_dict(), model_path)

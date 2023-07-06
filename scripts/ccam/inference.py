@@ -71,7 +71,6 @@ def run(args):
     dilated=args.dilated,
     stage4_out_features=args.stage4_out_features
   )
-  print(f'Loading weights from {WEIGHTS_PATH}.')
   load_model(model, WEIGHTS_PATH)
   model.eval()
 

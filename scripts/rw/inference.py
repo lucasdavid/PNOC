@@ -12,8 +12,8 @@ from torch import multiprocessing
 from torch.utils.data import Subset
 from pickle import UnpicklingError
 
+import datasets
 from core.aff_utils import propagate_to_edge
-from datasets import *
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -68,10 +68,11 @@ GPUS_COUNT = len(GPUS)
 
 
 def run(args):
-  normalize_fn = Normalize(*imagenet_stats())
+  normalize_fn = Normalize(*datasets.imagenet_stats())
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, ignore_bg_images=args.exclude_bg_images, sample_ids=args.sample_ids)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, sample_ids=args.sample_ids)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
 
   # Network
   model = AffinityNet(
@@ -84,8 +85,6 @@ def run(args):
     print(f'Restoring weights from {args.restore}')
     model.load_state_dict(torch.load(args.restore), strict=True)
   log_model("AffinityNet", model, args)
-
-  print(f'loading weights from {model_path}')
   load_model(model, model_path)
   model.eval()
 
@@ -101,7 +100,8 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
   cv2.setNumThreads(0)
 
   dataset = dataset[process_id]
-  length = len(dataset)
+  data_source = dataset.dataset.data_source
+
   errors = []
   missing = []
   processed = 0
@@ -110,9 +110,8 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for step, (x, image_id, label) in enumerate(dataset):
-      W, H = x.size
-
+    # for x, image_id, label in dataset:
+    for image_id, _, _ in dataset:
       cam_path = os.path.join(cams_dir, image_id + '.npy')
       npy_path = os.path.join(preds_dir, image_id + '.npy')
 
@@ -120,13 +119,12 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         skipped += 1
         continue
 
+      x = data_source.get_image(image_id)
+
+      W, H = x.size
+
       if args.verbose >= 2:
         print(f"id={image_id}", end=" ", flush=True)
-
-      if label.sum() == 0:
-        if args.verbose >= 2:
-          print(f"{image_id} skipped (bg)")
-        continue
 
       try:
         cam_dict = np.load(cam_path, allow_pickle=True).item()
