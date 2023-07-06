@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J voc-pnoc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-voc-pnoc.out
-#SBATCH --time=14:00:00
+#SBATCH -J dg-priors
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-priors.out
+#SBATCH --time=24:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -26,9 +26,9 @@
 
 ENV=sdumont # local
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
+# DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-# DATASET=deepglobe # DeepGlobe Land Cover Classification
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . config/env.sh
 . config/dataset.sh
@@ -273,9 +273,9 @@ inference_priors() {
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-EID=r4
+EID=r1
 TAG_VANILLA=vanilla/$DATASET-$IMAGE_SIZE-$ARCH-lr$LR-ls-ra-$EID
-# train_vanilla
+train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
