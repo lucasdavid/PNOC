@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J dg-priors
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-priors.out
-#SBATCH --time=24:00:00
+#SBATCH -J voc-pnoc
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-voc-pnoc.out
+#SBATCH --time=2:00:00
 
 # Copyright 2021 Lucas Oliveira David
 #
@@ -24,14 +24,18 @@
 # Train a model to perform multilabel classification over a WSSS dataset.
 #
 
-ENV=sdumont # local
-# Dataset
-# DATASET=voc12  # Pascal VOC 2012
-# DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
-. config/env.sh
-. config/dataset.sh
+# Dataset
+DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
+
+. $WORK_DIR/runners/config/env.sh
+. $WORK_DIR/runners/config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
@@ -66,6 +70,7 @@ OC_TRAINABLE_STEM=true
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.9
 OC_F_GAMMA=2.0
+OC_PERSIST=false
 
 ## Schedule
 P_INIT=0.0
@@ -112,6 +117,8 @@ train_vanilla() {
     --max_epoch $EPOCHS \
     --dataset $DATASET \
     --data_dir $DATA_DIR \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID \
     --validate $PERFORM_VALIDATION \
     --max_val_steps $MAX_VAL_STEPS \
     --device $DEVICE \
@@ -153,6 +160,8 @@ train_puzzle() {
     --validate $PERFORM_VALIDATION \
     --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID \
     --data_dir $DATA_DIR
 }
 
@@ -179,6 +188,7 @@ train_poc() {
     --oc-pretrained $OC_PRETRAINED \
     --oc-regularization $OC_REGULAR \
     --oc-mask-globalnorm $OC_MASK_GN \
+    --oc-persist $OC_PERSIST \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
@@ -199,6 +209,8 @@ train_poc() {
     --validate $PERFORM_VALIDATION \
     --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID \
     --data_dir $DATA_DIR
 }
 
@@ -250,6 +262,8 @@ train_pnoc() {
     --validate $PERFORM_VALIDATION \
     --max_val_steps $MAX_VAL_STEPS \
     --dataset $DATASET \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID \
     --data_dir $DATA_DIR
 }
 
@@ -273,9 +287,9 @@ inference_priors() {
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-EID=r1
-TAG_VANILLA=vanilla/$DATASET-$IMAGE_SIZE-$ARCH-lr$LR-ls-ra-$EID
-train_vanilla
+EID=r4
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
+# train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -286,10 +300,10 @@ OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="puzzle/$DATASET-$IMAGE_SIZE-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
-train_puzzle
+# train_puzzle
 TAG="poc/$DATASET-$IMAGE_SIZE-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_poc
-TAG="pnoc/$DATASET-$IMAGE_SIZE-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_poc
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+# train_pnoc
 
-# inference_priors
+# DOMAIN=$DOMAIN_VALID inference_priors

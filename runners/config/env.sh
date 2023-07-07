@@ -5,10 +5,10 @@
 if [[ $ENV == sdumont ]]; then
   ### Sdumont
   PY=python3.8
+  DEVICE=cuda
   DEVICES=0,1,2,3
   WORKERS_TRAIN=8
   WORKERS_INFER=48
-  WORK_DIR=$SCRATCH/PuzzleCAM
   DATASETS_DIR=$SCRATCH/datasets
 
   # export OMP_NUM_THREADS=4
@@ -18,9 +18,9 @@ if [[ $ENV == sdumont ]]; then
 else
   ### Local
   PY=python
+  DEVICE=cuda
   DEVICES=0
   WORKERS_TRAIN=8
   WORKERS_INFER=8
-  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
-  DATASETS_DIR=/home/ldavid/workspace/datasets
+  DATASETS_DIR=$HOME/workspace/datasets
 fi

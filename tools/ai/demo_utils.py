@@ -31,7 +31,7 @@ def denormalize(image, mean=None, std=None, dtype=np.uint8, tp=True):
 
     if mean is not None:
         image = (image * std) + mean
-    
+
     if dtype == np.uint8:
         return (image.clip(0, 1) * 255).astype(np.uint8)
     else:
@@ -62,14 +62,14 @@ def normalize(cam, epsilon=1e-5):
     max_value = np.max(cam, axis=(0, 1), keepdims=True)
     return np.maximum(cam - epsilon, 0) / (max_value + epsilon)
 
-def crf_inference(img, probs, t=10, scale_factor=1, labels=21, gt_prob=0.7):
+def crf_inference(img, probs, t=10, scale_factor=1, gt_prob=0.7):
     import pydensecrf.densecrf as dcrf
     from pydensecrf.utils import unary_from_softmax
 
     h, w = img.shape[:2]
-    n_labels = labels
+    labels = probs.shape[0]
 
-    d = dcrf.DenseCRF2D(w, h, n_labels)
+    d = dcrf.DenseCRF2D(w, h, labels)
 
     unary = unary_from_softmax(probs, scale=gt_prob)
     unary = np.ascontiguousarray(unary)
@@ -79,7 +79,7 @@ def crf_inference(img, probs, t=10, scale_factor=1, labels=21, gt_prob=0.7):
     d.addPairwiseBilateral(sxy=50/scale_factor, srgb=5, rgbim=np.copy(img), compat=10)
     Q = d.inference(t)
 
-    return np.array(Q).reshape((n_labels, h, w))
+    return np.array(Q).reshape((labels, h, w))
 
 def crf_with_alpha(ori_image, cams, alpha):
     # h, w, c -> c, h, w
@@ -87,8 +87,8 @@ def crf_with_alpha(ori_image, cams, alpha):
 
     bg_score = np.power(1 - np.max(cams, axis=0, keepdims=True), alpha)
     bgcam_score = np.concatenate((bg_score, cams), axis=0)
-    
-    cams_with_crf = crf_inference(ori_image, bgcam_score, labels=bgcam_score.shape[0])
+
+    cams_with_crf = crf_inference(ori_image, bgcam_score)
     # return cams_with_crf.transpose((1, 2, 0))
     return cams_with_crf
 
@@ -99,7 +99,7 @@ def crf_inference_label(img, labels, t=10, n_labels=21, gt_prob=0.7):
     h, w = img.shape[:2]
 
     d = dcrf.DenseCRF2D(w, h, n_labels)
-    
+
     unary = unary_from_labels(labels, n_labels, gt_prob=gt_prob, zero_unsure=False)
 
     d.setUnaryEnergy(unary)

@@ -24,14 +24,18 @@
 # Saliency Detection with C²AM-H.
 #
 
-ENV=sdumont # local
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-. config/env.sh
-. config/dataset.sh
+. $WORK_DIR/runners/config/env.sh
+. $WORK_DIR/runners/config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)

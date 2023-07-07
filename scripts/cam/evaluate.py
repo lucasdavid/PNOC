@@ -75,7 +75,7 @@ def main(args):
 
   model = Classifier(
     args.architecture,
-    dataset.info.num_classes,
+    num_classes=dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,

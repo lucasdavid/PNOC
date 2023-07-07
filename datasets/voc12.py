@@ -27,8 +27,10 @@ class VOC12DataSource(base.CustomDataSource):
   NAME = "voc12"
   DOMAINS = {
     "train": "train_aug",
-    "valid": "train",
+    "valid": "val",
   }
+
+  VOID_CLASS = 21
 
   def __init__(
     self,
@@ -39,6 +41,7 @@ class VOC12DataSource(base.CustomDataSource):
     masks_dir: str = None,
     xml_dir: str = None,
     sample_ids: List[str] = None,
+    segmentation: bool = False,
   ):
     super().__init__(
       domain=domain,
@@ -46,20 +49,19 @@ class VOC12DataSource(base.CustomDataSource):
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClass"),
       sample_ids=sample_ids,
+      segmentation=segmentation,
     )
     self.xml_dir = xml_dir or os.path.join(root_dir, 'Annotations/')
     self.root_dir = root_dir
 
-    data = read_json(os.path.join(DATA_DIR, "meta.json"))
-    self.class_dic = data['class_dic']
-    self.classes = np.asarray(CLASSES)
     self.colors = np.asarray(COLORS)
     # Reversed access ([2, 1, 0]) because it was stored as BGR:
     self.color_ids = self.colors[:, 2] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 0]
 
   def get_label(self, sample_id) -> np.ndarray:
+
     _, tags = read_xml(self.xml_dir + sample_id + '.xml')
-    label = one_hot_embedding([self.class_dic[tag] for tag in tags], 20)
+    label = one_hot_embedding([self.info.meta["class_dic"][tag] for tag in tags], 20)
 
     return label
 

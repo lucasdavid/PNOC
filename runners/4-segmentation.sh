@@ -24,14 +24,18 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-ENV=sdumont # local
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=$HOME/workspace/repos/research/pnoc
+
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 DATASET=deepglobe # DeepGlobe Land Cover Classification
 
-. config/env.sh
-. config/dataset.sh
+. $WORK_DIR/runners/config/env.sh
+. $WORK_DIR/runners/config/dataset.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
@@ -43,8 +47,9 @@ GROUP_NORM=true
 DILATED=false
 MODE=normal
 
-LR=0.007  # voc12
+# LR=0.007  # voc12
 # LR=0.004  # coco14
+LR=0.005  # deepglobe
 
 EPOCHS=50
 BATCH_SIZE=32
@@ -60,6 +65,8 @@ MIXED_PRECISION=true # false
 
 CRF_T=0
 CRF_GT=0.9
+MIN_TH=0.20
+MAX_TH=0.81
 
 # RESTORE=/path/to/weights
 # RESTORE_STRICT=true
@@ -93,8 +100,8 @@ segm_training() {
     --dataset $DATASET \
     --data_dir $DATA_DIR \
     --masks_dir "$MASKS_DIR" \
-    --train_domain $DOMAIN_TRAIN \
-    --valid_domain $DOMAIN_VALID \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID_SEG \
     --num_workers $WORKERS_TRAIN
 }
 
@@ -139,7 +146,7 @@ evaluate_masks() {
 LABELSMOOTHING=0.1
 
 ## For supervised segmentation:
-TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-ls-supervised
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-supervised
 MASKS_DIR=""
 
 ## For custom masks (pseudo masks from WSSS):
@@ -155,10 +162,10 @@ segm_training
 ##
 
 # CRF_T=1 DOMAIN=$DOMAIN_TRAIN SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
-CRF_T=1 DOMAIN=$DOMAIN_VALID SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
 # CRF_T=1 DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
 
 ## 4.3. Evaluation
 ##
 
-DOMAIN=$DOMAIN_VALID EVAL_MODE=png evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks

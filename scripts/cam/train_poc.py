@@ -30,8 +30,8 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
-parser.add_argument('--train_domain', default=None, type=str)
-parser.add_argument('--valid_domain', default=None, type=str)
+parser.add_argument('--domain_train', default=None, type=str)
+parser.add_argument('--domain_valid', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -112,8 +112,8 @@ if __name__ == '__main__':
 
   set_seed(SEED)
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset = datasets.ClassificationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)

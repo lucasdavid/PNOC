@@ -16,15 +16,15 @@ DATASOURCES: Dict[str, "CustomDataSource"] = {}
 
 class DatasetInfo:
 
-  def __init__(self, meta, classes, num_classes: int = None):
+  def __init__(self, meta, classes, num_classes: int = None, num_classes_segm: int = None):
     self.meta = meta
-    self.classes = classes
+    self.classes = np.asarray(classes)
     self.num_classes = num_classes or len(classes)
 
   @classmethod
-  def from_metafile(cls, dataset):
-    META = read_json(os.path.join(DATA_DIR, dataset, 'meta.json'))
-    CLASSES = np.asarray(META['class_names'])
+  def from_metafile(cls, dataset, segmentation=False):
+    META = read_json(os.path.join(DATA_DIR, dataset, 'meta_segm.json' if segmentation else 'meta.json'))
+    CLASSES = META['class_names']
     NUM_CLASSES = META['classes']
 
     return cls(META, CLASSES, NUM_CLASSES)
@@ -40,7 +40,7 @@ class CustomDataSource(metaclass=ABCMeta):
     "test": "test",
   }
 
-  UNKNOWN_CLASS: int = None
+  VOID_CLASS: int = None
 
   def __init__(
     self,
@@ -49,6 +49,7 @@ class CustomDataSource(metaclass=ABCMeta):
     split: Optional[str] = None,
     masks_dir: Optional[str] = None,
     sample_ids: Optional[Union[str, List[str]]] = None,
+    segmentation: bool = False,
   ):
     domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
@@ -64,13 +65,14 @@ class CustomDataSource(metaclass=ABCMeta):
       if isinstance(sample_ids, str)
       else sample_ids
     )
+    self.segmentation = segmentation
 
   _info: DatasetInfo = None
 
   @property
   def info(self):
     if self._info is None:
-      self._info = DatasetInfo.from_metafile(self.NAME)
+      self._info = DatasetInfo.from_metafile(self.NAME, segmentation=self.segmentation)
     return self._info
 
   def __len__(self) -> int:
@@ -101,7 +103,7 @@ class CustomDataSource(metaclass=ABCMeta):
 
       mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
       mask = np.argmax(mask[..., np.newaxis] == self.color_ids, axis=-1)
-      mask[mask == self.UNKNOWN_CLASS] = 255
+      mask[mask == self.VOID_CLASS] = 255
       mask = Image.fromarray(mask.astype('uint8'))
 
     return mask

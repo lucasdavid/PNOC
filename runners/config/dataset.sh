@@ -2,7 +2,8 @@
 
 if [[ $DATASET == voc12 ]]; then
   DOMAIN_TRAIN=train_aug
-  DOMAIN_VALID=val
+  DOMAIN_VALID=train
+  DOMAIN_VALID_SEG=val
   DATA_DIR=$DATASETS_DIR/VOCdevkit/VOC2012
 
   IMAGE_SIZE=512
@@ -14,7 +15,8 @@ if [[ $DATASET == voc12 ]]; then
 fi
 if [[ $DATASET == coco14 ]]; then
   DOMAIN_TRAIN=train2014
-  DOMAIN_VALID=valid2014
+  DOMAIN_VALID=train2014
+  DOMAIN_VALID_SEG=valid2014
   DATA_DIR=$DATASETS_DIR/coco14
 
   IMAGE_SIZE=640
@@ -26,12 +28,13 @@ if [[ $DATASET == coco14 ]]; then
 fi
 if [[ $DATASET == deepglobe ]]; then
   DOMAIN_TRAIN=train75
-  DOMAIN_VALID=test
+  DOMAIN_VALID=train75
+  DOMAIN_VALID_SEG=test
   DATA_DIR=$DATASETS_DIR/DGdevkit
 
-  IMAGE_SIZE=512
-  MIN_IMAGE_SIZE=320
-  MAX_IMAGE_SIZE=640
+  IMAGE_SIZE=1024
+  MIN_IMAGE_SIZE=768
+  MAX_IMAGE_SIZE=1280
 
   LR=0.1
   MAX_VAL_STEPS=0

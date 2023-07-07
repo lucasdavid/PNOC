@@ -35,8 +35,8 @@ parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
-parser.add_argument('--train_domain', default=None, type=str)
-parser.add_argument('--valid_domain', default=None, type=str)
+parser.add_argument('--domain_train', default=None, type=str)
+parser.add_argument('--domain_valid', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -263,8 +263,8 @@ if __name__ == '__main__':
   create_directory(os.path.dirname(model_path))
   set_seed(SEED)
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, split="train")
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.valid_domain, split="valid")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset = datasets.ClassificationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
@@ -410,6 +410,8 @@ if __name__ == '__main__':
         threshold, miou, iou, val_time = priors_validation_step(
           cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
           max_steps=args.max_val_steps,
+          # bg_index=train_dataset.info.bg_index,
+          # include_bg=True,  # TODO: fix it for DeepGlobe.
         )
       cgnet.train()
 

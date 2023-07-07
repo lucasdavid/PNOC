@@ -33,7 +33,7 @@ class COCO14DataSource(base.CustomDataSource):
     "valid": "val2014",
   }
 
-  UNKNOWN_CLASS = 81
+  VOID_CLASS = 81
 
   def __init__(
     self,
@@ -43,6 +43,7 @@ class COCO14DataSource(base.CustomDataSource):
     images_dir: Optional[str] = None,
     masks_dir: Optional[str] = None,
     sample_ids: Union[str, List[str]] = None,
+    segmentation: bool = False,
   ):
     domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
@@ -52,6 +53,7 @@ class COCO14DataSource(base.CustomDataSource):
       sample_ids=sample_ids,
       domain=domain,
       split=split,
+      segmentation=segmentation,
     )
 
     self.root_dir = root_dir

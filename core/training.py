@@ -21,6 +21,8 @@ def priors_validation_step(
     thresholds: List[float],
     device: str,
     max_steps: Optional[int] = None,
+    bg_index: int = 0,
+    include_bg: bool = True,
   ):
   """Run Validation Step.
 
@@ -29,7 +31,7 @@ def priors_validation_step(
 
   """
 
-  iou_meters = {th: MIoUCalculator(classes) for th in thresholds}
+  iou_meters = {th: MIoUCalculator(classes, bg_index=bg_index, include_bg=include_bg) for th in thresholds}
 
   start = time.time()
 
@@ -70,7 +72,8 @@ def segmentation_validation_step(
 ):
   start = time.time()
 
-  iou_meter = MIoUCalculator(classes)
+  # Set bg_index=None as we don't use FG mIoU information.
+  iou_meter = MIoUCalculator(classes, bg_index=None, include_bg=False)
 
   with torch.no_grad():
     for _, images, _, masks in loader:
@@ -105,7 +108,7 @@ def saliency_validation_step(
   start = time.time()
 
   classes = ['background', 'foreground']
-  iou_meters = {th: MIoUCalcFromNames(classes) for th in thresholds}
+  iou_meters = {th: MIoUCalcFromNames(classes, bg_index=0) for th in thresholds}
 
   with torch.no_grad():
     for _, (_, images, _, masks) in enumerate(loader):

@@ -64,7 +64,7 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, segmentation=True)
   dataset = datasets.PathsDataset(ds)
   print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 
@@ -73,7 +73,7 @@ def run(args):
   # Network
   model = DeepLabV3Plus(
     model_name=args.backbone,
-    num_classes=dataset.info.num_classes + 1,
+    num_classes=dataset.info.num_classes,
     mode=args.mode,
     use_group_norm=args.use_gn,
   )
@@ -91,12 +91,10 @@ def run(args):
 
 def forward_tta(model, images, image_size, device):
   images = images.to(device)
-
   logits = model(images)
-  logits = resize_for_tensors(logits, image_size)
-
+  logits = resize_for_tensors(logits, image_size).cpu().float()
   logits = logits[0] + logits[1].flip(-1)
-  logits = to_numpy(logits).transpose((1, 2, 0))
+
   return logits
 
 
@@ -129,15 +127,14 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
         p = forward_tta(model, x, (H, W), device)
         ps.append(p)
 
-      p = np.sum(ps, axis=0)
-      p = F.softmax(torch.from_numpy(p), dim=-1).numpy()
+      p = to_numpy(F.softmax(torch.stack(ps).mean(dim=0), dim=0))
 
       if args.crf_t > 0:
-        # h, w, c -> c, h, w
-        p = crf_inference(np.asarray(image), p.transpose((2, 0, 1)), t=args.crf_t, gt_prob=args.crf_gt_prob)
-        p = np.argmax(p, axis=0)
-      else:
-        p = np.argmax(p, axis=-1)
+        x = np.array(image)
+        p = crf_inference(x, p, t=args.crf_t, gt_prob=args.crf_gt_prob)
+        image.close()
+
+      p = np.argmax(p, axis=0)
 
       p = Image.fromarray(p.astype(np.uint8))
       p.save(os.path.join(preds_dir, image_id + '.png'))

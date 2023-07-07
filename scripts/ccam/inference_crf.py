@@ -74,7 +74,7 @@ def _work(process_id, dataset, args):
       cams = np.concatenate((1 - cams, cams))
 
       if args.crf_t > 0:
-        cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_t, labels=2, gt_prob=args.crf_gt_prob), axis=0)
+        cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_t, gt_prob=args.crf_gt_prob), axis=0)
 
     imageio.imwrite(png_path, (cams * 255).clip(0, 255).astype(np.uint8))
 

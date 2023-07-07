@@ -1,19 +1,22 @@
+from typing import Optional
+
 import cv2
 import numpy as np
 
 
 def accumulate_batch_iou(masks, cams, meters):
   for b in range(len(masks)):
-    cam = cams[b]
-    gt_mask = masks[b]
+    pred = cams[b]
+    mask = masks[b]
 
-    h, w, c = cam.shape
-    gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+    h, w, c = pred.shape
+    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
     for th, meter in meters.items():
-      bg = np.ones_like(cam[:, :, 0]) * th
-      pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
-      meter.add(pred_mask, gt_mask)
+      bg = np.ones_like(pred[:, :, 0]) * th
+      pred = np.concatenate([bg[..., np.newaxis], pred], axis=-1)
+      pred = np.argmax(pred, axis=-1)
+      meter.add(pred, mask)
 
 
 def accumulate_batch_iou_saliency(masks, ccams, meters):
@@ -50,11 +53,16 @@ def result_miou_from_thresholds(iou_meters, classes):
 
 class MIoUCalculator:
 
-  def __init__(self, classes):
+  def __init__(self, classes, bg_index: Optional[int] = 0, include_bg: bool = True):
     if isinstance(classes, np.ndarray):
       classes = classes.tolist()
 
-    self.class_names = ['background'] + classes
+    if include_bg:
+      classes = classes[:bg_index] + ["background"] + classes[bg_index:]
+
+    self.bg_index = bg_index
+    self.include_bg = include_bg
+    self.class_names = classes
     self.classes = len(self.class_names)
 
     self.clear()
@@ -106,19 +114,23 @@ class MIoUCalculator:
       FN_list.append(FN)
 
     iou = np.asarray(IoU_list)
-    mIoU = np.mean(iou)
-    mIoU_foreground = np.mean(iou[1:])
+    miou = np.mean(iou)
 
-    FP = np.mean(np.asarray(FP_list))
-    FN = np.mean(np.asarray(FN_list))
+    if self.bg_index is None:
+      miou_fg = miou
+    else:
+      miou_fg = (sum(iou[:self.bg_index]) + sum(iou[self.bg_index+1:])) / (len(iou)-1)
+
+    FP = np.mean(FP_list)
+    FN = np.mean(FN_list)
 
     if clear:
       self.clear()
 
     if detail:
-      return mIoU, mIoU_foreground, IoU_dic, FP, FN
+      return miou, miou_fg, IoU_dic, FP, FN
     else:
-      return mIoU, mIoU_foreground
+      return miou, miou_fg
 
   def clear(self):
     self.TP = []
@@ -133,7 +145,10 @@ class MIoUCalculator:
 
 class MIoUCalcFromNames(MIoUCalculator):
 
-  def __init__(self, class_names):
+  def __init__(self, class_names, bg_index: int = 0, include_bg: bool = False):
+    self.bg_index = bg_index
+    self.include_bg = include_bg
     self.class_names = class_names
     self.classes = len(self.class_names)
+
     self.clear()

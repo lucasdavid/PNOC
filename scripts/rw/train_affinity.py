@@ -30,7 +30,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
-parser.add_argument('--train_domain', default=None, type=str)
+parser.add_argument('--domain_train', default=None, type=str)
 
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
   path_index = PathIndex(radius=10, default_size=(args.image_size // 4, args.image_size // 4))
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.train_domain, masks_dir=args.label_dir, split="train")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.label_dir, split="train")
   tt = datasets.get_affinity_transforms(args.min_image_size, args.max_image_size, args.image_size)
   train_dataset = datasets.AffinityDataset(ts, path_index=path_index, transform=tt)
 

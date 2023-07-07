@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 import wandb
-from datasets import get_paths_dataset
+import datasets
 from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
 from tools.general.io_utils import load_saliency_file
@@ -17,7 +17,7 @@ parser.add_argument("--experiment_name", type=str, required=True)
 parser.add_argument("--num_workers", default=48, type=int)
 parser.add_argument("--verbose", default=1, type=int)
 
-parser.add_argument("--dataset", default="voc12", choices=["voc12", "coco14"])
+parser.add_argument("--dataset", default="voc12", choices=datasets.DATASOURCES)
 parser.add_argument("--domain", default="train", type=str)
 parser.add_argument("--data_dir", default="../VOCtrainval_11-May-2012/", type=str)
 parser.add_argument("--pred_dir", default="", type=str)
@@ -295,7 +295,8 @@ if __name__ == "__main__":
   wb_run = wandb_utils.setup(TAG, args, job_type="evaluation")
   wandb.define_metric("evaluation/t")
 
-  dataset = get_paths_dataset(args.dataset, args.data_dir, args.domain)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=False)
 
   try:
     run(args, dataset)

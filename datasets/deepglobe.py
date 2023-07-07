@@ -18,11 +18,11 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
   NAME = "deepglobe"
   DOMAINS = {
     "train": "train75",
-    "valid": "train75",
+    "valid": "test",
     "test": "test",
   }
 
-  UNKNOWN_CLASS = 7
+  VOID_CLASS = 6
 
   def __init__(
     self,
@@ -33,18 +33,19 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     masks_dir: str = None,
     xml_dir: str = None,
     sample_ids: List[str] = None,
+    segmentation: bool = False,
   ):
     super().__init__(
       domain=domain,
       split=split,
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClassAug"),
-      sample_ids=sample_ids
+      sample_ids=sample_ids,
+      segmentation=segmentation,
     )
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
 
-    self.classes = np.asarray(CLASSES)
     self.colors = np.asarray(COLORS)
     self.color_ids = self.colors[:, 0] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 2]
 
