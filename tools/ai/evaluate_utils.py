@@ -119,7 +119,7 @@ class MIoUCalculator:
     if self.bg_index is None:
       miou_fg = miou
     else:
-      miou_fg = (sum(iou[:self.bg_index]) + sum(iou[self.bg_index+1:])) / (len(iou)-1)
+      miou_fg = (sum(iou[:self.bg_index]) + sum(iou[self.bg_index + 1:])) / (len(iou) - 1)
 
     FP = np.mean(FP_list)
     FN = np.mean(FN_list)

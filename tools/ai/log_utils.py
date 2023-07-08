@@ -36,9 +36,7 @@ def log_model(name, model, args):
   config = [(p, getattr(args, p)) for p in properties if hasattr(args, p)]
 
   print(
-    f"{name}\n",
-    *(f"{p:>14} = {v}\n" for p, v in config),
-    f"  total params   = {calculate_parameters(model):.2f}M\n"
+    f"{name}\n", *(f"{p:>14} = {v}\n" for p, v in config), f"  total params   = {calculate_parameters(model):.2f}M\n"
   )
 
 

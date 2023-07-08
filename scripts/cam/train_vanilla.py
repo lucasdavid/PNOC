@@ -142,7 +142,7 @@ if __name__ == '__main__':
   # Train
   train_meter = MetricsContainer(['loss', 'class_loss'])
   train_timer = Timer()
-  best_train_mIoU = -1
+  miou_best = -1
 
   for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
     image_ids, images, labels = train_iterator.get()
@@ -202,8 +202,8 @@ if __name__ == '__main__':
       )
       model.train()
 
-      if best_train_mIoU == -1 or best_train_mIoU < miou:
-        best_train_mIoU = miou
+      if miou_best < miou:
+        miou_best = miou
         wandb.run.summary["train/best_t"] = threshold
         wandb.run.summary["train/best_miou"] = miou
         wandb.run.summary["train/best_iou"] = iou
@@ -212,7 +212,7 @@ if __name__ == '__main__':
         'iteration': step + 1,
         'threshold': threshold,
         'train_mIoU': miou,
-        'best_train_mIoU': best_train_mIoU,
+        'best_train_mIoU': miou_best,
         'time': val_time,
       }
       wandb.log({f"val/{k}": v for k, v in data.items()})

@@ -29,10 +29,26 @@ class PolyOptimizer(torch.optim.SGD):
 def get_optimizer(lr, wd, max_step, param_groups):
   return PolyOptimizer(
     [
-      {'params': param_groups[0], 'lr': lr, 'weight_decay': wd},
-      {'params': param_groups[1], 'lr': 2 * lr, 'weight_decay': 0},
-      {'params': param_groups[2], 'lr': 10 * lr, 'weight_decay': wd},
-      {'params': param_groups[3], 'lr': 20 * lr, 'weight_decay': 0},
+      {
+        'params': param_groups[0],
+        'lr': lr,
+        'weight_decay': wd
+      },
+      {
+        'params': param_groups[1],
+        'lr': 2 * lr,
+        'weight_decay': 0
+      },
+      {
+        'params': param_groups[2],
+        'lr': 10 * lr,
+        'weight_decay': wd
+      },
+      {
+        'params': param_groups[3],
+        'lr': 20 * lr,
+        'weight_decay': 0
+      },
     ],
     lr=lr,
     momentum=0.9,

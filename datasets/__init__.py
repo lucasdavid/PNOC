@@ -1,4 +1,4 @@
-import os
+from typing import Tuple
 
 from torchvision import transforms
 
@@ -69,6 +69,7 @@ def get_classification_transforms(
   mean, std = imagenet_stats()
 
   tt = []
+  tv = []
   if min_size == max_size:
     tt += [transforms.Resize((min_size, min_size))]
   else:
@@ -78,23 +79,21 @@ def get_classification_transforms(
     tt += [transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)]
   if 'randaugment' in augment:
     tt += [RandAugmentMC(n=2, m=10)]
+  if "clahe" in augment:
+    tt += [CLAHE()]
+    tv += [CLAHE()]
   tt += [Normalize(mean, std)]
   if 'cutmix' not in augment:
-    # This will happen inside CutMix.
-    tt += [RandomCrop(crop_size)]
+    tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.
   tt += [Transpose()]
 
-  tt = transforms.Compose(tt)
-  tv = transforms.Compose(
-    [
-      # RandomResize_For_Segmentation(image_size, image_size),
-      Normalize_For_Segmentation(mean, std),
-      Top_Left_Crop_For_Segmentation(crop_size),
-      Transpose_For_Segmentation()
-    ]
-  )
+  tv += [
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(crop_size),
+    Transpose_For_Segmentation()
+  ]
 
-  return tt, tv
+  return tuple(map(transforms.Compose, (tt, tv)))
 
 
 def get_affinity_transforms(
@@ -124,26 +123,35 @@ def get_segmentation_transforms(
   crop_size,
   augment,
   overcrop: bool = True,
-):
+) -> Tuple[transforms.Compose]:
   mean, std = imagenet_stats()
 
-  tt = transforms.Compose(
-    [
-      RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
-      RandomHorizontalFlip_For_Segmentation(),
-      Normalize_For_Segmentation(mean, std),
-      RandomCrop_For_Segmentation(crop_size),
-      Transpose_For_Segmentation()
-    ]
-  )
+  tt = [
+    RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
+    RandomHorizontalFlip_For_Segmentation(),
+  ]
+  tv = [
+    Resize_For_Segmentation(crop_size),
+  ]
 
-  tv = transforms.Compose(
-    [Normalize_For_Segmentation(mean, std),
-     Top_Left_Crop_For_Segmentation(crop_size),
-     Transpose_For_Segmentation()]
-  )
+  if "clahe" in augment:
+    tt += [CLAHE()]
+    tv += [CLAHE()]
 
-  return tt, tv
+  tt += [
+    Normalize_For_Segmentation(mean, std),
+    RandomCrop_For_Segmentation(crop_size),
+    Transpose_For_Segmentation(),
+  ]
+
+  tv += [
+    # RandomResize_For_Segmentation(crop, max_size, overcrop=overcrop),
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(crop_size),
+    Transpose_For_Segmentation(),
+  ]
+
+  return tuple(map(transforms.Compose, (tt, tv)))
 
 
 def get_ccam_transforms(
@@ -152,7 +160,11 @@ def get_ccam_transforms(
 ):
   mean, std = imagenet_stats()
 
-  resize = Resize_For_Segmentation(image_size)
+  size = [image_size, image_size]
+  resize = Resize_For_Segmentation(
+    size,
+    resize_y=transforms.Resize(size)  # CAMs are continuous maps. Bilinear interp. Ok.
+  )
 
   tt = transforms.Compose(
     [

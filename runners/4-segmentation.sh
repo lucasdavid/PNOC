@@ -24,10 +24,10 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=$HOME/workspace/repos/research/pnoc
+# ENV=sdumont
+# WORK_DIR=$SCRATCH/PuzzleCAM
+ENV=local
+WORK_DIR=$HOME/workspace/repos/research/pnoc
 
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012
@@ -41,21 +41,28 @@ cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
 # Architecture
-ARCH=rs269
-ARCHITECTURE=resnest269
+# ARCH=rs269
+# ARCHITECTURE=resnest269
+ARCH=rs101
+ARCHITECTURE=resnest101
 GROUP_NORM=true
 DILATED=false
-MODE=normal
+MODE=fix
 
 # LR=0.007  # voc12
 # LR=0.004  # coco14
-LR=0.005  # deepglobe
+# LR=0.001  # deepglobe
+
+IMAGE_SIZE=320
+MIN_IMAGE_SIZE=320
+MAX_IMAGE_SIZE=320
 
 EPOCHS=50
-BATCH_SIZE=32
-ACCUMULATE_STEPS=1
 
-AUGMENT=colorjitter # colorjitter_randaug_cutmix_mixup_cutormixup
+BATCH_SIZE=16
+ACCUMULATE_STEPS=2
+
+AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 CUTMIX=0.5
 MIXUP=1.
 LABELSMOOTHING=0 # 0.1
@@ -76,7 +83,7 @@ segm_training() {
   echo "Semantic Segmentation Training $TAG"
   echo "================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING" \
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING,aug:$AUGMENT" \
   WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
   CUDA_VISIBLE_DEVICES=$DEVICES \
   $PY scripts/segmentation/train.py \
@@ -152,11 +159,24 @@ MASKS_DIR=""
 ## For custom masks (pseudo masks from WSSS):
 # PRIORS=pn-ccamh@rs269pnoc-ls0.1
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc@beta=10@exp_times=8@rw@crf=$CRF_T
+#
 
 ## 4.1 DeepLabV3+ Training
 ##
 # TAG=segmentation/$DATASET-d3p-ls@$PRIORS_TAG
-segm_training
+# segm_ training
+#
+
+LRS="0.1 0.01 0.001"
+AUGMENTS="none clahe clahe_cutmix"
+
+for LR in $LRS; do
+  for AUGMENT in $AUGMENTS; do
+    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-supervised
+
+    segm_training
+  done
+done
 
 ## 4.2 DeepLabV3+ Inference
 ##

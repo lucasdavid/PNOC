@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
-  tt, tv = datasets.get_ccam_transforms(512, args.image_size)
+  tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
   # TODO: make this work for cams.

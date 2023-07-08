@@ -59,7 +59,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=256, type=int)
 parser.add_argument('--max_image_size', default=1024, type=int)
 
-parser.add_argument('--print_ratio', default=0.25, type=float)
+parser.add_argument('--print_ratio', default=1.0, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -139,7 +139,7 @@ if __name__ == '__main__':
   # Loss, Optimizer
   class_loss_fn = nn.CrossEntropyLoss(ignore_index=255, label_smoothing=args.label_smoothing).to(DEVICE)
 
-  opt = get_optimizer(args.lr, args.wd, step_max, param_groups)
+  opt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups)
   log_opt_params('DeepLabV3+', param_groups)
 
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)

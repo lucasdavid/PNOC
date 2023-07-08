@@ -1,9 +1,9 @@
 import random
 
+import cv2
 import numpy as np
 import torch
 from PIL import Image
-
 from torchvision import transforms
 
 
@@ -61,15 +61,17 @@ class RandomResize_For_Segmentation:
 
 class Resize_For_Segmentation:
 
-  def __init__(self, image_size):
-    self.image_size = [image_size] * 2 if isinstance(image_size, int) else image_size
-    self.resize = transforms.Resize(self.image_size)
-  
+  def __init__(self, image_size, resize_x = None, resize_y = None):
+
+    self.image_size = image_size
+    self.resize_x = resize_x or transforms.Resize(self.image_size)
+    self.resize_y = resize_y or transforms.Resize(self.image_size, interpolation=transforms.InterpolationMode.NEAREST)
+
   def __call__(self, data):
     image, mask = data['image'], data['mask']
     return {
-      "image": self.resize(image),
-      "mask": self.resize(mask),
+      "image": self.resize_x(image),
+      "mask": self.resize_y(mask),
     }
 
 
@@ -129,11 +131,11 @@ class Normalize:
 class Normalize_For_Segmentation:
 
   def __init__(
-      self,
-      mean=(0.485, 0.456, 0.406),
-      std=(0.229, 0.224, 0.225),
-      idtype=np.float32,
-      mdtype=np.int64,
+    self,
+    mean=(0.485, 0.456, 0.406),
+    std=(0.229, 0.224, 0.225),
+    idtype=np.float32,
+    mdtype=np.int64,
   ):
     self.mean = mean
     self.std = std
@@ -275,13 +277,13 @@ class RandomCrop:
 class RandomCrop_For_Segmentation(RandomCrop):
 
   def __init__(
-      self,
-      crop_size,
-      channels=3,
-      channels_last=True,
-      labels_last=True,
-      bg_value=0,
-      ignore_value=255,
+    self,
+    crop_size,
+    channels=3,
+    channels_last=True,
+    labels_last=True,
+    bg_value=0,
+    ignore_value=255,
   ):
     super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
 
@@ -300,7 +302,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
       cm = np.ones([*self.mask_crop_shape, *l], dtype=mask.dtype) * self.ignore_value
       cm[b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[a['ymin']:a['ymax'], a['xmin']:a['xmax']]
     else:
-      l = mask.shape[:rank-2]
+      l = mask.shape[:rank - 2]
       cm = np.ones([*l, *self.mask_crop_shape], dtype=mask.dtype) * self.ignore_value
       cm[..., b['ymin']:b['ymax'], b['xmin']:b['xmax']] = mask[..., a['ymin']:a['ymax'], a['xmin']:a['xmax']]
 
@@ -339,7 +341,38 @@ class ResizeMask:
     return data
 
 
+class CLAHE:
+
+  def __init__(self, clip_limit: float = 2.0, width: int = 8, height: int = 8):
+
+    self.clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(width, height))
+
+  def __call__(self, data):
+    if isinstance(data, dict):
+      x = data["image"]
+    else:
+      x = data
+
+    if isinstance(x, Image.Image):
+      i = np.array(x)
+      x.close()
+      x = i
+
+    x = cv2.cvtColor(x, cv2.COLOR_RGB2Lab)
+    # 0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
+    x[:, :, 0] = self.clahe.apply(x[:, :, 0])
+    x = cv2.cvtColor(x, cv2.COLOR_Lab2RGB)
+
+    if isinstance(data, dict):
+      data["image"] = x
+    else:
+      data = x
+
+    return data
+
+
 # region MixUp
+
 
 class AugmentedDataset(torch.utils.data.Dataset):
   dataset: torch.utils.data.Dataset
@@ -430,7 +463,7 @@ class CutMix(AugmentedDataset):
 
     if self.segmentation_mode:
       target_b = target_b[bh1:bh2, bw1:bw2]
-      target_a[bhs:bhs + bH, bws:bws + bW]  = target_b
+      target_a[bhs:bhs + bH, bws:bws + bW] = target_b
     else:  # Classification mode.
       alpha = 1 - ((bH * bW) / (aH * aW))
       target_a = target_a * alpha + target_b * (1. - alpha)
