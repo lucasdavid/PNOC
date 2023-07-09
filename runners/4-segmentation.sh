@@ -6,7 +6,7 @@
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-segm.out
 #SBATCH --time=24:00:00
 
-# Copyright 2021 Lucas Oliveira David
+# Copyright 2023 Lucas Oliveira David
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,8 +54,8 @@ MODE=fix
 # LR=0.001  # deepglobe
 
 IMAGE_SIZE=320
-MIN_IMAGE_SIZE=320
-MAX_IMAGE_SIZE=320
+MIN_IMAGE_SIZE=$IMAGE_SIZE
+MAX_IMAGE_SIZE=$IMAGE_SIZE
 
 EPOCHS=50
 
@@ -68,7 +68,7 @@ MIXUP=1.
 LABELSMOOTHING=0 # 0.1
 
 # Infrastructure
-MIXED_PRECISION=true # false
+MIXED_PRECISION=true
 
 CRF_T=0
 CRF_GT=0.9
@@ -84,9 +84,9 @@ segm_training() {
   echo "================================================="
 
   WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING,aug:$AUGMENT" \
-  WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
-  CUDA_VISIBLE_DEVICES=$DEVICES \
-  $PY scripts/segmentation/train.py \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
+    $PY scripts/segmentation/train.py \
     --tag $TAG \
     --lr $LR \
     --max_epoch $EPOCHS \
@@ -100,7 +100,7 @@ segm_training() {
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
-    --augment $AUGMENT \
+    --augment "$AUGMENT" \
     --cutmix_prob $CUTMIX \
     --mixup_prob $MIXUP \
     --label_smoothing $LABELSMOOTHING \
@@ -150,33 +150,21 @@ evaluate_masks() {
     --num_workers $WORKERS_INFER
 }
 
+## 4.1 DeepLabV3+ Training
+##
+
 LABELSMOOTHING=0.1
 
 ## For supervised segmentation:
-TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-supervised
+PRIORS_TAG=sup
 MASKS_DIR=""
 
 ## For custom masks (pseudo masks from WSSS):
-# PRIORS=pn-ccamh@rs269pnoc-ls0.1
+# PRIORS_TAG=pnoc-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc@beta=10@exp_times=8@rw@crf=$CRF_T
-#
 
-## 4.1 DeepLabV3+ Training
-##
-# TAG=segmentation/$DATASET-d3p-ls@$PRIORS_TAG
-# segm_ training
-#
-
-LRS="0.1 0.01 0.001"
-AUGMENTS="none clahe clahe_cutmix"
-
-for LR in $LRS; do
-  for AUGMENT in $AUGMENTS; do
-    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-supervised
-
-    segm_training
-  done
-done
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$PRIORS_TAG
+# segm_training
 
 ## 4.2 DeepLabV3+ Inference
 ##
@@ -189,3 +177,18 @@ done
 ##
 
 # DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks
+
+# region Deep-Globe Land Cover
+## LR and augmentation search
+## ==========================
+LRS="0.1 0.01 0.001"
+AUGMENTS="none clahe clahe_cutmix"
+
+for LR in $LRS; do
+  for AUGMENT in $AUGMENTS; do
+    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
+    # segm_training
+  done
+done
+
+# endregion

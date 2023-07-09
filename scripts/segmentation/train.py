@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
   TAG = args.tag
   SEED = args.seed
-  DEVICE = args.device
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -99,7 +99,7 @@ if __name__ == '__main__':
   tt, tv = datasets.get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset = datasets.SegmentationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
-  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob, segmentation=True)
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     _, images, _, targets = train_iterator.get()
     images, targets = images.to(DEVICE), targets.to(DEVICE)
 
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       logits = model(images)
       loss = class_loss_fn(logits, targets)
 
@@ -191,7 +191,7 @@ if __name__ == '__main__':
 
     if do_validation:
       model.eval()
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         miou, iou, val_time = segmentation_validation_step(model, valid_loader, train_dataset.info.classes, DEVICE)
       model.train()
 

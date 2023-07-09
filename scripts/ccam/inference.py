@@ -162,7 +162,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   SEED = args.seed
-  DEVICE = args.device
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
   TAG = f'{args.tag}@train' if 'train' in args.domain else f'{args.tag}@val'
   TAG += '@scale=%s' % args.scales
 

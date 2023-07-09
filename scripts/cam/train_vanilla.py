@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
   TAG = args.tag
   SEED = args.seed
-  DEVICE = args.device
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -145,7 +145,7 @@ if __name__ == '__main__':
   miou_best = -1
 
   for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
-    image_ids, images, labels = train_iterator.get()
+    _, images, labels = train_iterator.get()
 
     optimizer.zero_grad()
 

@@ -19,12 +19,6 @@ def _decode_id(sample_id):
   return s
 
 
-def _load_labels_from_npy(sample_ids, root_dir):
-  filepath = os.path.join(root_dir, 'cls_labels_coco.npy')
-  data = np.load(filepath, allow_pickle=True).item()
-  return {_id: data[int(_id)] for _id in sample_ids}
-
-
 class COCO14DataSource(base.CustomDataSource):
 
   NAME = "coco14"
@@ -57,7 +51,7 @@ class COCO14DataSource(base.CustomDataSource):
     )
 
     self.root_dir = root_dir
-    self.sample_labels = _load_labels_from_npy(self.sample_ids, root_dir)
+    self.sample_labels = self._load_labels_from_npy()
 
   def get_image_path(self, sample_id) -> str:
     return os.path.join(self.images_dir, f"COCO_{self.domain}_{sample_id}.jpg")
@@ -68,6 +62,11 @@ class COCO14DataSource(base.CustomDataSource):
   def get_sample_ids(self, domain) -> List[str]:
     sample_ids = super().get_sample_ids(domain)
     return [_decode_id(_id) for _id in sample_ids if _id]
+
+  def _load_labels_from_npy(self):
+    filepath = os.path.join(self.root_dir, 'cls_labels_coco.npy')
+    data = np.load(filepath, allow_pickle=True).item()
+    return {_id: data[int(_id)] for _id in self.sample_ids}
 
 
 base.DATASOURCES[COCO14DataSource.NAME] = COCO14DataSource

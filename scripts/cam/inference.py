@@ -161,7 +161,7 @@ def forward_tta(model, ori_image, scale, DEVICE):
 if __name__ == '__main__':
   args = parser.parse_args()
 
-  DEVICE = args.device
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
   SEED = args.seed
   TAG = args.tag
   TAG += '@train' if 'train' in args.domain else '@val'

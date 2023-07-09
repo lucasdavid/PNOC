@@ -4,7 +4,7 @@ import torch
 from sklearn import metrics as skmetrics
 from torch.utils.data import DataLoader
 
-from datasets import *
+import datasets
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.log_utils import *
@@ -39,7 +39,7 @@ parser.add_argument('--domain', default='train', type=str)
 def main(args):
   TAG = args.tag
   SEED = args.seed
-  DEVICE = args.device
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
   SIZE = args.image_size
 
   print('Evaluation Configuration')
@@ -60,11 +60,12 @@ def main(args):
 
   transform = transforms.Compose([
     transforms.Resize(size=(SIZE, SIZE)),
-    Normalize(*imagenet_stats()),
+    Normalize(*datasets.imagenet_stats()),
     Transpose(),
   ])
 
-  dataset = get_inference_dataset(args.dataset, args.data_dir, args.domain, transform)
+  data_source = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
+  dataset = datasets.ClassificationDataset(data_source, transform, ignore_bg_images=False)
   loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=args.num_workers)
   total_steps = args.max_steps or len(loader)
   logg_steps = max(1, int(total_steps * 0.1))
@@ -86,12 +87,12 @@ def main(args):
   model.to(DEVICE)
 
   try:
-    CUDA_DEVICES = os.environ['CUDA_VISIBLE_DEVICES']
+    GPUS = os.environ['CUDA_VISIBLE_DEVICES']
   except KeyError:
-    CUDA_DEVICES = '0'
+    GPUS = '0'
 
-  if len(CUDA_DEVICES.split(',')) > 1:
-    log(f'GPUs = {CUDA_DEVICES}')
+  if len(GPUS.split(',')) > 1:
+    log(f'GPUs = {GPUS}')
     model = nn.DataParallel(model)
 
   model.eval()
@@ -100,7 +101,7 @@ def main(args):
   probs = []
   targs = []
 
-  for step, (images, _, y) in enumerate(loader):
+  for step, (_, images, y) in enumerate(loader):
     images = images.to(DEVICE)
     p = model(images)
     p = torch.sigmoid(p)

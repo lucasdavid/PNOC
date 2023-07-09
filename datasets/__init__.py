@@ -38,14 +38,14 @@ def custom_data_source(dataset, data_dir, domain=None, split=None, **kwargs):
   )
 
 
-def apply_augmentation(dataset, augment, image_size, cutmix_prob, mixup_prob, segmentation=False):
+def apply_augmentation(dataset, augment, image_size, cutmix_prob, mixup_prob):
   if 'cutormixup' in augment:
     print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob, segmentation=segmentation)
+    dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
   else:
     if 'cutmix' in augment:
       print(f'Applying cutmix image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
-      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob, segmentation=segmentation)
+      dataset = CutMix(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
     if 'mixup' in augment:
       print(f'Applying mixup num_mix=1, beta=1., prob={mixup_prob}')
       dataset = MixUp(dataset, num_mix=1, beta=1., prob=mixup_prob)

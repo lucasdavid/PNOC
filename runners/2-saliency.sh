@@ -6,7 +6,7 @@
 #SBATCH -o /scratch/lerdl/lucas.david/logs/sal-%j.out
 #SBATCH --time=24:00:00
 
-# Copyright 2021 Lucas Oliveira David
+# Copyright 2023 Lucas Oliveira David
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

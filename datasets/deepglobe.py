@@ -50,7 +50,7 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     self.color_ids = self.colors[:, 0] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 2]
 
   def get_label(self, sample_id) -> np.ndarray:
-    return self.sample_labels[sample_id]
+    return self.sample_labels[sample_id].astype("float32")
 
   @classmethod
   def _load_labels_from_npy(cls):

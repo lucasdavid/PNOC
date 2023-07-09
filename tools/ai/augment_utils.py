@@ -384,6 +384,13 @@ class AugmentedDataset(torch.utils.data.Dataset):
   def info(self):
     return self.dataset.info
 
+  def _to_segm_batch(self, batch):
+    return (
+      (batch, True)
+      if len(batch) == 4
+      else (batch + (None,), False)
+    )
+
 
 class MixUp(AugmentedDataset):
 
@@ -394,7 +401,8 @@ class MixUp(AugmentedDataset):
     self.prob = prob
 
   def __getitem__(self, index):
-    x, y = self.dataset[index]
+    batch, is_segm = self._to_segm_batch(self.dataset[index])
+    i, x, y, m = batch
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -403,14 +411,15 @@ class MixUp(AugmentedDataset):
 
       # Draw random sample.
       r = random.choice(range(len(self)))
-      xb, yb = self.dataset[r]
+      (_, xb, yb, mb), _ = self._to_segm_batch(self.dataset[r])
 
       alpha = np.random.beta(self.beta, self.beta)
       x = x * alpha + xb * (1. - alpha)
       y = y * alpha + yb * (1. - alpha)
 
-    return x, y
+      # TODO: mix int segmentation masks.
 
+    return (i, x, y, m) if is_segm else (i, x, y)
 
 # endregion
 
@@ -435,45 +444,50 @@ def rand_bbox(h, w, lam):
 
 class CutMix(AugmentedDataset):
 
-  def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0, segmentation=False):
+  def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0):
     self.dataset = dataset
     self.num_mix = num_mix
     self.beta = beta
     self.prob = prob
-    self.segmentation_mode = segmentation
+
+    # This is done here so cut-mixed batches aren't cropped as well.
     self.random_crop = RandomCrop(crop, channels_last=False)
 
-  def do_cutmix(self, image_a, target_a, image_b, target_b, alpha):
+  def do_cutmix(self, batch_a, batch_b, alpha):
+    ia, xa, ya, ma = batch_a
+    _, xb, yb, mb = batch_b
+
     # Cut random bbox.
-    bH, bW = image_b.shape[1:]
+    bH, bW = xb.shape[1:]
     bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, alpha)
-    image_b = image_b[:, bh1:bh2, bw1:bw2]
+    xb = xb[:, bh1:bh2, bw1:bw2]
 
     # Central crop if B larger than A.
-    aH, aW = image_a.shape[1:]
-    bH, bW = image_b.shape[1:]
+    aH, aW = xa.shape[1:]
+    bH, bW = xb.shape[1:]
     bhs = (bH - aH) // 2 if bH > aH else 0
     bws = (bW - aW) // 2 if bW > aW else 0
-    image_b = image_b[:, bhs:bhs + aH, bws:bws + aW]
+    xb = xb[:, bhs:bhs + aH, bws:bws + aW]
 
     # Random (x,y) placement if A larger than B.
-    bH, bW = image_b.shape[1:]
+    bH, bW = xb.shape[1:]
     bhs, bws = random.randint(0, aH - bH), random.randint(0, aW - bW)
-    image_a[:, bhs:bhs + bH, bws:bws + bW] = image_b
+    xa[:, bhs:bhs + bH, bws:bws + bW] = xb
 
-    if self.segmentation_mode:
-      target_b = target_b[bh1:bh2, bw1:bw2]
-      target_a[bhs:bhs + bH, bws:bws + bW] = target_b
-    else:  # Classification mode.
-      alpha = 1 - ((bH * bW) / (aH * aW))
-      target_a = target_a * alpha + target_b * (1. - alpha)
+    # targets.
+    alpha = 1 - ((bH * bW) / (aH * aW))
+    ya = ya * alpha + yb * (1. - alpha)
 
-    return image_a, target_a
+    # masks.
+    if ma is not None:
+      mb = mb[bh1:bh2, bw1:bw2]
+      ma[bhs:bhs + bH, bws:bws + bW] = mb
+
+    return ia, xa, ya, ma
 
   def __getitem__(self, index):
-    x, y = self.dataset[index]
-
-    x = self.random_crop(x)
+    (i, x, y, m), is_segm = self._to_segm_batch(self.dataset[index])
+    batch_a = (i, self.random_crop(x), y, m)
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -483,19 +497,18 @@ class CutMix(AugmentedDataset):
       # Draw random sample.
       l = np.random.beta(self.beta, self.beta)
       r = random.choice(range(len(self)))
-      xb, yb = self.dataset[r]
+      batch_b, _ = self._to_segm_batch(self.dataset[r])
 
-      x, y = self.do_cutmix(x, y, xb, yb, l)
+      batch_a = self.do_cutmix(batch_a, batch_b, l)
 
-    return x, y
+    return batch_a if is_segm else batch_a[:3]
 
 
 class CutOrMixUp(CutMix):
 
   def __getitem__(self, index):
-    x, y = self.dataset[index]
-
-    x = self.random_crop(x)
+    (i, x, y, m), is_segm = self._to_segm_batch(self.dataset[index])
+    batch_a = (i, self.random_crop(x), y, m)
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -505,15 +518,18 @@ class CutOrMixUp(CutMix):
       # Draw random sample.
       alpha = np.random.beta(self.beta, self.beta)
       r = random.choice(range(len(self)))
-      xb, yb = self.dataset[r]
+      batch_b, _ = self._to_segm_batch(self.dataset[r])
 
       if np.random.rand(1) > 0.5:
-        x, y = self.do_cutmix(x, y, xb, yb, alpha)
+        batch_a = self.do_cutmix(batch_a, batch_b, alpha)
+        i, x, y, m = batch_a
       else:
+        x, y = batch_a
+        xb, yb = batch_b[1:3]
         x = x * alpha + xb * (1. - alpha)
         y = y * alpha + yb * (1. - alpha)
+        batch_a = (i, x, y, m)
 
-    return x, y
-
+    return (i, x, y, m) if is_segm else (i, x, y)
 
 # endregion

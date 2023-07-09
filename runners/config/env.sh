@@ -2,6 +2,12 @@
 
 ## Environment
 
+# if [[ "`hostname`" == "sdumont"* ]]; then
+#   ENV=sdumont
+# else
+#   ENV=local
+# fi
+
 if [[ $ENV == sdumont ]]; then
   ### Sdumont
   PY=python3.8
