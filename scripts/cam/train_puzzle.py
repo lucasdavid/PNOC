@@ -2,12 +2,7 @@
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
 import argparse
-import copy
-import math
 import os
-import random
-import shutil
-import sys
 
 import numpy as np
 import torch
@@ -33,6 +28,7 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 # Dataset
 ###############################################################################
+parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
@@ -59,7 +55,8 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
-parser.add_argument('--max_val_steps', default=None, type=int)
+parser.add_argument('--validate_max_steps', default=None, type=int)
+parser.add_argument('--validate_thresholds', default=None, type=str)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -89,15 +86,17 @@ parser.add_argument('--alpha', default=1.0, type=float)
 parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
 import cv2
+
 cv2.setNumThreads(0)
 
-DEVICE = "cuda"
 
 if __name__ == '__main__':
   ###################################################################################
   # Arguments
   ###################################################################################
   args = parser.parse_args()
+
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
 
   log_dir = f'./experiments/logs/'
   data_dir = f'./experiments/data/'
@@ -210,20 +209,25 @@ if __name__ == '__main__':
   train_meter = MetricsContainer(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha'])
 
   best_train_mIoU = -1
-  thresholds = list(np.arange(0.10, 0.50, 0.05))
+  thresholds = list(map(float, args.validate_thresholds.split(","))) if args.validate_thresholds else list(np.arange(0.10, 0.50, 0.05))
 
   def evaluate(loader):
+    include_bg = train_dataset.info.bg_class is None
+
     model.eval()
     eval_timer.tik()
 
-    meter_dic = {th: MIoUCalculator(train_dataset.info.classes) for th in thresholds}
+    meter_dic = {
+      th: MIoUCalculator(train_dataset.info.classes, train_dataset.info.bg_class, include_bg)
+      for th in thresholds
+    }
 
     with torch.no_grad():
       for step, (_, images, labels, gt_masks) in enumerate(loader):
         images = images.to(DEVICE)
         labels = labels.to(DEVICE)
 
-        with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+        with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
           _, features = model(images, with_cam=True)
 
         # features = resize_for_tensors(features, images.size()[-2:])
@@ -241,12 +245,16 @@ if __name__ == '__main__':
           gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
           for th in thresholds:
-            bg = np.ones_like(cam[:, :, 0]) * th
-            pred_mask = np.argmax(np.concatenate([bg[..., np.newaxis], cam], axis=-1), axis=-1)
+            pred_mask = cam
+            if include_bg:
+              bg = np.ones_like(cam[:, :, 0]) * th
+              pred_mask = np.concatenate([bg[..., np.newaxis], pred_mask], axis=-1)
+
+            pred_mask = np.argmax(pred_mask, axis=-1)
 
             meter_dic[th].add(pred_mask, gt_mask)
 
-        if args.max_val_steps and step >= args.max_val_steps:
+        if args.validate_max_steps and step >= args.validate_max_steps:
           break
 
     model.train()
@@ -272,7 +280,7 @@ if __name__ == '__main__':
     _, images, targets = train_iterator.get()
     images = images.to(DEVICE)
 
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       ###############################################################################
       # Normal
       ###############################################################################

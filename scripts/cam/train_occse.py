@@ -58,6 +58,9 @@ parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--validate_max_steps', default=None, type=int)
+parser.add_argument('--validate_thresholds', default=None, type=str)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -206,7 +209,7 @@ if __name__ == '__main__':
 
   best_train_mIoU = -1
   DEVICE = "cuda"
-  THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
+  THRESHOLDS = list(map(float, args.validate_thresholds.split(","))) if args.validate_thresholds else list(np.arange(0.10, 0.50, 0.05))
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
@@ -251,7 +254,10 @@ if __name__ == '__main__':
     # region logging
     train_meter.update({'loss': loss.item(), 'c_loss': c_loss.item(), 'o_loss': o_loss.item(), 'oc_alpha': ao, 'k': k})
 
-    if (step + 1) % log_iteration == 0:
+    do_logging = (step + 1) % log_iteration == 0
+    do_validation = args.validate and (step + 1) % val_iteration == 0
+
+    if do_logging:
       (loss, c_loss, o_loss, ao, k) = train_meter.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(optimizer))
@@ -291,8 +297,12 @@ if __name__ == '__main__':
       # endregion
 
     # region evaluation
-    if (step + 1) % val_iteration == 0:
-      threshold, miou, iou, val_time = priors_validation_step(model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE)
+
+    if do_validation:
+      threshold, miou, iou, val_time = priors_validation_step(
+        model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
+        args.validate_max_steps, train_dataset.info.bg_class
+      )
 
       if best_train_mIoU == -1 or best_train_mIoU < miou:
         best_train_mIoU = miou

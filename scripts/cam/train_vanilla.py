@@ -45,7 +45,8 @@ parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
 parser.add_argument('--validate', default=True, type=str2bool)
-parser.add_argument('--max_val_steps', default=None, type=int)
+parser.add_argument('--validate_max_steps', default=None, type=int)
+parser.add_argument('--validate_thresholds', default=None, type=str)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -80,6 +81,8 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
+  if args.validate_thresholds:
+    THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -160,14 +163,11 @@ if __name__ == '__main__':
 
     train_meter.update({'loss': loss.item(), 'class_loss': class_loss.item()})
 
-    #################################################################################################
-    # For Log
-    #################################################################################################
     epoch = step // step_val
     do_logging = (step + 1) % step_log == 0
     do_validation = args.validate and (step + 1) % step_val == 0
 
-    if (step + 1) % step_log == 0:
+    if do_logging:
       loss, class_loss = train_meter.get(clear=True)
       learning_rate = float(get_learning_rate_from_optimizer(optimizer))
 
@@ -191,14 +191,11 @@ if __name__ == '__main__':
         'time={time:.0f}sec'.format(**data)
       )
 
-    #################################################################################################
-    # Evaluation
-    #################################################################################################
     if do_validation:
       model.eval()
       threshold, miou, iou, val_time = priors_validation_step(
         model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-        max_steps=args.max_val_steps,
+        args.validate_max_steps, train_dataset.info.bg_class
       )
       model.train()
 

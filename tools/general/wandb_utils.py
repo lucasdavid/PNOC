@@ -22,13 +22,14 @@ def setup(name, config, job_type="train", tags=None):
 
 
 def cams_to_wb_images(images, cams):
-  wb_images, wb_cams = [], []
-
-  mu_std = imagenet_stats()
+  samples = min(len(images), 8)
   cams = cams.max(-1)
 
-  for b in range(8):
-    image = denormalize(images[b], *mu_std)
+  wb_images, wb_cams = [], []
+  stats = imagenet_stats()
+
+  for b in range(samples):
+    image = denormalize(images[b], *stats)
     img = image[..., ::-1]
     cam = colormap(cams[b], img.shape)
     cam = cv2.addWeighted(img, 0.5, cam, 0.5, 0)

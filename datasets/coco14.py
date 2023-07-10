@@ -2,14 +2,18 @@ import os
 from typing import List, Optional, Union
 
 import numpy as np
-from PIL import Image
-from torch.utils.data import Dataset
-
-from core.aff_utils import *
 
 from . import base
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'coco14')
+CLASSES = [
+  "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant",
+  "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
+  "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat",
+  "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon",
+  "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+  "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
+  "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
+]
 
 
 def _decode_id(sample_id):
@@ -62,6 +66,24 @@ class COCO14DataSource(base.CustomDataSource):
   def get_sample_ids(self, domain) -> List[str]:
     sample_ids = super().get_sample_ids(domain)
     return [_decode_id(_id) for _id in sample_ids if _id]
+
+  def get_info(self):
+    if self.segmentation:
+      classes = ["background"] + CLASSES
+      bg_class = 0
+      void_class = 81
+    else:
+      # without bg and void:
+      classes = CLASSES
+      bg_class = None
+      void_class = None
+
+    return base.DatasetInfo(
+      classes=classes,
+      colors=None,
+      bg_class=bg_class,
+      void_class=void_class,
+    )
 
   def _load_labels_from_npy(self):
     filepath = os.path.join(self.root_dir, 'cls_labels_coco.npy')

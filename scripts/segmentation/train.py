@@ -192,7 +192,9 @@ if __name__ == '__main__':
     if do_validation:
       model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-        miou, iou, val_time = segmentation_validation_step(model, valid_loader, train_dataset.info.classes, DEVICE)
+        miou, iou, val_time = segmentation_validation_step(
+          model, valid_loader, train_dataset.info.classes, DEVICE, train_dataset.info.bg_class
+        )
       model.train()
 
       if miou_best_ < miou:

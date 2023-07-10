@@ -4,19 +4,22 @@ import cv2
 import numpy as np
 
 
-def accumulate_batch_iou(masks, cams, meters):
+def accumulate_batch_iou(masks, cams, meters, include_bg: bool = True):
   for b in range(len(masks)):
-    pred = cams[b]
+    cam = cams[b]
     mask = masks[b]
 
-    h, w, c = pred.shape
+    h, w, c = cam.shape
     mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
-    for th, meter in meters.items():
-      bg = np.ones_like(pred[:, :, 0]) * th
-      pred = np.concatenate([bg[..., np.newaxis], pred], axis=-1)
-      pred = np.argmax(pred, axis=-1)
-      meter.add(pred, mask)
+    for t, meter in meters.items():
+      pred = cam
+      if include_bg:
+        bg = np.ones_like(cam[:, :, 0]) * t
+        pred = np.concatenate([bg[..., np.newaxis], pred], axis=-1)
+
+      p = np.argmax(pred, axis=-1)
+      meter.add(p, mask)
 
 
 def accumulate_batch_iou_saliency(masks, ccams, meters):
@@ -36,7 +39,7 @@ def accumulate_batch_iou_saliency(masks, ccams, meters):
       meter.add(ccam_b, y_i)
 
 
-def result_miou_from_thresholds(iou_meters, classes):
+def maximum_miou_from_thresholds(iou_meters, classes):
   th_ = iou_ = None
   miou_ = 0.0
 
@@ -53,14 +56,14 @@ def result_miou_from_thresholds(iou_meters, classes):
 
 class MIoUCalculator:
 
-  def __init__(self, classes, bg_index: Optional[int] = 0, include_bg: bool = True):
+  def __init__(self, classes, bg_class: Optional[int] = 0, include_bg: bool = True):
     if isinstance(classes, np.ndarray):
       classes = classes.tolist()
 
     if include_bg:
-      classes = classes[:bg_index] + ["background"] + classes[bg_index:]
+      classes = classes[:bg_class] + ["background"] + classes[bg_class:]
 
-    self.bg_index = bg_index
+    self.bg_class = bg_class
     self.include_bg = include_bg
     self.class_names = classes
     self.classes = len(self.class_names)
@@ -116,10 +119,10 @@ class MIoUCalculator:
     iou = np.asarray(IoU_list)
     miou = np.mean(iou)
 
-    if self.bg_index is None:
+    if self.bg_class is None:
       miou_fg = miou
     else:
-      miou_fg = (sum(iou[:self.bg_index]) + sum(iou[self.bg_index + 1:])) / (len(iou) - 1)
+      miou_fg = (sum(iou[:self.bg_class]) + sum(iou[self.bg_class + 1:])) / (len(iou) - 1)
 
     FP = np.mean(FP_list)
     FN = np.mean(FN_list)
@@ -145,8 +148,8 @@ class MIoUCalculator:
 
 class MIoUCalcFromNames(MIoUCalculator):
 
-  def __init__(self, class_names, bg_index: int = 0, include_bg: bool = False):
-    self.bg_index = bg_index
+  def __init__(self, class_names, bg_class: int = 0, include_bg: bool = False):
+    self.bg_class = bg_class
     self.include_bg = include_bg
     self.class_names = class_names
     self.classes = len(self.class_names)

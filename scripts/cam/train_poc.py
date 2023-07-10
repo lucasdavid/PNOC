@@ -57,7 +57,8 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
-parser.add_argument('--max_val_steps', default=None, type=int)
+parser.add_argument('--validate_max_steps', default=None, type=int)
+parser.add_argument('--validate_thresholds', default=None, type=str)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -104,6 +105,8 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
+  if args.validate_thresholds:
+      THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -124,11 +127,11 @@ if __name__ == '__main__':
   train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
-  step_valid = len(train_loader)
-  step_log = int(step_valid * args.print_ratio)
-  step_init = args.first_epoch * step_valid
-  step_max = args.max_epoch * step_valid
-  print(f"Iterations: first={step_init} logging={step_log} validation={step_valid} max={step_max}")
+  step_val = len(train_loader)
+  step_log = int(step_val * args.print_ratio)
+  step_init = args.first_epoch * step_val
+  step_max = args.max_epoch * step_val
+  print(f"Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}")
 
   # Network
   cgnet = Classifier(
@@ -201,7 +204,7 @@ if __name__ == '__main__':
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
     k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       # Normal
       logits, features = cgnet(images, with_cam=True)
 
@@ -242,9 +245,9 @@ if __name__ == '__main__':
       gamma=args.oc_focal_gamma
     )
 
-    epoch = step // step_valid
+    epoch = step // step_val
     do_logging = (step + 1) % step_log == 0
-    do_validation = args.validate and (step + 1) % step_valid == 0
+    do_validation = args.validate and (step + 1) % step_val == 0
 
     train_metrics.update(
       {
@@ -304,10 +307,10 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         threshold, miou, iou, val_time = priors_validation_step(
           cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-          max_steps=args.max_val_steps,
+          args.validate_max_steps, train_dataset.info.bg_class
         )
       cgnet.train()
 

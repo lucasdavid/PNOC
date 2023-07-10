@@ -124,8 +124,8 @@ if __name__ == '__main__':
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
-  # TODO: make this work for cams.
-  # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
+  # TODO: test mixup and cutmix in C2AM
+  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     model.train()
 
     for step, (_, images, _, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
 
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     save_model(model, model_path, parallel=GPUS_COUNT > 1)
     print('[i] save model')
 
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       threshold, miou, iou, val_time = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
 
     if miou_best < miou:

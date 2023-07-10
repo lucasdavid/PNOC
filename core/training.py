@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from tools.ai.evaluate_utils import (MIoUCalcFromNames, MIoUCalculator,
                                      accumulate_batch_iou,
                                      accumulate_batch_iou_saliency,
-                                     result_miou_from_thresholds)
+                                     maximum_miou_from_thresholds)
 from tools.ai.torch_utils import make_cam, resize_for_tensors, to_numpy
 from tools.general import wandb_utils
 
@@ -21,8 +21,7 @@ def priors_validation_step(
     thresholds: List[float],
     device: str,
     max_steps: Optional[int] = None,
-    bg_index: int = 0,
-    include_bg: bool = True,
+    bg_class: Optional[int] = None,
   ):
   """Run Validation Step.
 
@@ -31,7 +30,10 @@ def priors_validation_step(
 
   """
 
-  iou_meters = {th: MIoUCalculator(classes, bg_index=bg_index, include_bg=include_bg) for th in thresholds}
+  # if dataset does not have a background class, add it at i=0.
+  include_bg = bg_class is None
+  bg_class = bg_class or 0
+  meters = {t: MIoUCalculator(classes, bg_class=bg_class, include_bg=include_bg) for t in thresholds}
 
   start = time.time()
 
@@ -50,14 +52,14 @@ def priors_validation_step(
         preds = to_numpy(torch.sigmoid(logits).float())  # TODO: check if `to_numpy(...).astype(np.float32)` is better.
         wandb_utils.log_cams(classes, inputs, targets, cams, preds)
 
-      accumulate_batch_iou(masks, cams, iou_meters)
+      accumulate_batch_iou(masks, cams, meters, include_bg=include_bg)
 
       if max_steps and step >= max_steps:
         break
 
   val_time = time.time() - start
 
-  return (*result_miou_from_thresholds(iou_meters, classes), val_time)
+  return (*maximum_miou_from_thresholds(meters, classes), val_time)
 
   # preds_ = np.concatenate(preds_, axis=0)
   # targets_ = np.concatenate(targets_, axis=0)
@@ -69,11 +71,11 @@ def segmentation_validation_step(
     loader: DataLoader,
     classes: List[str],
     device: str,
+    bg_class: int = 0,
 ):
   start = time.time()
 
-  # Set bg_index=None as we don't use FG mIoU information.
-  iou_meter = MIoUCalculator(classes, bg_index=None, include_bg=False)
+  meter = MIoUCalculator(classes, bg_class=bg_class, include_bg=False)
 
   with torch.no_grad():
     for _, images, _, masks in loader:
@@ -90,9 +92,9 @@ def segmentation_validation_step(
         h, w = pred_mask.shape
         gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
-        iou_meter.add(pred_mask, gt_mask)
+        meter.add(pred_mask, gt_mask)
 
-  miou, _, iou, *_ = iou_meter.get(clear=True, detail=True)
+  miou, _, iou, *_ = meter.get(clear=True, detail=True)
   iou = [round(iou[c], 2) for c in classes]
 
   val_time = time.time() - start
@@ -108,7 +110,7 @@ def saliency_validation_step(
   start = time.time()
 
   classes = ['background', 'foreground']
-  iou_meters = {th: MIoUCalcFromNames(classes, bg_index=0) for th in thresholds}
+  iou_meters = {th: MIoUCalcFromNames(classes, bg_class=0) for th in thresholds}
 
   with torch.no_grad():
     for _, (_, images, _, masks) in enumerate(loader):
@@ -124,4 +126,4 @@ def saliency_validation_step(
 
   val_time = time.time() - start
 
-  return (*result_miou_from_thresholds(iou_meters, classes), val_time)
+  return (*maximum_miou_from_thresholds(iou_meters, classes), val_time)

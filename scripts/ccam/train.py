@@ -109,7 +109,7 @@ if __name__ == '__main__':
 
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
-  tt, tv = datasets.get_classification_transforms(512, 512, args.image_size, args.augment)
+  tt, tv = datasets.get_classification_transforms(512, 512, args.image_size)
   train_dataset = datasets.ClassificationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
   train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
@@ -166,7 +166,7 @@ if __name__ == '__main__':
     model.train()
 
     for step, (_, images, labels) in enumerate(train_loader):
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         fg_feats, bg_feats, ccams = model(images.to(DEVICE))
 
         loss1 = criterion[0](fg_feats)
@@ -227,7 +227,7 @@ if __name__ == '__main__':
 
     # region evaluation
     model.eval()
-    with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       threshold, miou, iou, val_time = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
 
     if best_train_mIoU == -1 or best_train_mIoU < miou:

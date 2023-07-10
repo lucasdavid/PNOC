@@ -1,6 +1,6 @@
 import os
 from abc import ABCMeta, abstractmethod
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -16,18 +16,15 @@ DATASOURCES: Dict[str, "CustomDataSource"] = {}
 
 class DatasetInfo:
 
-  def __init__(self, meta, classes, num_classes: int = None, num_classes_segm: int = None):
-    self.meta = meta
+  def __init__(self, classes: List[str], colors: List[Tuple[int, int, int]], bg_class: int, void_class: int):
     self.classes = np.asarray(classes)
-    self.num_classes = num_classes or len(classes)
+    self.colors = np.asarray(colors)
+    self.num_classes = len(classes)
+    self.bg_class = bg_class
+    self.void_class = void_class
 
-  @classmethod
-  def from_metafile(cls, dataset, segmentation=False):
-    META = read_json(os.path.join(DATA_DIR, dataset, 'meta_segm.json' if segmentation else 'meta.json'))
-    CLASSES = META['class_names']
-    NUM_CLASSES = META['classes']
-
-    return cls(META, CLASSES, NUM_CLASSES)
+    self.class_ids = {c: i for i, c in enumerate(classes)}
+    self.color_ids = self.colors[:, 0] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 2]
 
 
 class CustomDataSource(metaclass=ABCMeta):
@@ -39,8 +36,6 @@ class CustomDataSource(metaclass=ABCMeta):
     "valid": "valid",
     "test": "test",
   }
-
-  VOID_CLASS: int = None
 
   def __init__(
     self,
@@ -60,20 +55,20 @@ class CustomDataSource(metaclass=ABCMeta):
     self.masks_dir = masks_dir
     self.split = split
     self.domain = domain
-    self.sample_ids = np.asarray(
-      sample_ids.split(",")
-      if isinstance(sample_ids, str)
-      else sample_ids
-    )
+    self.sample_ids = np.asarray(sample_ids.split(",") if isinstance(sample_ids, str) else sample_ids)
     self.segmentation = segmentation
 
   _info: DatasetInfo = None
 
   @property
-  def info(self):
+  def info(self) -> DatasetInfo:
     if self._info is None:
-      self._info = DatasetInfo.from_metafile(self.NAME, segmentation=self.segmentation)
+      self._info = self.get_info()
     return self._info
+
+  @abstractmethod
+  def get_info(self):
+    raise NotImplementedError
 
   def __len__(self) -> int:
     return len(self.sample_ids)
@@ -102,8 +97,8 @@ class CustomDataSource(metaclass=ABCMeta):
         mask = np.array(mask)
 
       mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
-      mask = np.argmax(mask[..., np.newaxis] == self.color_ids, axis=-1)
-      mask[mask == self.VOID_CLASS] = 255
+      mask = np.argmax(mask[..., np.newaxis] == self.info.color_ids, axis=-1)
+      mask[mask == self.info.void_class] = 255
       mask = Image.fromarray(mask.astype('uint8'))
 
     return mask
@@ -115,21 +110,20 @@ class CustomDataSource(metaclass=ABCMeta):
 
 # region Datasets
 
+
 class ClassificationDataset(torch.utils.data.Dataset):
 
   IGNORE_BG_IMAGES: bool = True
 
-  def __init__(self, data_source: CustomDataSource, transform: transforms.Compose = None, ignore_bg_images: bool = None):
+  def __init__(
+    self, data_source: CustomDataSource, transform: transforms.Compose = None, ignore_bg_images: bool = None
+  ):
     self.data_source = data_source
     self.transform = transform
-    self.ignore_bg_images = (
-      ignore_bg_images
-      if ignore_bg_images is not None
-      else self.IGNORE_BG_IMAGES
-    )
+    self.ignore_bg_images = (ignore_bg_images if ignore_bg_images is not None else self.IGNORE_BG_IMAGES)
 
   @property
-  def info(self):
+  def info(self) -> DatasetInfo:
     return self.data_source.info
 
   def __len__(self) -> int:
@@ -140,7 +134,7 @@ class ClassificationDataset(torch.utils.data.Dataset):
     label = self.data_source.get_label(sample_id)
 
     if self.ignore_bg_images and label.sum() == 0:
-      return self.get_valid_sample(index+1)
+      return self.get_valid_sample(index + 1)
 
     return sample_id, label
 
@@ -221,5 +215,6 @@ class CAMsDataset(ClassificationDataset):
       image, cams = data['image'], data['mask']
 
     return sample_id, image, label, cams
+
 
 # endregion

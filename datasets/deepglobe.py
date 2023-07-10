@@ -10,7 +10,7 @@ from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'deepglobe')
 CLASSES = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown']
-COLORS  = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0]]
+COLORS = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0]]
 
 
 class DeepGlobeLandCoverDataSource(base.CustomDataSource):
@@ -22,7 +22,13 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     "test": "test",
   }
 
+  BG_CLASS = 1
   VOID_CLASS = 6
+
+  @classmethod
+  def _load_labels_from_npy(cls):
+    filepath = os.path.join(DATA_DIR, 'cls_labels_unbalanced.npy')
+    return np.load(filepath, allow_pickle=True).item()
 
   def __init__(
     self,
@@ -46,16 +52,21 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
 
-    self.colors = np.asarray(COLORS)
-    self.color_ids = self.colors[:, 0] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 2]
-
   def get_label(self, sample_id) -> np.ndarray:
     return self.sample_labels[sample_id].astype("float32")
 
-  @classmethod
-  def _load_labels_from_npy(cls):
-    filepath = os.path.join(DATA_DIR, 'cls_labels_unbalanced.npy')
-    return np.load(filepath, allow_pickle=True).item()
+  def get_info(self):
+    if self.segmentation:
+      void_class = 7
+    else:
+      void_class = None
+
+    return base.DatasetInfo(
+      classes=CLASSES,
+      colors=COLORS,
+      bg_class=1,
+      void_class=void_class,
+    )
 
 
 base.DATASOURCES[DeepGlobeLandCoverDataSource.NAME] = DeepGlobeLandCoverDataSource

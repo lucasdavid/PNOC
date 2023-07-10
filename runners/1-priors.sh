@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J voc-pnoc
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-voc-pnoc.out
+#SBATCH -J priors
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
 #SBATCH --time=2:00:00
 
 # Copyright 2023 Lucas Oliveira David
@@ -24,15 +24,15 @@
 # Train a model to perform multilabel classification over a WSSS dataset.
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+# ENV=sdumont
+# WORK_DIR=$SCRATCH/PuzzleCAM
+ENV=local
+WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
+# DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-# DATASET=deepglobe # DeepGlobe Land Cover Classification
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -92,7 +92,7 @@ OC_TRAIN_INT_STEPS=1
 
 train_vanilla() {
   echo "=================================================================="
-  echo "[train vanilla:$TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
@@ -120,14 +120,15 @@ train_vanilla() {
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
     --validate $PERFORM_VALIDATION \
-    --max_val_steps $MAX_VAL_STEPS \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
+    --validate_thresholds $VALIDATE_THRESHOLDS \
     --device $DEVICE \
     --num_workers $WORKERS_TRAIN
 }
 
 train_puzzle() {
   echo "=================================================================="
-  echo "[train puzzle:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
@@ -158,7 +159,8 @@ train_puzzle() {
     --mixup_prob $MIXUP \
     --label_smoothing $LABELSMOOTHING \
     --validate $PERFORM_VALIDATION \
-    --max_val_steps $MAX_VAL_STEPS \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
+    --validate_thresholds $VALIDATE_THRESHOLDS \
     --dataset $DATASET \
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
@@ -167,7 +169,7 @@ train_puzzle() {
 
 train_poc() {
   echo "=================================================================="
-  echo "[train poc:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,poc" \
@@ -188,7 +190,6 @@ train_poc() {
     --oc-pretrained $OC_PRETRAINED \
     --oc-regularization $OC_REGULAR \
     --oc-mask-globalnorm $OC_MASK_GN \
-    --oc-persist $OC_PERSIST \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
@@ -207,7 +208,8 @@ train_poc() {
     --oc-focal-momentum $OC_F_MOMENTUM \
     --oc-focal-gamma $OC_F_GAMMA \
     --validate $PERFORM_VALIDATION \
-    --max_val_steps $MAX_VAL_STEPS \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
+    --validate_thresholds $VALIDATE_THRESHOLDS \
     --dataset $DATASET \
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
@@ -216,7 +218,7 @@ train_poc() {
 
 train_pnoc() {
   echo "=================================================================="
-  echo "[train pnoc:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
@@ -259,8 +261,10 @@ train_pnoc() {
     --oc-train-masks $OC_TRAIN_MASKS \
     --oc_train_mask_t $OC_TRAIN_MASK_T \
     --oc-train-interval-steps $OC_TRAIN_INT_STEPS \
+    --oc-persist $OC_PERSIST \
     --validate $PERFORM_VALIDATION \
-    --max_val_steps $MAX_VAL_STEPS \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
+    --validate_thresholds $VALIDATE_THRESHOLDS \
     --dataset $DATASET \
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
@@ -285,11 +289,12 @@ inference_priors() {
     --device $DEVICE
 }
 
+
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-EID=r4
+EID=r1
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
-# train_vanilla
+train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -301,9 +306,11 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="puzzle/$DATASET-$IMAGE_SIZE-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
 # train_puzzle
+
 TAG="poc/$DATASET-$IMAGE_SIZE-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
+
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+train_pnoc
 
 # DOMAIN=$DOMAIN_VALID inference_priors

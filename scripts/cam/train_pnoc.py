@@ -63,7 +63,8 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
-parser.add_argument('--max_val_steps', default=None, type=int)
+parser.add_argument('--validate_max_steps', default=None, type=int)
+parser.add_argument('--validate_thresholds', default=None, type=str)
 
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -158,7 +159,8 @@ def train_step(train_iterator, step):
 
 
 def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
-  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+  # with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
     # Normal
     logits, features = cgnet(images, with_cam=True)
 
@@ -220,7 +222,7 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
 
 
 def train_step_oc(step, images_mask, targets_sm, ow):
-  with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+  with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
     cl_logits = ocnet(images_mask)
     ot_loss = ow * class_loss_fn(cl_logits, targets_sm).mean()
 
@@ -253,6 +255,8 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
+  if args.validate_thresholds:
+    THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -406,12 +410,10 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      with torch.autocast(device_type=DEVICE, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         threshold, miou, iou, val_time = priors_validation_step(
           cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-          max_steps=args.max_val_steps,
-          # bg_index=train_dataset.info.bg_index,
-          # include_bg=True,  # TODO: fix it for DeepGlobe.
+          args.validate_max_steps, train_dataset.info.bg_class
         )
       cgnet.train()
 

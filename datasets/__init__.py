@@ -38,7 +38,9 @@ def custom_data_source(dataset, data_dir, domain=None, split=None, **kwargs):
   )
 
 
-def apply_augmentation(dataset, augment, image_size, cutmix_prob, mixup_prob):
+def apply_augmentation(
+  dataset: ClassificationDataset, augment: str, image_size, cutmix_prob, mixup_prob
+) -> ClassificationDataset:
   if 'cutormixup' in augment:
     print(f'Applying cutormixup image_size={image_size}, num_mix=1, beta=1., prob={cutmix_prob}')
     dataset = CutOrMixUp(dataset, image_size, num_mix=1, beta=1., prob=cutmix_prob)
@@ -87,11 +89,7 @@ def get_classification_transforms(
     tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.
   tt += [Transpose()]
 
-  tv += [
-    Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(crop_size),
-    Transpose_For_Segmentation()
-  ]
+  tv += [Normalize_For_Segmentation(mean, std), Top_Left_Crop_For_Segmentation(crop_size), Transpose_For_Segmentation()]
 
   return tuple(map(transforms.Compose, (tt, tv)))
 
@@ -158,7 +156,7 @@ def get_ccam_transforms(
   image_size,
   crop_size,
 ):
-  mean, std = imagenet_stats()
+  u, s = imagenet_stats()
 
   size = [image_size, image_size]
   resize = Resize_For_Segmentation(
@@ -169,7 +167,7 @@ def get_ccam_transforms(
   tt = transforms.Compose(
     [
       resize,
-      Normalize_For_Segmentation(mean, std, mdtype=np.float32),
+      Normalize_For_Segmentation(u, s, mdtype=np.float32),
       RandomCrop_For_Segmentation(crop_size, ignore_value=0., labels_last=False),
       Transpose_For_Segmentation(),
       random_hflip_fn,
@@ -178,7 +176,7 @@ def get_ccam_transforms(
 
   tv = transforms.Compose([
     resize,
-    Normalize_For_Segmentation(mean, std),
+    Normalize_For_Segmentation(u, s),
     Transpose_For_Segmentation(),
   ])
 

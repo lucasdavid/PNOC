@@ -156,7 +156,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       x = torch.stack([x, x.flip(-1)])
       x = x.to(device)
 
-      with torch.autocast(device_type=device, dtype=torch.float16, enabled=args.mixed_precision):
+      with torch.autocast(device_type=device, enabled=args.mixed_precision):
         # inference
         edge = model.get_edge(x, image_size=args.image_size)
 
