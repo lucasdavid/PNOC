@@ -24,15 +24,15 @@
 # Train a model to perform multilabel classification over a WSSS dataset.
 #
 
-# ENV=sdumont
-# WORK_DIR=$SCRATCH/PuzzleCAM
-ENV=local
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -88,7 +88,12 @@ OC_TRAIN_MASKS=cams
 OC_TRAIN_MASK_T=0.2
 OC_TRAIN_INT_STEPS=1
 
-# regionend
+# Evaluation
+MIN_TH=0.05
+MAX_TH=0.81
+CRF_T=0
+CRF_GT=0.7
+
 
 train_vanilla() {
   echo "=================================================================="
@@ -289,6 +294,22 @@ inference_priors() {
     --device $DEVICE
 }
 
+evaluate_priors() {
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT,priors" \
+  CUDA_VISIBLE_DEVICES="" \
+  $PY scripts/evaluate.py \
+    --experiment_name $TAG \
+    --dataset $DATASET \
+    --domain $DOMAIN \
+    --data_dir $DATA_DIR \
+    --min_th $MIN_TH \
+    --max_th $MAX_TH \
+    --crf_t $CRF_T \
+    --crf_gt_prob $CRF_GT \
+    --mode npy \
+    --num_workers $WORKERS_INFER;
+}
+
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
@@ -313,4 +334,5 @@ TAG="poc/$DATASET-$IMAGE_SIZE-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
-# DOMAIN=$DOMAIN_VALID inference_priors
+DOMAIN=$DOMAIN_VALID inference_priors
+DOMAIN=train TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
