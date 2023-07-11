@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J sal-ccamh
-#SBATCH -o /scratch/lerdl/lucas.david/logs/sal-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-sal-ccamh.out
 #SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
@@ -30,9 +30,9 @@ WORK_DIR=$SCRATCH/PuzzleCAM
 # WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -144,7 +144,7 @@ ccamh_pseudo_masks_crf() {
 }
 
 poolnet_training() {
-  cd $PRJ_DIR/poolnet
+  cd $WORK_DIR/poolnet
 
   CUDA_VISIBLE_DEVICES=0 $PY main_custom.py \
     --arch "resnet" \
@@ -154,11 +154,11 @@ poolnet_training() {
     --train_list $DOMAIN \
     --pseudo_root $SAL_PRIORS_DIR
 
-  cd $PRJ_DIR
+  cd $WORK_DIR
 }
 
 poolnet_inference() {
-  cd $PRJ_DIR/poolnet
+  cd $WORK_DIR/poolnet
 
   CUDA_VISIBLE_DEVICES=0 $PY main_custom.py \
     --arch "resnet" \
@@ -170,7 +170,7 @@ poolnet_inference() {
     --pseudo_root $SAL_PRIORS_DIR \
     --sal_folder ./results/$PN_TAG
 
-  cd $PRJ_DIR
+  cd $WORK_DIR
 }
 
 evaluate_saliency_detection() {
@@ -195,6 +195,13 @@ evaluate_saliency_detection() {
 # FG_T=0.4
 # CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
 # CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+
+FG_T=0.4
+CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE@rw269pnoc@rs269-rals
+
+
 ##
 ## ================================================
 
@@ -204,29 +211,6 @@ evaluate_saliency_detection() {
 # LR=0.0005
 # CAMS_DIR=experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
 # CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-lr0.05@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-##
-## ================================================
-
-## Ensemble
-##
-FG_T=0.3
-
-# ENS=ra-oc-p-poc-pnoc-avg
-# CAMS_DIR=experiments/predictions/ensemble/$ENS
-# PN_CKPT=$PRJ_DIR/poolnet/results/run-0/models/epoch_9.pth
-
-ENS=ra-oc-p-poc-pnoc-learned-a0.25
-CAMS_DIR=experiments/predictions/ensemble/$ENS
-PN_CKPT=$PRJ_DIR/poolnet/results/run-1/models/epoch_9.pth
-
-# ENS=ra-oc-p-poc-pnoc-weighted-a0.25
-# CAMS_DIR=experiments/predictions/ensemble/$ENS
-PN_CKPT=$PRJ_DIR/poolnet/results/run-2/models/epoch_9.pth
-
-CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@$ENS@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-PN_TAG=$DATASET-pn@ccamh-rs269@$ENS
-SAL_PRIORS_DIR=$PRJ_DIR/experiments/predictions/saliency/$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0@t=0.2@crf=10/
-
 ##
 ## ================================================
 
@@ -240,8 +224,9 @@ ccamh_pseudo_masks_crf
 poolnet_training
 poolnet_inference
 
-cp $PN_CKPT $PRJ_DIR/experiments/models/saliency/$PN_TAG.pth
-mv $PRJ_DIR/poolnet/results/$PN_TAG $PRJ_DIR/experiments/predictions/saliency/
+PN_CKPT=$WORK_DIR/poolnet/results/run-0/models/epoch_9.pth
+cp $PN_CKPT $WORK_DIR/experiments/models/saliency/$PN_TAG.pth
+mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
 
 ## Evaluation
 ## ==============================

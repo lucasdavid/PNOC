@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=2:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -30,9 +30,9 @@ WORK_DIR=$SCRATCH/PuzzleCAM
 # WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
+# DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-# DATASET=deepglobe # DeepGlobe Land Cover Classification
+DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -325,14 +325,16 @@ AUGMENT=colorjitter
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
-TAG="puzzle/$DATASET-$IMAGE_SIZE-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
+TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
 # train_puzzle
 
-TAG="poc/$DATASET-$IMAGE_SIZE-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
-DOMAIN=$DOMAIN_VALID inference_priors
-DOMAIN=train TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# DOMAIN=$DOMAIN_TRAIN inference_priors
+# DOMAIN=$DOMAIN_VALID inference_priors
+
+# DOMAIN=$DOMAIN_VALID TAG=$TAG@$DOMAIN_VALID@scale=0.5,1.0,1.5,2.0 evaluate_priors

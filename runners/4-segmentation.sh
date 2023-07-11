@@ -41,19 +41,19 @@ cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
 # Architecture
-# ARCH=rs269
-# ARCHITECTURE=resnest269
-ARCH=rs101
-ARCHITECTURE=resnest101
+ARCH=rs269
+ARCHITECTURE=resnest269
+# ARCH=rs101
+# ARCHITECTURE=resnest101
 GROUP_NORM=true
 DILATED=false
 MODE=fix
 
 # LR=0.007  # voc12
 # LR=0.004  # coco14
-# LR=0.001  # deepglobe
+LR=0.01  # deepglobe
 
-IMAGE_SIZE=320
+IMAGE_SIZE=1024
 MIN_IMAGE_SIZE=$IMAGE_SIZE
 MAX_IMAGE_SIZE=$IMAGE_SIZE
 
@@ -163,15 +163,17 @@ MASKS_DIR=""
 # PRIORS_TAG=pnoc-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc@beta=10@exp_times=8@rw@crf=$CRF_T
 
+AUGMENT=clahe  # colorjitter_randaug_cutmix_mixup_cutormixup
+
 TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$PRIORS_TAG
-# segm_training
+segm_training
 
 ## 4.2 DeepLabV3+ Inference
 ##
 
-# CRF_T=1 DOMAIN=$DOMAIN_TRAIN SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
-# CRF_T=1 DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
-# CRF_T=1 DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_TRAIN     SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
+# CRF_T=1 DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
 
 ## 4.3. Evaluation
 ##
@@ -181,14 +183,14 @@ TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$PRIORS_TAG
 # region Deep-Globe Land Cover
 ## LR and augmentation search
 ## ==========================
-LRS="0.1 0.01 0.001"
-AUGMENTS="none clahe clahe_cutmix"
+# LRS="0.1 0.01 0.001"
+# AUGMENTS="none clahe clahe_cutmix"
 
-for LR in $LRS; do
-  for AUGMENT in $AUGMENTS; do
-    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
-    # segm_training
-  done
-done
+# for LR in $LRS; do
+#   for AUGMENT in $AUGMENTS; do
+#     TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
+#     # segm_training
+#   done
+# done
 
 # endregion

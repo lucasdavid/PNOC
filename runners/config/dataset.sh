@@ -36,9 +36,10 @@ if [[ $DATASET == deepglobe ]]; then
   DOMAIN_VALID_SEG=test
   DATA_DIR=$DATASETS_DIR/DGdevkit
 
-  IMAGE_SIZE=2048
-  MIN_IMAGE_SIZE=2048
-  MAX_IMAGE_SIZE=2048
+  # IMAGE_SIZE=2048  # real sizes
+  IMAGE_SIZE=1024
+  MIN_IMAGE_SIZE=$IMAGE_SIZE
+  MAX_IMAGE_SIZE=$IMAGE_SIZE
 
   VALIDATE_MAX_STEPS=0
   # single th because the bg class is not added based on thresholding.
