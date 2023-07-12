@@ -1,21 +1,17 @@
 # Copyright (C) 2021 * Ltd. All rights reserved.
 # author : Sanghyeon Jo <josanghyeokn@gmail.com>
 
-import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from torchvision import models
 
-from tools.ai.torch_utils import set_trainable_layers, gap2d, resize_for_tensors
+from tools.ai.torch_utils import (gap2d, resize_for_tensors,
+                                  set_trainable_layers)
 
 from . import ccam, regularizers
-from .aff_utils import PathIndex
 from .deeplab_utils import ASPP, Decoder
 from .mcar import mcar_resnet50, mcar_resnet101
-from .puzzle_utils import merge_features, tile_features
 
 
 class FixedBatchNorm(nn.BatchNorm2d):
@@ -182,6 +178,12 @@ class Backbone(nn.Module):
 
     return groups
 
+  def train(self, mode=True):
+    super().train(mode)
+    for m in self.not_training:
+      m.eval()
+    return self
+
 
 class Classifier(Backbone):
 
@@ -213,12 +215,6 @@ class Classifier(Backbone):
 
     self.from_scratch_layers.extend([self.classifier])
     self.initialize([self.classifier])
-
-  def train(self, mode=True):
-    super().train(mode)
-    for m in self.not_training:
-      m.eval()
-    return self
 
   def forward(self, x, with_cam=False):
     x = self.stage1(x)

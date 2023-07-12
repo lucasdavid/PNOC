@@ -28,7 +28,9 @@ class Iterator:
     return data
 
 
-def custom_data_source(dataset, data_dir, domain=None, split=None, **kwargs):
+def custom_data_source(
+  dataset: str, data_dir: str, domain: Optional[str] = None, split: Optional[str] = None, **kwargs
+) -> CustomDataSource:
   data_source_cls = base.DATASOURCES[dataset]
   return data_source_cls(
     root_dir=data_dir,
