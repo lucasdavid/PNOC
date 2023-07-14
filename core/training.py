@@ -1,7 +1,6 @@
 import time
 from typing import List, Optional
 
-import cv2
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -49,8 +48,8 @@ def priors_validation_step(
 
       if step == 0:
         inputs = to_numpy(inputs)
-        preds = to_numpy(torch.sigmoid(logits).float())  # TODO: check if `to_numpy(...).astype(np.float32)` is better.
-        wandb_utils.log_cams(classes, inputs, targets, cams, preds)
+        preds = to_numpy(torch.sigmoid(logits).float())
+        wandb_utils.log_cams(ids, inputs, targets, cams, preds, classes=classes)
 
       accumulate_batch_iou(masks, cams, meters, include_bg=include_bg)
 
@@ -72,27 +71,29 @@ def segmentation_validation_step(
     classes: List[str],
     device: str,
     bg_class: int = 0,
+    log_samples: bool = True,
 ):
   start = time.time()
 
   meter = MIoUCalculator(classes, bg_class=bg_class, include_bg=False)
 
   with torch.no_grad():
-    for _, images, _, masks in loader:
-      logits = model(images.to(device))
-      preds = torch.argmax(logits, dim=1)
+    for step, (ids, inputs, targets, masks) in enumerate(loader):
+      _, H, W = masks.shape
 
-      masks = to_numpy(masks)
+      logits = model(inputs.to(device))
+      preds = torch.argmax(logits, dim=1).cpu()
+      preds = resize_for_tensors(
+        preds.float().unsqueeze(1), (H, W), mode="nearest"
+      ).squeeze().to(masks)
       preds = to_numpy(preds)
+      masks = to_numpy(masks)
 
-      for i in range(images.shape[0]):
-        pred_mask = preds[i]
-        gt_mask = masks[i]
+      meter.add_many(preds, masks)
 
-        h, w = pred_mask.shape
-        gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-        meter.add(pred_mask, gt_mask)
+      if step == 0 and log_samples:
+        inputs = to_numpy(inputs)
+        wandb_utils.log_masks(ids, inputs, targets, masks, preds, classes)
 
   miou, _, iou, *_ = meter.get(clear=True, detail=True)
   iou = [round(iou[c], 2) for c in classes]

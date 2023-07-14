@@ -98,6 +98,10 @@ class MIoUCalculator:
       self.T[i] += np.sum((gt_mask == i) * obj_mask)
       self.TP[i] += np.sum((gt_mask == i) * correct_mask)
 
+  def add_many(self, predictions, masks):
+    for p, m in zip(predictions, masks):
+      self.add(p, m)
+
   def get(self, detail=False, clear=True):
     IoU_dic = {}
     IoU_list = []

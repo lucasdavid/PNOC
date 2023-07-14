@@ -37,6 +37,18 @@ class RandomResize:
     return image.resize(size, mode)
 
 
+class ApplyToImage:
+  def __init__(self, transform):
+    self.transform = transform
+
+  def __call__(self, data):
+    data["image"] = self.transform(data["image"])
+    return data
+
+  def __str__(self) -> str:
+    return f"ApplyToImage({self.transform})"
+
+
 class RandomResize_For_Segmentation:
 
   def __init__(self, min_image_size, max_image_size, overcrop=True):
@@ -428,8 +440,8 @@ class MixUp(AugmentedDataset):
 
 def rand_bbox(h, w, lam):
   ratio = np.sqrt(1. - lam)
-  cw = np.int(w * ratio)
-  ch = np.int(h * ratio)
+  cw = int(w * ratio)
+  ch = int(h * ratio)
 
   cx = np.random.randint(cw // 2, w - cw // 2)
   cy = np.random.randint(ch // 2, h - ch // 2)

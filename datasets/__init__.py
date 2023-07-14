@@ -134,6 +134,9 @@ def get_segmentation_transforms(
     Resize_For_Segmentation(crop_size),
   ]
 
+  if 'colorjitter' in augment:
+    tt += [ApplyToImage(transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1))]
+
   if "clahe" in augment:
     tt += [CLAHE()]
     tv += [CLAHE()]

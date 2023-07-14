@@ -11,18 +11,14 @@ from tqdm import tqdm
 
 import datasets
 import wandb
-from core.networks import *
+from core.networks import DeepLabV3Plus
 from core.training import segmentation_validation_step
-from tools.ai.augment_utils import *
-from tools.ai.demo_utils import *
-from tools.ai.evaluate_utils import *
 from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
-from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.time_utils import *
+from tools.general.time_utils import Timer
 
 parser = argparse.ArgumentParser()
 
@@ -60,6 +56,7 @@ parser.add_argument('--min_image_size', default=256, type=int)
 parser.add_argument('--max_image_size', default=1024, type=int)
 
 parser.add_argument('--print_ratio', default=1.0, type=float)
+parser.add_argument('--plot_ratio', default=10.0, type=float)
 
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--augment', default='', type=str)
@@ -108,6 +105,7 @@ if __name__ == '__main__':
 
   step_val = len(train_loader)
   step_log = int(step_val * args.print_ratio)
+  step_plot = int(step_val * args.plot_ratio)
   step_init = args.first_epoch * step_val
   step_max = args.max_epoch * step_val
   print(f'Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}')
@@ -159,13 +157,14 @@ if __name__ == '__main__':
       logits = model(images)
       loss = class_loss_fn(logits, targets)
 
-    scaler.scale(loss).backward()
+    scaler.scale(loss / args.accumulate_steps).backward()
 
     if (step + 1) % args.accumulate_steps == 0:
       scaler.step(opt)
       scaler.update()
       opt.zero_grad()
 
+    # if not torch.isnan(loss):
     train_meter.update({'loss': loss.item()})
 
     epoch = step // step_val
@@ -190,10 +189,13 @@ if __name__ == '__main__':
       print('step={iteration:,} lr={learning_rate:.4f} loss={loss:.4f} time={time:.0f} sec'.format(**data))
 
     if do_validation:
+      log_samples = (step + 1) % step_plot == 0
+
       model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         miou, iou, val_time = segmentation_validation_step(
-          model, valid_loader, train_dataset.info.classes, DEVICE, train_dataset.info.bg_class
+          model, valid_loader, train_dataset.info.classes, DEVICE, train_dataset.info.bg_class,
+          log_samples=log_samples,
         )
       model.train()
 

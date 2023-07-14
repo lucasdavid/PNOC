@@ -6,13 +6,28 @@ import numpy as np
 from . import base
 
 CLASSES = [
-  "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant",
+  "background", "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant",
   "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
   "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat",
   "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon",
   "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
   "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
-  "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
+  "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "void"
+]
+
+COLORS = [
+  [0, 0, 0], [172, 47, 117], [192, 67, 195], [103, 9, 211], [21, 36, 87], [70, 216, 88], [140, 58, 193], [39, 87, 174],
+  [88, 81, 165], [25, 77, 72], [9, 148, 115], [208, 197, 79], [175, 192, 82], [99, 216, 177], [29, 147, 147],
+  [142, 167, 32], [193, 9, 185], [127, 32, 31], [202, 151, 163], [203, 114, 183], [28, 34, 128], [128, 164, 53],
+  [133, 38, 17], [79, 132, 105], [42, 186, 31], [120, 1, 65], [169, 57, 35], [102, 119, 11], [174, 82, 91],
+  [128, 142, 99], [53, 140, 121], [170, 84, 203], [68, 6, 196], [47, 127, 131], [204, 100, 180], [78, 143, 148],
+  [186, 23, 207], [141, 117, 85], [48, 49, 69], [169, 163, 192], [95, 197, 94], [0, 113, 178], [36, 162, 48],
+  [93, 131, 98], [42, 205, 112], [149, 201, 127], [0, 138, 114], [43, 186, 127], [23, 187, 130], [121, 98, 62],
+  [163, 222, 123], [195, 82, 174], [148, 209, 50], [155, 14, 41], [58, 193, 36], [10, 86, 43], [104, 11, 2],
+  [51, 80, 32], [182, 128, 38], [19, 174, 42], [115, 184, 188], [77, 30, 24], [125, 2, 3], [94, 107, 13],
+  [112, 40, 72], [19, 95, 72], [154, 194, 180], [67, 61, 14], [96, 4, 195], [139, 86, 205], [121, 109, 75],
+  [184, 16, 152], [157, 149, 110], [25, 208, 188], [121, 118, 117], [189, 83, 161], [104, 160, 121], [70, 213, 31],
+  [13, 71, 184], [152, 79, 41], [18, 40, 182], [224, 224, 192],
 ]
 
 
@@ -69,18 +84,20 @@ class COCO14DataSource(base.CustomDataSource):
 
   def get_info(self):
     if self.segmentation:
-      classes = ["background"] + CLASSES
+      classes = CLASSES
+      colors = COLORS
       bg_class = 0
       void_class = 81
     else:
       # without bg and void:
-      classes = CLASSES
+      classes = CLASSES[1:-1]
+      colors = COLORS[1:-1]
       bg_class = None
       void_class = None
 
     return base.DatasetInfo(
       classes=classes,
-      colors=None,
+      colors=colors,
       bg_class=bg_class,
       void_class=void_class,
     )
