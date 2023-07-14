@@ -124,7 +124,7 @@ if __name__ == '__main__':
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
   # TODO: test mixup and cutmix in C2AM
-  train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
+  # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)

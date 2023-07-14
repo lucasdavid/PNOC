@@ -283,7 +283,7 @@ if __name__ == "__main__":
   wandb.define_metric("evaluation/t")
 
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
-  dataset = datasets.PathsDataset(ds, ignore_bg_images=)
+  dataset = datasets.PathsDataset(ds, ignore_bg_images=True)
   run(args, dataset)
 
   wb_run.finish()

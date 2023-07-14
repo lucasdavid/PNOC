@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J priors
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=24:00:00
+#SBATCH -J coco-p
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-coco-p.out
+#SBATCH --time=96:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -31,8 +31,8 @@ WORK_DIR=$SCRATCH/PuzzleCAM
 
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012
-# DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+DATASET=coco14  # MS COCO 2014
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -310,12 +310,15 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+# IMAGE_SIZE=512
+# MIN_IMAGE_SIZE=$IMAGE_SIZE
+# MAX_IMAGE_SIZE=$IMAGE_SIZE
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 EID=r1
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
-train_vanilla
+# train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -326,13 +329,13 @@ OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
-# train_puzzle
+train_puzzle
 
 TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN inference_priors
 # DOMAIN=$DOMAIN_VALID inference_priors

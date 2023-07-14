@@ -24,10 +24,10 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-# ENV=sdumont
-# WORK_DIR=$SCRATCH/PuzzleCAM
-ENV=local
-WORK_DIR=$HOME/workspace/repos/research/pnoc
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=$HOME/workspace/repos/research/pnoc
 
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012

@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 import datasets
+import wandb
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -19,6 +20,7 @@ from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
+from tools.general import wandb_utils
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
@@ -96,15 +98,19 @@ if __name__ == '__main__':
   ###################################################################################
   args = parser.parse_args()
 
+  TAG = args.tag
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
+
+  wb_run = wandb_utils.setup(TAG, args)
+  log_config(vars(args), TAG)
 
   log_dir = f'./experiments/logs/'
   data_dir = f'./experiments/data/'
   model_dir = './experiments/models/'
 
-  log_path = log_dir + f'{args.tag}.txt'
-  data_path = data_dir + f'{args.tag}.json'
-  model_path = model_dir + f'{args.tag}.pth'
+  log_path = log_dir + f'{TAG}.txt'
+  data_path = data_dir + f'{TAG}.json'
+  model_path = model_dir + f'{TAG}.pth'
 
   create_directory(os.path.dirname(log_path))
   create_directory(os.path.dirname(data_path))
@@ -113,7 +119,7 @@ if __name__ == '__main__':
   set_seed(args.seed)
   log = lambda string='': log_print(string, log_path)
 
-  log('[i] {}'.format(args.tag))
+  log('[i] {}'.format(TAG))
   log()
 
   ###################################################################################
@@ -351,6 +357,10 @@ if __name__ == '__main__':
       if args.amp_min_scale and scaler._scale < args.amp_min_scale:
           scaler._scale = torch.as_tensor(args.amp_min_scale, dtype=scaler._scale.dtype, device=scaler._scale.device)
 
+    epoch = iteration // max_iteration
+    do_logging = (iteration + 1) % log_iteration == 0
+    do_validation = args.validate and (iteration + 1) % val_iteration == 0
+
     train_meter.update(
       {
         'loss': loss.item(),
@@ -365,7 +375,7 @@ if __name__ == '__main__':
     #################################################################################################
     # For Log
     #################################################################################################
-    if (iteration + 1) % log_iteration == 0:
+    if do_logging:
       loss, class_loss, p_class_loss, re_loss, conf_loss, alpha = train_meter.get(clear=True)
       learning_rate = float(get_learning_rate_from_optimizer(optimizer))
 
@@ -383,6 +393,10 @@ if __name__ == '__main__':
       data_dic['train'].append(data)
       write_json(data_path, data_dic)
 
+      wb_logs = {f"train/{k}": v for k, v in data.items()}
+      wb_logs["train/epoch"] = epoch
+      wandb.log(wb_logs, commit=not do_validation)
+
       log(
         '[i] \
                 iteration={iteration:,}, \
@@ -399,11 +413,14 @@ if __name__ == '__main__':
     #################################################################################################
     # Evaluation
     #################################################################################################
-    if args.validate and (iteration + 1) % val_iteration == 0:
+    if do_validation:
       threshold, mIoU, iou = evaluate(valid_loader)
 
       if best_train_mIoU == -1 or best_train_mIoU < mIoU:
         best_train_mIoU = mIoU
+        wandb.run.summary["train/best_t"] = threshold
+        wandb.run.summary["train/best_miou"] = mIoU
+        wandb.run.summary["train/best_iou"] = iou
 
       data = {
         'iteration': iteration + 1,
@@ -415,6 +432,7 @@ if __name__ == '__main__':
       }
       data_dic['validation'].append(data)
       write_json(data_path, data_dic)
+      wandb.log({f"val/{k}": v for k, v in data.items()})
 
       log(
         'iteration       = {iteration:,} '
@@ -428,4 +446,5 @@ if __name__ == '__main__':
       save_model_fn()
 
   write_json(data_path, data_dic)
-  log(args.tag)
+  log(TAG)
+  wb_run.finish()

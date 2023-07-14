@@ -65,6 +65,8 @@ INF_FG_T=0.2
 CRF_T=10
 CRF_GT_PROB=0.7
 
+DOMAIN=$DOMAIN_TRAIN
+
 ccam_training() {
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
     WANDB_TAGS="$DATASET,$ARCH,ccam" \
@@ -177,7 +179,6 @@ evaluate_saliency_detection() {
   WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh,pn" \
     $PY scripts/ccam/evaluate.py \
     --experiment_name "$TAG" \
-    --pred_dir $PRED_DIR \
     --dataset $DATASET \
     --domain $DOMAIN \
     --min_th 0.05 \
@@ -199,7 +200,7 @@ evaluate_saliency_detection() {
 
 FG_T=0.4
 CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE@rw269pnoc@rs269-rals
+CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
 
 
 ##
