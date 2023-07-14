@@ -183,15 +183,17 @@ MASKS_DIR=""
 # region Deep-Globe Land Cover
 ## LR and augmentation search
 ## ==========================
-MODE=normal
-LRS="0.1 0.01 0.001"
+# MODE=normal
+MODE=fix
+# LRS="0.1 0.01 0.001"
 AUGMENTS="none clahe clahe_cutmix"
 
-for LR in $LRS; do
-  for AUGMENT in $AUGMENTS; do
-    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
-    segm_training
-  done
+# for LR in $LRS; do
+LR=0.01
+for AUGMENT in $AUGMENTS; do
+  TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
+  segm_training
 done
+# done
 
 # endregion

@@ -16,7 +16,13 @@ DATASOURCES: Dict[str, "CustomDataSource"] = {}
 
 class DatasetInfo:
 
-  def __init__(self, classes: List[str], colors: List[Tuple[int, int, int]], bg_class: int, void_class: int):
+  def __init__(
+      self,
+      classes: List[str],
+      colors: List[Tuple[int, int, int]],
+      bg_class: Optional[int],
+      void_class: Optional[int],
+  ):
     self.classes = np.asarray(classes)
     self.colors = np.asarray(colors)
     self.num_classes = len(classes)
@@ -206,9 +212,20 @@ class CAMsDataset(ClassificationDataset):
 
     image = self.data_source.get_image(sample_id)
 
-    cams_path = os.path.join(self.masks_dir, f'{sample_id}.npy')
+    cams_path = os.path.join(self.data_source.masks_dir, f'{sample_id}.npy')
     cams = np.load(cams_path, allow_pickle=True).item()
-    cams = torch.from_numpy(cams['hr_cam'].max(0, keepdims=True))
+    cams = cams['hr_cam']
+
+    if not self.info.bg_class:
+      cams = cams.max(0, keepdims=True)
+    else:
+      # TODO: fix this.
+      bg_cam = cams[cams["keys"] == self.info.bg_class]
+      cams = (1 - bg_cam)
+      if len(cams.shape) == 2:
+        cams = cams[np.newaxis, ...]
+
+    cams = torch.from_numpy(cams)
 
     if self.transform is not None:
       data = self.transform({'image': image, 'mask': cams})
