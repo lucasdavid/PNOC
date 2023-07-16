@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 
-def accumulate_batch_iou(masks, cams, meters, include_bg: bool = True):
+def accumulate_batch_iou_priors(masks, cams, meters, include_bg: bool = True):
   for b in range(len(masks)):
     cam = cams[b]
     mask = masks[b]
@@ -22,11 +22,11 @@ def accumulate_batch_iou(masks, cams, meters, include_bg: bool = True):
       meter.add(p, mask)
 
 
-def accumulate_batch_iou_saliency(masks, ccams, meters):
+def accumulate_batch_iou_saliency(masks, ccams, meters, bg_class: int = 0):
   for i in range(len(masks)):
     y_i = masks[i]
     valid_mask = y_i < 255
-    bg_mask = y_i == 0
+    bg_mask = y_i == bg_class
 
     y_i = np.zeros_like(y_i)
     y_i[~bg_mask] = 1
@@ -41,17 +41,22 @@ def accumulate_batch_iou_saliency(masks, ccams, meters):
 
 def maximum_miou_from_thresholds(iou_meters, classes):
   th_ = iou_ = None
-  miou_ = 0.0
+  miou_ = miou_fg_ = 0.0
 
   for th, meter in iou_meters.items():
     miou, miou_fg, iou, *_ = meter.get(clear=True, detail=True)
     if miou_ < miou:
       th_ = th
       miou_ = miou
-      # miou_fg_ = miou_fg
+      miou_fg_ = miou_fg
       iou_ = [round(iou[c], 2) for c in classes]
 
-  return th_, miou_, iou_
+  return {
+    "threshold": th_,
+    "miou": miou_,
+    "miou_fg": miou_fg_,
+    "iou": iou_,
+  }
 
 
 class MIoUCalculator:

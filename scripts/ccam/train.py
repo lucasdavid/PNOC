@@ -160,7 +160,7 @@ if __name__ == '__main__':
   train_timer = Timer()
   train_metrics = MetricsContainer(['loss', 'positive_loss', 'negative_loss'])
 
-  best_train_mIoU = -1
+  miou_best = -1
 
   for epoch in range(args.max_epoch):
     model.train()
@@ -228,32 +228,16 @@ if __name__ == '__main__':
     # region evaluation
     model.eval()
     with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-      threshold, miou, iou, val_time = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
+      metric_results = saliency_validation_step(model, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE)
+      metric_results["iteration"] = step + 1
 
-    if best_train_mIoU == -1 or best_train_mIoU < miou:
-      best_train_mIoU = miou
-      wandb.run.summary["train/best_t"] = threshold
-      wandb.run.summary["train/best_miou"] = miou
-      wandb.run.summary["train/best_iou"] = iou
+    wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+    print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-    data = {
-      'iteration': step + 1,
-      'threshold': threshold,
-      'train_sal_mIoU': miou,
-      'train_sal_iou': iou,
-      'best_train_sal_mIoU': best_train_mIoU,
-      'time': val_time,
-    }
-    wandb.log({f"val/{k}": v for k, v in data.items()})
-
-    print(
-      'iteration={iteration:,}\n'
-      'threshold={threshold:.2f}\n'
-      'train_sal_mIoU={train_sal_mIoU:.2f}%\n'
-      'train_sal_iou ={train_sal_iou}\n'
-      'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
-      'time={time:.0f}sec'.format(**data)
-    )
+    if metric_results["miou"] > miou_best:
+      miou_best = metric_results["miou"]
+      for k in ("threshold", "miou", "iou"):
+        wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
     save_model(model, model_path, parallel=GPUS_COUNT > 1)
     # endregion

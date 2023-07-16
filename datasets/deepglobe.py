@@ -3,9 +3,6 @@ from typing import List, Optional
 
 import numpy as np
 
-from core.aff_utils import *
-from tools.ai.augment_utils import *
-
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'deepglobe')
@@ -22,9 +19,6 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     "test": "test",
   }
 
-  BG_CLASS = 1
-  VOID_CLASS = 6
-
   @classmethod
   def _load_labels_from_npy(cls):
     filepath = os.path.join(DATA_DIR, 'cls_labels_unbalanced.npy')
@@ -37,9 +31,8 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     split: Optional[str] = None,
     images_dir=None,
     masks_dir: str = None,
-    xml_dir: str = None,
     sample_ids: List[str] = None,
-    segmentation: bool = False,
+    task: Optional[str] = "classification",
   ):
     super().__init__(
       domain=domain,
@@ -47,7 +40,7 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClassAug"),
       sample_ids=sample_ids,
-      segmentation=segmentation,
+      task=task,
     )
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
@@ -56,15 +49,17 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     return self.sample_labels[sample_id].astype("float32")
 
   def get_info(self):
-    if self.segmentation:
+    if self.task == "segmentation":
       void_class = 7
+      bg_class = 1  # can I call this pinoptic?
     else:
       void_class = None
+      bg_class = 1
 
     return base.DatasetInfo(
       classes=CLASSES,
       colors=COLORS,
-      bg_class=1,
+      bg_class=bg_class,
       void_class=void_class,
     )
 

@@ -118,8 +118,8 @@ if __name__ == '__main__':
   print('[i] {}'.format(TAG))
   print()
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train", task="saliency")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid", task="saliency")
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
@@ -263,35 +263,19 @@ if __name__ == '__main__':
     # region evaluation
 
     model.eval()
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+      metric_results = saliency_validation_step(model, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE)
+      metric_results["iteration"] = step + 1
+
+    wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+    print(*(f"{metric}={value}" for metric, value in metric_results.items()))
+
+    if metric_results["miou"] > miou_best:
+      miou_best = metric_results["miou"]
+      for k in ("threshold", "miou", "iou"):
+        wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
     save_model(model, model_path, parallel=GPUS_COUNT > 1)
-    print('[i] save model')
-
-    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-      threshold, miou, iou, val_time = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
-
-    if miou_best < miou:
-      miou_best = miou
-
-    data = {
-      'iteration': step + 1,
-      'threshold': threshold,
-      'train_sal_mIoU': miou,
-      'train_sal_iou': iou,
-      'best_train_sal_mIoU': miou_best,
-      'time': val_time,
-    }
-    wandb.log({f"val/{k}": v for k, v in data.items()})
-
-    print(
-      'iteration={iteration:,}\n'
-      'threshold={threshold:.2f}\n'
-      'train_sal_mIoU={train_sal_mIoU:.2f}%\n'
-      'train_sal_iou ={train_sal_iou}\n'
-      'best_train_sal_mIoU={best_train_sal_mIoU:.2f}%\n'
-      'time={time:.0f}sec'.format(**data)
-    )
-
     # endregion
 
   print(TAG)

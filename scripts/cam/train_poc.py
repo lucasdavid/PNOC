@@ -307,37 +307,18 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-        threshold, miou, iou, val_time = priors_validation_step(
-          cgnet, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-          args.validate_max_steps, train_dataset.info.bg_class
-        )
+      metric_results = priors_validation_step(
+        cgnet, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+      )
       cgnet.train()
 
-      if best_train_mIoU == -1 or best_train_mIoU < miou:
-        best_train_mIoU = miou
-        wandb.run.summary["train/best_t"] = threshold
-        wandb.run.summary["train/best_miou"] = miou
-        wandb.run.summary["train/best_iou"] = iou
+      wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+      print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-      data = {
-        'iteration': step + 1,
-        'threshold': threshold,
-        'train_mIoU': miou,
-        'train_iou': iou,
-        'best_train_mIoU': best_train_mIoU,
-        'time': val_time,
-      }
-      wandb.log({f"val/{k}": v for k, v in data.items()})
-
-      print(
-        '\niteration       = {iteration:,}\n'
-        'time            = {time:.0f} sec\n'
-        'threshold       = {threshold:.2f}\n'
-        'train_mIoU      = {train_mIoU:.2f}%\n'
-        'best_train_mIoU = {best_train_mIoU:.2f}%\n'
-        'train_iou       = {train_iou}\n'.format(**data)
-      )
+      if metric_results["miou"] > miou_best:
+        miou_best = metric_results["miou"]
+        for k in ("threshold", "miou", "iou"):
+          wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
       save_model(cgnet, MODEL_PATH, parallel=GPUS_COUNT > 1)
 

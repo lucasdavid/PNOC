@@ -425,9 +425,9 @@ if __name__ == '__main__':
       data = {
         'iteration': iteration + 1,
         'threshold': threshold,
-        'train_mIoU': mIoU,
-        'train_iou': iou,
-        'best_train_mIoU': best_train_mIoU,
+        'miou': mIoU,
+        'iou': iou,
+        'best_miou': best_train_mIoU,
         'time': eval_timer.tok(clear=True),
       }
       data_dic['validation'].append(data)
@@ -435,12 +435,12 @@ if __name__ == '__main__':
       wandb.log({f"val/{k}": v for k, v in data.items()})
 
       log(
-        'iteration       = {iteration:,} '
-        'threshold       = {threshold:.2f}'
-        'best_train_mIoU = {best_train_mIoU:.2f}%'
-        'train_mIoU      = {train_mIoU:.2f}%'
-        'train_iou       = {train_iou}'
-        'time={time:.0f}sec'.format(**data)
+        'iteration = {iteration:,} '
+        'threshold = {threshold:.2f}'
+        'best_miou = {best_miou:.2f}%'
+        'miou      = {miou:.2f}%'
+        'iou       = {iou}'
+        'time      = {time:.0f}sec'.format(**data)
       )
 
       save_model_fn()

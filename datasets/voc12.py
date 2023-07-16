@@ -36,7 +36,7 @@ class VOC12DataSource(base.CustomDataSource):
     masks_dir: str = None,
     xml_dir: str = None,
     sample_ids: List[str] = None,
-    segmentation: bool = False,
+    task: Optional[str] = "classification",
   ):
     super().__init__(
       domain=domain,
@@ -44,7 +44,7 @@ class VOC12DataSource(base.CustomDataSource):
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClass"),
       sample_ids=sample_ids,
-      segmentation=segmentation,
+      task=task,
     )
     self.xml_dir = xml_dir or os.path.join(root_dir, 'Annotations/')
     self.root_dir = root_dir
@@ -57,7 +57,7 @@ class VOC12DataSource(base.CustomDataSource):
     return label
 
   def get_info(self) -> base.DatasetInfo:
-    if self.segmentation:
+    if self.task == "segmentation":
       classes = CLASSES
       colors = COLORS
       bg_class = 0

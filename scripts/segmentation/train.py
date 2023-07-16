@@ -145,7 +145,7 @@ if __name__ == '__main__':
   # Train
   train_timer = Timer()
   train_meter = MetricsContainer(['loss'])
-  miou_best_ = -1
+  miou_best = -1
 
   # torch.autograd.set_detect_anomaly(True)
 
@@ -199,8 +199,8 @@ if __name__ == '__main__':
         )
       model.train()
 
-      if miou_best_ < miou:
-        miou_best_ = miou
+      if miou_best < miou:
+        miou_best = miou
         wandb.run.summary['val/best_miou'] = miou
         wandb.run.summary['val/best_iou'] = iou
 
@@ -210,7 +210,7 @@ if __name__ == '__main__':
         'iteration': step + 1,
         'mIoU': miou,
         'iou': iou,
-        'best_valid_mIoU': miou_best_,
+        'best_valid_mIoU': miou_best,
         'time': val_time,
       }
       wandb.log({f'val/{k}': v for k, v in data.items()})

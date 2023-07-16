@@ -50,7 +50,7 @@ class CustomDataSource(metaclass=ABCMeta):
     split: Optional[str] = None,
     masks_dir: Optional[str] = None,
     sample_ids: Optional[Union[str, List[str]]] = None,
-    segmentation: bool = False,
+    task: Optional[str] = "classification",
   ):
     domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
@@ -62,7 +62,7 @@ class CustomDataSource(metaclass=ABCMeta):
     self.split = split
     self.domain = domain
     self.sample_ids = np.asarray(sample_ids.split(",") if isinstance(sample_ids, str) else sample_ids)
-    self.segmentation = segmentation
+    self.task = task or "classification"
 
   _info: DatasetInfo = None
 
@@ -194,7 +194,7 @@ class AffinityDataset(SegmentationDataset):
     self.get_affinities = GetAffinityLabelFromIndices(
       self.path_index.src_indices,
       self.path_index.dst_indices,
-      classes=self.info.num_classes + 1,
+      classes=self.info.num_classes,
     )
 
   def __getitem__(self, idx):
