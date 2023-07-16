@@ -91,8 +91,8 @@ if __name__ == '__main__':
 
   set_seed(SEED)
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.masks_dir, split="train", segmentation=True)
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, masks_dir=args.masks_dir, split="valid", segmentation=True)
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.masks_dir, split="train", task="segmentation")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, masks_dir=args.masks_dir, split="valid", task="segmentation")
   tt, tv = datasets.get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset = datasets.SegmentationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)

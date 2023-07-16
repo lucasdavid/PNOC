@@ -54,7 +54,6 @@ class COCO14DataSource(base.CustomDataSource):
     images_dir: Optional[str] = None,
     masks_dir: Optional[str] = None,
     sample_ids: Union[str, List[str]] = None,
-    task: Optional[str] = "classification",
   ):
     domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
@@ -64,7 +63,6 @@ class COCO14DataSource(base.CustomDataSource):
       sample_ids=sample_ids,
       domain=domain,
       split=split,
-      task=task,
     )
 
     self.root_dir = root_dir
@@ -80,8 +78,8 @@ class COCO14DataSource(base.CustomDataSource):
     sample_ids = super().get_sample_ids(domain)
     return [_decode_id(_id) for _id in sample_ids if _id]
 
-  def get_info(self):
-    if self.task == "segmentation":
+  def get_info(self, task: str) -> base.DatasetInfo:
+    if task == "segmentation":
       classes = CLASSES
       colors = COLORS
       bg_class = 0

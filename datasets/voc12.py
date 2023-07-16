@@ -36,7 +36,6 @@ class VOC12DataSource(base.CustomDataSource):
     masks_dir: str = None,
     xml_dir: str = None,
     sample_ids: List[str] = None,
-    task: Optional[str] = "classification",
   ):
     super().__init__(
       domain=domain,
@@ -44,20 +43,19 @@ class VOC12DataSource(base.CustomDataSource):
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClass"),
       sample_ids=sample_ids,
-      task=task,
     )
     self.xml_dir = xml_dir or os.path.join(root_dir, 'Annotations/')
     self.root_dir = root_dir
 
   def get_label(self, sample_id) -> np.ndarray:
     _, tags = read_xml(self.xml_dir + sample_id + '.xml')
-    label = [self.info.class_ids[tag] for tag in tags]
-    label = one_hot_embedding(label, len(self.info.classes))
+    label = [self.classification_info.class_ids[tag] for tag in tags]
+    label = one_hot_embedding(label, len(self.classification_info.classes))
 
     return label
 
-  def get_info(self) -> base.DatasetInfo:
-    if self.task == "segmentation":
+  def get_info(self, task: str) -> base.DatasetInfo:
+    if task == "segmentation":
       classes = CLASSES
       colors = COLORS
       bg_class = 0

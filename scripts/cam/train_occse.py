@@ -299,22 +299,19 @@ if __name__ == '__main__':
     # region evaluation
 
     if do_validation:
-      threshold, miou, iou, val_time = priors_validation_step(
-        model, valid_loader, train_dataset.info.classes, THRESHOLDS, DEVICE,
-        args.validate_max_steps, train_dataset.info.bg_class
+      model.eval()
+      metric_results = priors_validation_step(
+        model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
       )
+      metric_results["iteration"] = step + 1
+      model.train()
 
-      if best_train_mIoU == -1 or best_train_mIoU < miou:
-        best_train_mIoU = miou
+      print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-      data = {
-        'iteration': step + 1,
-        'threshold': threshold,
-        'train_mIoU': miou,
-        'best_train_mIoU': best_train_mIoU,
-        'time': val_time,
-      }
-      data_dic['validation'].append(data)
+      if metric_results["miou"] > miou_best:
+        miou_best = metric_results["miou"]
+
+      data_dic['validation'].append(metric_results)
       write_json(data_path, data_dic)
 
       log(
@@ -322,7 +319,7 @@ if __name__ == '__main__':
         'time            = {time:.0f} sec\n'
         'threshold       = {threshold:.2f}\n'
         'train_mIoU      = {train_mIoU:.2f}%\n'
-        'best_train_mIoU = {best_train_mIoU:.2f}%\n'.format(**data)
+        'best_train_mIoU = {best_train_mIoU:.2f}%\n'.format(**metric_results)
       )
 
     # endregion

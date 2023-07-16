@@ -308,8 +308,9 @@ if __name__ == '__main__':
     if do_validation:
       cgnet.eval()
       metric_results = priors_validation_step(
-        cgnet, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        cgnet, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
       )
+      metric_results["iteration"] = step + 1
       cgnet.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})

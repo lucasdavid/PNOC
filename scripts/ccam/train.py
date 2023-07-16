@@ -228,7 +228,7 @@ if __name__ == '__main__':
     # region evaluation
     model.eval()
     with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-      metric_results = saliency_validation_step(model, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE)
+      metric_results = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE)
       metric_results["iteration"] = step + 1
 
     wandb.log({f"val/{k}": v for k, v in metric_results.items()})

@@ -64,7 +64,7 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, segmentation=True)
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, task="segmentation")
   dataset = datasets.PathsDataset(ds)
   print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
 

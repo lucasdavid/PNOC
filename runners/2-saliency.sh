@@ -24,10 +24,10 @@
 # Saliency Detection with C²AM-H.
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+# ENV=sdumont
+# WORK_DIR=$SCRATCH/PuzzleCAM
+ENV=local
+WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
 DATASET=voc12  # Pascal VOC 2012
@@ -44,8 +44,10 @@ IMAGE_SIZE=448
 EPOCHS=10
 BATCH_SIZE=64
 ACCUMULATE_STEPS=2
-MIXED_PRECISION=true
 LABELSMOOTHING=0.1
+
+MIXED_PRECISION=true
+PERFORM_VALIDATION=true
 
 ARCHITECTURE=resnest269
 ARCH=rs269
@@ -53,6 +55,15 @@ DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
 S4_OUT_FEATURES=1024
+
+IMAGE_SIZE=128
+MIN_IMAGE_SIZE=$IMAGE_SIZE
+MAX_IMAGE_SIZE=$IMAGE_SIZE
+ARCH=rn50
+ARCHITECTURE=resnet50
+VALIDATE_MAX_STEPS=16
+EPOCHS=2
+BATCH_SIZE=4
 
 ALPHA=0.25
 HINT_W=1.0
@@ -102,6 +113,8 @@ ccamh_training() {
     --label_smoothing $LABELSMOOTHING \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
+    --validate $PERFORM_VALIDATION \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
     --num_workers $WORKERS_TRAIN \
     --architecture $ARCHITECTURE \
     --stage4_out_features $S4_OUT_FEATURES \
@@ -193,14 +206,13 @@ evaluate_saliency_detection() {
 
 ## Pascal VoC 2012
 ##
-# FG_T=0.4
-# CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-
-
 FG_T=0.4
-CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
+CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+# FG_T=0.4
+# CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
 
 
 ##

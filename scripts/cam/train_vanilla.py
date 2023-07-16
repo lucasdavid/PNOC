@@ -194,8 +194,9 @@ if __name__ == '__main__':
     if do_validation:
       model.eval()
       metric_results = priors_validation_step(
-        model, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
       )
+      metric_results["iteration"] = step + 1
       model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})

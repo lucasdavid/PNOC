@@ -1,45 +1,38 @@
-from typing import Optional
+from typing import Dict, Optional
 
 import cv2
 import numpy as np
 
 
 def accumulate_batch_iou_priors(masks, cams, meters, include_bg: bool = True):
-  for b in range(len(masks)):
-    cam = cams[b]
-    mask = masks[b]
+  for i in range(len(masks)):
+    yi = masks[i]
+    ci = cams[i]
 
-    h, w, c = cam.shape
-    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+    h, w, _ = ci.shape
+    yi = cv2.resize(yi, (w, h), interpolation=cv2.INTER_NEAREST)
 
     for t, meter in meters.items():
-      pred = cam
+      pred = ci
       if include_bg:
-        bg = np.ones_like(cam[:, :, 0]) * t
+        bg = np.ones_like(ci[:, :, 0]) * t
         pred = np.concatenate([bg[..., np.newaxis], pred], axis=-1)
 
       p = np.argmax(pred, axis=-1)
-      meter.add(p, mask)
+      meter.add(p, yi)
 
 
-def accumulate_batch_iou_saliency(masks, ccams, meters, bg_class: int = 0):
+def accumulate_batch_iou_saliency(masks, ccams, meters: Dict[float, "MIoUCalculator"]):
   for i in range(len(masks)):
-    y_i = masks[i]
-    valid_mask = y_i < 255
-    bg_mask = y_i == bg_class
-
-    y_i = np.zeros_like(y_i)
-    y_i[~bg_mask] = 1
-    y_i[~valid_mask] = 255
-
-    ccam_i = ccams[i]
+    yi = masks[i]
+    pi = ccams[i]
 
     for t, meter in meters.items():
-      ccam_b = (ccam_i > t).astype(y_i.dtype)
-      meter.add(ccam_b, y_i)
+      pi_b = (pi > t).astype(yi.dtype)
+      meter.add(pi_b, yi)
 
 
-def maximum_miou_from_thresholds(iou_meters, classes):
+def maximum_miou_from_thresholds(iou_meters: Dict[float, "MIoUCalculator"]):
   th_ = iou_ = None
   miou_ = miou_fg_ = 0.0
 
@@ -49,12 +42,12 @@ def maximum_miou_from_thresholds(iou_meters, classes):
       th_ = th
       miou_ = miou
       miou_fg_ = miou_fg
-      iou_ = [round(iou[c], 2) for c in classes]
+      iou_ = [round(iou[c], 2) for c in meter.class_names]
 
   return {
     "threshold": th_,
-    "miou": miou_,
-    "miou_fg": miou_fg_,
+    "miou": round(miou_, 3),
+    "miou_fg": round(miou_fg_, 3),
     "iou": iou_,
   }
 

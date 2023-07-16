@@ -56,6 +56,8 @@ parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument('--max_epoch', default=10, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument("--mixed_precision", default=False, type=str2bool)
+parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--validate_max_steps', default=None, type=int)
 
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
@@ -118,11 +120,11 @@ if __name__ == '__main__':
   print('[i] {}'.format(TAG))
   print()
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train", task="saliency")
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid", task="saliency")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
-  valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
+  valid_dataset = datasets.SaliencyDataset(vs, transform=tv)
   # TODO: test mixup and cutmix in C2AM
   # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True, drop_last=True)
@@ -222,7 +224,7 @@ if __name__ == '__main__':
       # region logging
 
       do_logging = (step + 1) % step_log == 0
-      do_validation = (step + 1) % step_valid == 0
+      do_validation = args.validate and (step + 1) % step_valid == 0
 
       train_metrics.update(
         {
@@ -261,22 +263,22 @@ if __name__ == '__main__':
       # endregion
 
     # region evaluation
+    if do_validation:
+      model.eval()
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+        metric_results = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE, args.validate_max_steps)
+        metric_results["iteration"] = step + 1
 
-    model.eval()
-    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-      metric_results = saliency_validation_step(model, valid_loader, valid_dataset.info, THRESHOLDS, DEVICE)
-      metric_results["iteration"] = step + 1
+      wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+      print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-    wandb.log({f"val/{k}": v for k, v in metric_results.items()})
-    print(*(f"{metric}={value}" for metric, value in metric_results.items()))
+      if metric_results["miou"] > miou_best:
+        miou_best = metric_results["miou"]
+        for k in ("threshold", "miou", "iou"):
+          wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
-    if metric_results["miou"] > miou_best:
-      miou_best = metric_results["miou"]
-      for k in ("threshold", "miou", "iou"):
-        wandb.run.summary[f"val/best_{k}"] = metric_results[k]
-
-    save_model(model, model_path, parallel=GPUS_COUNT > 1)
-    # endregion
+      save_model(model, model_path, parallel=GPUS_COUNT > 1)
+      # endregion
 
   print(TAG)
   wb_run.finish()

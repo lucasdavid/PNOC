@@ -70,13 +70,13 @@ def priors_validation_step(
   precision, recall, f_score, _ = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average="macro")
   roc = skmetrics.roc_auc_score(targets_, preds_, average="macro")
 
-  results = maximum_miou_from_thresholds(meters, info.classes)
+  results = maximum_miou_from_thresholds(meters)
   results.update({
-    "precision": precision,
-    "recall": recall,
-    "f_score": f_score,
-    "roc_auc": roc,
-    "time": elapsed,
+    "precision": round(100 * precision, 3),
+    "recall": round(100 * recall, 3),
+    "f_score": round(100 * f_score, 3),
+    "roc_auc": round(100 * roc, 3),
+    "time": int(round(elapsed)),
   })
 
   return results
@@ -129,9 +129,9 @@ def segmentation_validation_step(
 def saliency_validation_step(
     model: torch.nn.Module,
     loader: DataLoader,
-    info: DatasetInfo,
     thresholds: List[float],
     device: str,
+    max_steps: Optional[int] = None,
 ):
   start = time.time()
 
@@ -139,7 +139,7 @@ def saliency_validation_step(
   iou_meters = {th: MIoUCalcFromNames(classes, bg_class=0) for th in thresholds}
 
   with torch.no_grad():
-    for _, (_, images, _, masks) in enumerate(loader):
+    for step, (_, images, _, masks) in enumerate(loader):
       B, C, H, W = images.size()
 
       _, _, ccams = model(images.to(device))
@@ -148,11 +148,14 @@ def saliency_validation_step(
       ccams = to_numpy(make_cam(ccams).squeeze())
       masks = to_numpy(masks)
 
-      accumulate_batch_iou_saliency(masks, ccams, iou_meters, bg_class=info.bg_class)
+      accumulate_batch_iou_saliency(masks, ccams, iou_meters)
+
+      if max_steps and step >= max_steps:
+        break
 
   elapsed = time.time() - start
 
-  results = maximum_miou_from_thresholds(iou_meters, classes)
+  results = maximum_miou_from_thresholds(iou_meters)
   results.update({
     "time" : elapsed,
   })

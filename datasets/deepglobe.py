@@ -32,7 +32,6 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     images_dir=None,
     masks_dir: str = None,
     sample_ids: List[str] = None,
-    task: Optional[str] = "classification",
   ):
     super().__init__(
       domain=domain,
@@ -40,7 +39,6 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
       images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
       masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClassAug"),
       sample_ids=sample_ids,
-      task=task,
     )
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
@@ -48,8 +46,8 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
   def get_label(self, sample_id) -> np.ndarray:
     return self.sample_labels[sample_id].astype("float32")
 
-  def get_info(self):
-    if self.task == "segmentation":
+  def get_info(self, task: str) -> base.DatasetInfo:
+    if task == "segmentation":
       void_class = 7
       bg_class = 1  # can I call this pinoptic?
     else:

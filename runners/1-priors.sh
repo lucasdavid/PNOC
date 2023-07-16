@@ -310,26 +310,31 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-# IMAGE_SIZE=512
+# IMAGE_SIZE=128
 # MIN_IMAGE_SIZE=$IMAGE_SIZE
 # MAX_IMAGE_SIZE=$IMAGE_SIZE
+# ARCH=rn50
+# ARCHITECTURE=resnet50
+# VALIDATE_MAX_STEPS=16
+# EPOCHS=2
+# BATCH_SIZE=4
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 EID=r1
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
-# train_vanilla
+train_vanilla
 
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
-LABELSMOOTHING=0.1
-AUGMENT=colorjitter
+# BATCH_SIZE=16
+# ACCUMULATE_STEPS=2
+# LABELSMOOTHING=0.1
+# AUGMENT=colorjitter
 
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
-train_puzzle
+# train_puzzle
 
 TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc

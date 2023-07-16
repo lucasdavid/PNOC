@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--show_every', type=int, default=50)
 
     # Train data
-    parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
+    parser.add_argument('--dataset', default='voc12', choices=["voc12", "coco14"])
     parser.add_argument('--train_root', type=str, default='')
     parser.add_argument('--pseudo_root', type=str, default='')
     parser.add_argument('--train_list', type=str, default='')

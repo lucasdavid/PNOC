@@ -50,7 +50,6 @@ class CustomDataSource(metaclass=ABCMeta):
     split: Optional[str] = None,
     masks_dir: Optional[str] = None,
     sample_ids: Optional[Union[str, List[str]]] = None,
-    task: Optional[str] = "classification",
   ):
     domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
 
@@ -62,18 +61,25 @@ class CustomDataSource(metaclass=ABCMeta):
     self.split = split
     self.domain = domain
     self.sample_ids = np.asarray(sample_ids.split(",") if isinstance(sample_ids, str) else sample_ids)
-    self.task = task or "classification"
 
-  _info: DatasetInfo = None
+  _class_info: DatasetInfo = None
 
   @property
-  def info(self) -> DatasetInfo:
-    if self._info is None:
-      self._info = self.get_info()
-    return self._info
+  def classification_info(self):
+    if self._class_info is None:
+      self._class_info = self.get_info("classification")
+    return self._class_info
+
+  _segm_info: DatasetInfo = None
+
+  @property
+  def segmentation_info(self):
+    if self._segm_info is None:
+      self._segm_info = self.get_info("segmentation")
+    return self._segm_info
 
   @abstractmethod
-  def get_info(self):
+  def get_info(self, task: str) -> DatasetInfo:
     raise NotImplementedError
 
   def __len__(self) -> int:
@@ -104,7 +110,8 @@ class CustomDataSource(metaclass=ABCMeta):
 
       mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
       mask = np.argmax(mask[..., np.newaxis] == self.info.color_ids, axis=-1)
-      mask[mask == self.info.void_class] = 255
+      if self.segmentation_info.void_class is not None:
+        mask[mask == self.segmentation_info.void_class] = 255
       mask = Image.fromarray(mask.astype('uint8'))
 
     return mask
@@ -119,6 +126,7 @@ class CustomDataSource(metaclass=ABCMeta):
 
 class ClassificationDataset(torch.utils.data.Dataset):
 
+  TASK: str = "classification"
   IGNORE_BG_IMAGES: bool = True
 
   def __init__(
@@ -128,9 +136,13 @@ class ClassificationDataset(torch.utils.data.Dataset):
     self.transform = transform
     self.ignore_bg_images = (ignore_bg_images if ignore_bg_images is not None else self.IGNORE_BG_IMAGES)
 
+  _info: DatasetInfo = None
+
   @property
   def info(self) -> DatasetInfo:
-    return self.data_source.info
+    if self._info is None:
+      self._info = self.data_source.get_info(self.TASK)
+    return self._info
 
   def __len__(self) -> int:
     return len(self.data_source)
@@ -156,6 +168,7 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
 class SegmentationDataset(ClassificationDataset):
 
+  TASK: str = "segmentation"
   IGNORE_BG_IMAGES: bool = False
 
   def __getitem__(self, index):
@@ -171,8 +184,22 @@ class SegmentationDataset(ClassificationDataset):
     return sample_id, image, label, mask
 
 
+class SaliencyDataset(SegmentationDataset):
+
+  TASK: str = "segmentation"
+  IGNORE_BG_IMAGES: bool = False
+
+  def __getitem__(self, index):
+    sample_id, image, label, mask = super().__getitem__(index)
+
+    mask = (mask != self.info.bg_class).astype("int8")
+
+    return sample_id, image, label, mask
+
+
 class PathsDataset(ClassificationDataset):
 
+  TASK: str = "segmentation"
   IGNORE_BG_IMAGES: bool = False
 
   def __getitem__(self, index):
@@ -186,6 +213,7 @@ class PathsDataset(ClassificationDataset):
 
 class AffinityDataset(SegmentationDataset):
 
+  TASK: str = "segmentation"
   IGNORE_BG_IMAGES: bool = True
 
   def __init__(self, path_index, **kwargs):
@@ -205,6 +233,7 @@ class AffinityDataset(SegmentationDataset):
 
 class CAMsDataset(ClassificationDataset):
 
+  TASK: str = "segmentation"
   IGNORE_BG_IMAGES: bool = True
 
   def __getitem__(self, index):
