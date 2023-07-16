@@ -63,11 +63,12 @@ normalize_fn = Normalize(*datasets.imagenet_stats())
 def run(args):
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
-  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+  info = ds.classification_info
+  print(f'{TAG} dataset={args.dataset} num_classes={info.num_classes}')
 
   model = Classifier(
     args.architecture,
-    dataset.info.num_classes,
+    info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
     regularization=args.regularization,

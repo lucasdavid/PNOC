@@ -190,8 +190,18 @@ def do_python_eval(dataset, classes, num_workers=8):
   return loglist
 
 
-def run(args, dataset):
-  classes = ["background"] + dataset.info.classes.tolist()
+def run(args, dataset: datasets.PathsDataset):
+  classes = dataset.info.classes.tolist()
+  include_bg = dataset.info.bg_class is None
+  if include_bg:
+    classes = ["background"] + classes
+  bg_class = dataset.info.bg_class or 0
+  bg_class = classes[bg_class]
+
+  if dataset.info.void_class is not None:
+    try: classes.pop(dataset.info.void_class)
+    except IndexError: ...
+
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 
@@ -222,7 +232,7 @@ def run(args, dataset):
         "evaluation/t": t,
         "evaluation/miou": r["mIoU"],
         "evaluation/miou_fg": r["miou_foreground"],
-        "evaluation/miou_bg": r["background"],
+        "evaluation/miou_bg": r[bg_class],
         "evaluation/fp": r["fp_all"],
         "evaluation/fn": r["fn_all"],
         "evaluation/iou": wandb.Table(columns=columns, data=report_iou)

@@ -130,18 +130,21 @@ class ClassificationDataset(torch.utils.data.Dataset):
   IGNORE_BG_IMAGES: bool = True
 
   def __init__(
-    self, data_source: CustomDataSource, transform: transforms.Compose = None, ignore_bg_images: bool = None
+    self, data_source: CustomDataSource, transform: transforms.Compose = None,
+    ignore_bg_images: bool = None,
+    task: Optional[str] = None,
   ):
     self.data_source = data_source
     self.transform = transform
     self.ignore_bg_images = (ignore_bg_images if ignore_bg_images is not None else self.IGNORE_BG_IMAGES)
+    self.task = task or self.TASK
 
   _info: DatasetInfo = None
 
   @property
   def info(self) -> DatasetInfo:
     if self._info is None:
-      self._info = self.data_source.get_info(self.TASK)
+      self._info = self.data_source.get_info(self.task)
     return self._info
 
   def __len__(self) -> int:

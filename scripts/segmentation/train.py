@@ -91,8 +91,8 @@ if __name__ == '__main__':
 
   set_seed(SEED)
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.masks_dir, split="train", task="segmentation")
-  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, masks_dir=args.masks_dir, split="valid", task="segmentation")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.masks_dir, split="train")
+  vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, masks_dir=args.masks_dir, split="valid")
   tt, tv = datasets.get_segmentation_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
   train_dataset = datasets.SegmentationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
@@ -193,10 +193,7 @@ if __name__ == '__main__':
 
       model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-        miou, iou, val_time = segmentation_validation_step(
-          model, valid_loader, train_dataset.info.classes, DEVICE, train_dataset.info.bg_class,
-          log_samples=log_samples,
-        )
+        miou, iou, val_time = segmentation_validation_step(model, valid_loader, train_dataset.info, DEVICE, log_samples)
       model.train()
 
       if miou_best < miou:

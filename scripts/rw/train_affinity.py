@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 import datasets
 import wandb
+from core.aff_utils import PathIndex
 from core.networks import *
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *

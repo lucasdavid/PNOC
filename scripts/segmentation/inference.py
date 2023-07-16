@@ -64,16 +64,17 @@ def run(args):
 
   scales = [float(scale) for scale in args.scales.split(',')]
 
-  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain, task="segmentation")
+  ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds)
-  print(f'{TAG} dataset={args.dataset} num_classes={dataset.info.num_classes}')
+  info = ds.segmentation_info
+  print(f'{TAG} dataset={args.dataset} num_classes={info.num_classes}')
 
   normalize_fn = Normalize(*datasets.imagenet_stats())
 
   # Network
   model = DeepLabV3Plus(
     model_name=args.backbone,
-    num_classes=dataset.info.num_classes,
+    num_classes=info.num_classes,
     mode=args.mode,
     use_group_norm=args.use_gn,
   )
