@@ -24,10 +24,10 @@
 # Saliency Detection with C²AM-H.
 #
 
-# ENV=sdumont
-# WORK_DIR=$SCRATCH/PuzzleCAM
-ENV=local
-WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+ENV=sdumont
+WORK_DIR=$SCRATCH/PuzzleCAM
+# ENV=local
+# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
 
 # Dataset
 DATASET=voc12  # Pascal VOC 2012
@@ -56,14 +56,14 @@ TRAINABLE_STEM=true
 MODE=normal
 S4_OUT_FEATURES=1024
 
-IMAGE_SIZE=128
-MIN_IMAGE_SIZE=$IMAGE_SIZE
-MAX_IMAGE_SIZE=$IMAGE_SIZE
-ARCH=rn50
-ARCHITECTURE=resnet50
-VALIDATE_MAX_STEPS=16
-EPOCHS=2
-BATCH_SIZE=4
+# IMAGE_SIZE=128
+# MIN_IMAGE_SIZE=$IMAGE_SIZE
+# MAX_IMAGE_SIZE=$IMAGE_SIZE
+# ARCH=rn50
+# ARCHITECTURE=resnet50
+# VALIDATE_MAX_STEPS=16
+# EPOCHS=2
+# BATCH_SIZE=4
 
 ALPHA=0.25
 HINT_W=1.0
