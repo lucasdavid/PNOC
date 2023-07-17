@@ -44,6 +44,9 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument("--first_epoch", default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
+parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
 parser.add_argument('--validate_max_steps', default=None, type=int)
 parser.add_argument('--validate_thresholds', default=None, type=str)
@@ -139,7 +142,8 @@ if __name__ == '__main__':
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
-  optimizer = get_optimizer(args.lr, args.wd, step_max, param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups)
+  scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
   log_opt_params("Vanilla", param_groups)
 
   # Train
@@ -150,16 +154,19 @@ if __name__ == '__main__':
   for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
     _, images, labels = train_iterator.get()
 
-    optimizer.zero_grad()
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+      logits = model(images.to(DEVICE))
 
-    logits = model(images.to(DEVICE))
+      labels = label_smoothing(labels, args.label_smoothing)
+      class_loss = class_loss_fn(logits, labels.to(DEVICE)).mean()
+      loss = class_loss
 
-    labels = label_smoothing(labels, args.label_smoothing)
-    class_loss = class_loss_fn(logits, labels.to(DEVICE)).mean()
-    loss = class_loss
+    scaler.scale(loss).backward()
 
-    loss.backward()
-    optimizer.step()
+    if (step + 1) % args.accumulate_steps == 0:
+      scaler.step(optimizer)
+      scaler.update()
+      optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     train_meter.update({'loss': loss.item(), 'class_loss': class_loss.item()})
 
@@ -193,9 +200,10 @@ if __name__ == '__main__':
 
     if do_validation:
       model.eval()
-      metric_results = priors_validation_step(
-        model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
-      )
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+        metric_results = priors_validation_step(
+          model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        )
       metric_results["iteration"] = step + 1
       model.train()
 

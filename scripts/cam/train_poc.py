@@ -307,9 +307,10 @@ if __name__ == '__main__':
 
     if do_validation:
       cgnet.eval()
-      metric_results = priors_validation_step(
-        cgnet, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
-      )
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+        metric_results = priors_validation_step(
+          cgnet, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        )
       metric_results["iteration"] = step + 1
       cgnet.train()
 

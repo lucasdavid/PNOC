@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J coco-p
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-coco-p.out
+#SBATCH -J priors
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
 #SBATCH --time=96:00:00
 
 # Copyright 2023 Lucas Oliveira David
@@ -24,14 +24,17 @@
 # Train a model to perform multilabel classification over a WSSS dataset.
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+if [[ "`hostname`" == "sdumont"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/PuzzleCAM
+else
+  ENV=local
+  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+fi
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
-DATASET=coco14  # MS COCO 2014
+DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
@@ -42,17 +45,18 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ### Priors
-ARCH=rs269
-ARCHITECTURE=resnest269
+ARCH=rs50
+ARCHITECTURE=resnest50
 TRAINABLE_STEM=true
 DILATED=false
-MODE=normal
+MODE=fix  # normal
 REGULAR=none
 
 # Training
 # LR=0.1  # defined in dataset.sh
 EPOCHS=15
-BATCH_SIZE=32
+BATCH_SIZE=16
+ACCUMULATE_STEPS=2
 
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
@@ -107,6 +111,8 @@ train_vanilla() {
     --tag $TAG_VANILLA \
     --lr $LR \
     --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \

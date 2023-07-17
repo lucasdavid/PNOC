@@ -24,10 +24,10 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=$HOME/workspace/repos/research/pnoc
+# ENV=sdumont
+# WORK_DIR=$SCRATCH/PuzzleCAM
+ENV=local
+WORK_DIR=$HOME/workspace/repos/research/pnoc
 
 # Dataset
 # DATASET=voc12  # Pascal VOC 2012
@@ -52,10 +52,6 @@ MODE=fix
 # LR=0.007  # voc12
 # LR=0.004  # coco14
 LR=0.01  # deepglobe
-
-IMAGE_SIZE=320
-MIN_IMAGE_SIZE=$IMAGE_SIZE
-MAX_IMAGE_SIZE=$IMAGE_SIZE
 
 EPOCHS=50
 
@@ -83,7 +79,7 @@ segm_training() {
   echo "Semantic Segmentation Training $TAG"
   echo "================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING,aug:$AUGMENT" \
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING,aug:$AUGMENT,mode:$MODE" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/segmentation/train.py \
@@ -183,17 +179,29 @@ MASKS_DIR=""
 # region Deep-Globe Land Cover
 ## LR and augmentation search
 ## ==========================
-# MODE=normal
+
 MODE=fix
-# LRS="0.1 0.01 0.001"
+AUGMENT=clahe_cutmix
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
+segm_training
+
+LR=0.001
 AUGMENTS="none clahe clahe_cutmix"
 
-# for LR in $LRS; do
-LR=0.01
 for AUGMENT in $AUGMENTS; do
   TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
   segm_training
 done
-# done
+
+MODE=normal
+LRS="0.1 0.01 0.001"
+AUGMENTS="none clahe clahe_cutmix"
+
+for LR in $LRS; do
+  for AUGMENT in $AUGMENTS; do
+    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
+    segm_training
+  done
+done
 
 # endregion
