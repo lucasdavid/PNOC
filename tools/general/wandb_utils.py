@@ -10,8 +10,6 @@ def setup(name, config, job_type="train", tags=None):
   wb_run = wandb.init(
     name=name,
     job_type=job_type,
-    entity="lerdl",
-    project="research-wsss",
     config=config,
     tags=tags,
   )

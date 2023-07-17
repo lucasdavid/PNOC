@@ -39,6 +39,7 @@ DATASET=voc12  # Pascal VOC 2012
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
+. $WORK_DIR/runners/config/wandb.sh
 
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
