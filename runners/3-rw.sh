@@ -50,6 +50,10 @@ LR=0.1
 # Infrastructure
 MIXED_PRECISION=true # false
 
+CRF_T=1
+CRF_GT=0.7
+
+
 rw_make_affinity_labels() {
   echo "=================================================================="
   echo "[rw make affinity labels] started at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -162,43 +166,32 @@ rw_training
 ##
 RW_BETA=10
 RW_EXP=8
+PARAMS="beta=$RW_BETA@exp_times=$RW_EXP@rw"
 
-DOMAIN=train_aug # train2014 for COCO14
-rw_inference
-DOMAIN=val
-rw_inference
+DOMAIN=$DOMAIN_TRAIN     rw_inference
+DOMAIN=$DOMAIN_VALID_SEG rw_inference
 
 CRF_T=1
 MIN_TH=0.05
 MAX_TH=0.81
 
-DOMAIN=train
-RW_MASKS=$AFF_TAG@$DOMAIN@beta=$RW_BETA@exp_times=$RW_EXP@rw
-W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,crf:$CRF_T-$CRF_GT"
-run_evaluation
-
-DOMAIN=val
-RW_MASKS=$AFF_TAG@$DOMAIN@beta=$RW_BETA@exp_times=$RW_EXP@rw
+## 3.4. Evaluate Refined Pseudo Masks (Optional)
+##
+DOMAIN=$DOMAIN_VALID
+RW_MASKS=$AFF_TAG@$DOMAIN@$PARAMS
 W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,crf:$CRF_T-$CRF_GT"
 run_evaluation
 
 ## 3.4 Make Pseudo Masks
 ##
 
-PRIORS_TAG=ra-oc-p-poc-pnoc-avg
-# PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
+THRESHOLD=0.3  # May need adjustment (Default in OC-CSE, AffinityNet, Puzzle, ...)
 
-THRESHOLD=0.3
-CRF_T=1
-CRF_GT=0.9
-
-AFF_TAG=rw/$DATASET-an@ccamh@$PRIORS_TAG
-
-DOMAIN=$DOMAIN_TRAIN RW_MASKS=$AFF_TAG@train@beta=10@exp_times=8@rw make_pseudo_labels
-DOMAIN=$DOMAIN_VALID RW_MASKS=$AFF_TAG@val@beta=10@exp_times=8@rw make_pseudo_labels
+DOMAIN=$DOMAIN_TRAIN     RW_MASKS=$AFF_TAG@train@$PARAMS             make_pseudo_labels
+DOMAIN=$DOMAIN_VALID_SEG RW_MASKS=$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS make_pseudo_labels
 
 # Move everything (train/val) into a single folder.
-RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@beta=10@exp_times=8@rw@crf=$CRF_T
-mv ./experiments/predictions/$AFF_TAG@train@beta=10@exp_times=8@rw@crf=$CRF_T $RW_MASKS_DIR
-mv ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T/* $RW_MASKS_DIR/
-rm -r ./experiments/predictions/$AFF_TAG@val@beta=10@exp_times=8@rw@crf=$CRF_T
+RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@$PARAMS@crf=$CRF_T
+mv ./experiments/predictions/$AFF_TAG@train@$PARAMS@crf=$CRF_T $RW_MASKS_DIR
+mv ./experiments/predictions/$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS@crf=$CRF_T/* $RW_MASKS_DIR/
+rm -r ./experiments/predictions/$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS@crf=$CRF_T
