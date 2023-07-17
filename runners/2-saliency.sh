@@ -24,10 +24,13 @@
 # Saliency Detection with C²AM-H.
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+if [[ "`hostname`" == "sdumont"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/PuzzleCAM
+else
+  ENV=local
+  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+fi
 
 # Dataset
 DATASET=voc12  # Pascal VOC 2012
@@ -56,14 +59,14 @@ TRAINABLE_STEM=true
 MODE=normal
 S4_OUT_FEATURES=1024
 
-# IMAGE_SIZE=128
+# IMAGE_SIZE=224
 # MIN_IMAGE_SIZE=$IMAGE_SIZE
 # MAX_IMAGE_SIZE=$IMAGE_SIZE
 # ARCH=rn50
 # ARCHITECTURE=resnet50
 # VALIDATE_MAX_STEPS=16
 # EPOCHS=2
-# BATCH_SIZE=4
+# BATCH_SIZE=16
 
 ALPHA=0.25
 HINT_W=1.0
@@ -79,6 +82,10 @@ CRF_GT_PROB=0.7
 DOMAIN=$DOMAIN_TRAIN
 
 ccam_training() {
+  echo "=================================================================="
+  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
   CUDA_VISIBLE_DEVICES=0,1,2,3 \
     WANDB_TAGS="$DATASET,$ARCH,ccam" \
     WANDB_TAGS="ccam,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,lr:$LR" \
@@ -102,6 +109,10 @@ ccam_training() {
 }
 
 ccamh_training() {
+  echo "=================================================================="
+  echo "[train $CCAMH_TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
   WANDB_TAGS="ccamh,amp,$DATASET,$ARCH,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,fg:$FG_T,ls:$LABELSMOOTHING,lr:$LR" \
     CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/train_hints.py \
     --tag $CCAMH_TAG \
@@ -130,6 +141,10 @@ ccamh_training() {
 }
 
 ccamh_inference() {
+  echo "=================================================================="
+  echo "[inference $CCAMH_TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
   WEIGHTS=imagenet
   PRETRAINED=./experiments/models/$CCAMH_TAG.pth
 
@@ -148,6 +163,9 @@ ccamh_inference() {
 }
 
 ccamh_pseudo_masks_crf() {
+  echo "=================================================================="
+  echo "[pseudo masks dCRF $CCAMH_TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
   $PY scripts/ccam/inference_crf.py \
     --experiment_name $CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 \
     --dataset $DATASET \
@@ -206,13 +224,13 @@ evaluate_saliency_detection() {
 
 ## Pascal VoC 2012
 ##
-FG_T=0.4
-CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-
 # FG_T=0.4
-# CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
+# CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
+# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
+
+FG_T=0.4
+CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
 
 
 ##

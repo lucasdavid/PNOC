@@ -101,26 +101,15 @@ if __name__ == '__main__':
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
-  log_dir = create_directory('./experiments/logs/')
-  data_dir = create_directory('./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-
-  log_path = log_dir + f'{TAG}.txt'
-  data_path = data_dir + f'{TAG}.json'
   model_path = model_dir + f'{TAG}.pth'
-  cam_path = f'./experiments/images/{TAG}'
-  create_directory(cam_path)
-  create_directory(cam_path + '/train')
-  create_directory(cam_path + '/test')
-  create_directory(cam_path + '/train/colormaps')
-  create_directory(cam_path + '/test/colormaps')
 
   set_seed(args.seed)
 
   print('[i] {}'.format(TAG))
   print()
 
-  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
+  ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.cams_dir, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
   train_dataset = datasets.CAMsDataset(ts, transform=tt)
@@ -178,8 +167,6 @@ if __name__ == '__main__':
   train_metrics = MetricsContainer(['loss', 'positive_loss', 'negative_loss', 'hint_loss'])
 
   for epoch in range(args.max_epoch):
-    model.train()
-
     for step, (_, images, _, cam_hints) in enumerate(tqdm(train_loader, f"Epoch {epoch}", mininterval=2.0)):
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
 
@@ -237,7 +224,7 @@ if __name__ == '__main__':
 
       if do_logging:
         ccams = torch.sigmoid(ccams).cpu().float()
-        visualize_heatmap(TAG, images.clone().detach(), ccams, 0, step)
+        # visualize_heatmap(TAG, images.clone().detach(), ccams, 0, step)
         loss, positive_loss, negative_loss, loss_h = train_metrics.get(clear=True)
         lr = float(get_learning_rate_from_optimizer(optimizer))
 
@@ -268,6 +255,7 @@ if __name__ == '__main__':
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         metric_results = saliency_validation_step(model, valid_loader, THRESHOLDS, DEVICE, args.validate_max_steps)
         metric_results["iteration"] = step + 1
+      model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))

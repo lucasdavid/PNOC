@@ -53,7 +53,7 @@ MODE=fix  # normal
 REGULAR=none
 
 # Training
-# LR=0.1  # defined in dataset.sh
+LR=0.01  # defined in dataset.sh
 EPOCHS=15
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
