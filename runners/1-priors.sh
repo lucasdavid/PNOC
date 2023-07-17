@@ -63,6 +63,7 @@ MIXED_PRECISION=true
 PERFORM_VALIDATION=true
 
 ## Augmentation
+AUGMENT=randaugment  # collorjitter_mixup_cutmix_cutormixup
 CUTMIX=0.5
 MIXUP=1.0
 LABELSMOOTHING=0
