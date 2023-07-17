@@ -45,18 +45,18 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ### Priors
-ARCH=rs50
-ARCHITECTURE=resnest50
+ARCH=rs269
+ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
 DILATED=false
-MODE=fix  # normal
+MODE=normal
 REGULAR=none
 
 # Training
-LR=0.01  # defined in dataset.sh
+# LR=0.1  # defined in dataset.sh
 EPOCHS=15
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
+BATCH_SIZE=32
+ACCUMULATE_STEPS=1
 
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
@@ -319,11 +319,11 @@ evaluate_priors() {
 # IMAGE_SIZE=128
 # MIN_IMAGE_SIZE=$IMAGE_SIZE
 # MAX_IMAGE_SIZE=$IMAGE_SIZE
-# ARCH=rn50
-# ARCHITECTURE=resnet50
+# ARCH=rs101
+# ARCHITECTURE=resnest101
 # VALIDATE_MAX_STEPS=16
 # EPOCHS=2
-# BATCH_SIZE=4
+# BATCH_SIZE=32
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
