@@ -109,7 +109,7 @@ class CustomDataSource(metaclass=ABCMeta):
         mask = np.array(mask)
 
       mask = mask[..., 0] * 256**2 + mask[..., 1] * 256 + mask[..., 2]
-      mask = np.argmax(mask[..., np.newaxis] == self.info.color_ids, axis=-1)
+      mask = np.argmax(mask[..., np.newaxis] == self.segmentation_info.color_ids, axis=-1)
       if self.segmentation_info.void_class is not None:
         mask[mask == self.segmentation_info.void_class] = 255
       mask = Image.fromarray(mask.astype('uint8'))
