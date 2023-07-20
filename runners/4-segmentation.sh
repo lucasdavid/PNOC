@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J dg-segm
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dg-segm.out
-#SBATCH --time=24:00:00
+#SBATCH -J segm
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-segm.out
+#SBATCH --time=48:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -24,15 +24,18 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-# ENV=sdumont
-# WORK_DIR=$SCRATCH/PuzzleCAM
-ENV=local
-WORK_DIR=$HOME/workspace/repos/research/pnoc
+if [[ "`hostname`" == "sdumont"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/pnoc
+else
+  ENV=local
+  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+fi
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -41,17 +44,15 @@ cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
 # Architecture
-# ARCH=rs269
-# ARCHITECTURE=resnest269
-ARCH=rs101
-ARCHITECTURE=resnest101
+ARCH=rs269
+ARCHITECTURE=resnest269
 GROUP_NORM=true
 DILATED=false
-MODE=fix
+MODE=normal  # fix
 
-# LR=0.007  # voc12
+LR=0.007  # voc12
 # LR=0.004  # coco14
-LR=0.01  # deepglobe
+# LR=0.01  # deepglobe
 
 EPOCHS=50
 
@@ -135,6 +136,7 @@ evaluate_masks() {
     WANDB_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT" \
     $PY scripts/evaluate.py \
     --experiment_name $TAG \
+    --pred_dir $SEGM_PRED_DIR \
     --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
@@ -150,58 +152,27 @@ evaluate_masks() {
 ##
 
 LABELSMOOTHING=0.1
+AUGMENT=none  # colorjitter_randaug_cutmix_mixup_cutormixup
 
 ## For supervised segmentation:
 PRIORS_TAG=sup
 MASKS_DIR=""
 
 ## For custom masks (pseudo masks from WSSS):
-# PRIORS_TAG=pnoc-ccamh-rw
-# MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc@beta=10@exp_times=8@rw@crf=$CRF_T
+PRIORS_TAG=pnoc-rals-r4-ccamh-rw
+MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
-# AUGMENT=none  # colorjitter_randaug_cutmix_mixup_cutormixup
-
-# TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$PRIORS_TAG
-# segm_training
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$MODE-$PRIORS_TAG
+segm_training
 
 ## 4.2 DeepLabV3+ Inference
 ##
-
-# CRF_T=1 DOMAIN=$DOMAIN_TRAIN     SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
-# CRF_T=1 DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
-# CRF_T=1 DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1 segm_inference
+SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=1
+CRF_T=1 DOMAIN=$DOMAIN_VALID     segm_inference
+CRF_T=1 DOMAIN=$DOMAIN_VALID_SEG segm_inference
+CRF_T=1 DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=1 segm_inference
 
 ## 4.3. Evaluation
 ##
 
-# DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks
-
-# region Deep-Globe Land Cover
-## LR and augmentation search
-## ==========================
-
-MODE=fix
-AUGMENT=clahe_cutmix
-TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
-segm_training
-
-LR=0.001
-AUGMENTS="none clahe clahe_cutmix"
-
-for AUGMENT in $AUGMENTS; do
-  TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
-  segm_training
-done
-
-MODE=normal
-LRS="0.1 0.01 0.001"
-AUGMENTS="none clahe clahe_cutmix"
-
-for LR in $LRS; do
-  for AUGMENT in $AUGMENTS; do
-    TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$AUGMENT-sup
-    segm_training
-  done
-done
-
-# endregion
+DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks

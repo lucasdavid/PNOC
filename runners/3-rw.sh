@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J tr-aff
-#SBATCH -o /scratch/lerdl/lucas.david/logs/aff-%j.out
+#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-aff.out
 #SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
@@ -24,15 +24,18 @@
 # Random Walk.
 #
 
-ENV=sdumont
-WORK_DIR=$SCRATCH/PuzzleCAM
-# ENV=local
-# WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+if [[ "`hostname`" == "sdumont"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/pnoc
+else
+  ENV=local
+  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+fi
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
-DATASET=deepglobe # DeepGlobe Land Cover Classification
+# DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -52,16 +55,15 @@ MIXED_PRECISION=true # false
 CRF_T=1
 CRF_GT=0.7
 
-
 rw_make_affinity_labels() {
   echo "=================================================================="
   echo "[rw make affinity labels] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  $PY scripts/rw/rw_make_affinity_labels.py \
+  $PY scripts/rw/make_affinity_labels.py \
     --tag $AFF_LABELS_TAG \
     --dataset $DATASET \
-    --domain $DOMAIN \
+    --domain $DOMAIN_TRAIN \
     --fg_threshold $FG \
     --bg_threshold $BG \
     --crf_t $CRF_T \
@@ -141,13 +143,13 @@ run_evaluation() {
 
 ## 3.1 Make Affinity Labels
 ##
-# PRIORS_TAG=ra-oc-p-poc-pnoc-avg
-PRIORS_TAG=ra-oc-p-poc-pnoc-learned-a0.25
+
+PRIORS_TAG=rs269-pnoc-ls-r4@rs269-rals
 W_GROUP=$DATASET-$PRIORS_TAG
 
-CAMS_DIR=./experiments/predictions/ensemble/$PRIORS_TAG
-SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269@$PRIORS_TAG
-FG=0.30
+CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269-fg0.4@rw269pnoc@rs269-rals
+FG=0.40
 BG=0.10
 CRF_T=10
 CRF_GT=0.7
@@ -167,7 +169,9 @@ RW_BETA=10
 RW_EXP=8
 PARAMS="beta=$RW_BETA@exp_times=$RW_EXP@rw"
 
-DOMAIN=$DOMAIN_TRAIN     rw_inference
+# DOMAIN=$DOMAIN_TRAIN     rw_inference
+# DOMAIN=$DOMAIN_VALID     rw_inference
+CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@$DOMAIN_VALID_SEG@scale=0.5,1.0,1.5,2.0
 DOMAIN=$DOMAIN_VALID_SEG rw_inference
 
 CRF_T=1
@@ -176,15 +180,15 @@ MAX_TH=0.81
 
 ## 3.4. Evaluate Refined Pseudo Masks (Optional)
 ##
-DOMAIN=$DOMAIN_VALID
+DOMAIN=$DOMAIN_VALID_SEG
 RW_MASKS=$AFF_TAG@$DOMAIN@$PARAMS
-W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ensemble,ccamh,rw,crf:$CRF_T-$CRF_GT"
+W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,crf:$CRF_T-$CRF_GT"
 run_evaluation
 
 ## 3.4 Make Pseudo Masks
 ##
 
-THRESHOLD=0.3  # May need adjustment (Default in OC-CSE, AffinityNet, Puzzle, ...)
+THRESHOLD=0.3  # May need adjustment (Default in OC-CSE, AffinityNet, Puzzle...)
 
 DOMAIN=$DOMAIN_TRAIN     RW_MASKS=$AFF_TAG@train@$PARAMS             make_pseudo_labels
 DOMAIN=$DOMAIN_VALID_SEG RW_MASKS=$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS make_pseudo_labels

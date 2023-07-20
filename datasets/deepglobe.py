@@ -6,8 +6,8 @@ import numpy as np
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'deepglobe')
-CLASSES = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown']
-COLORS = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0]]
+CLASSES = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown', "void"]
+COLORS = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [127, 127, 127]]
 
 
 class DeepGlobeLandCoverDataSource(base.CustomDataSource):
@@ -22,7 +22,7 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
   @classmethod
   def _load_labels_from_npy(cls):
     filepath = os.path.join(DATA_DIR, 'cls_labels_unbalanced.npy')
-    return np.load(filepath, allow_pickle=True).item()
+    return {k: v.astype("float32") for k, v in np.load(filepath, allow_pickle=True).item().items()}
 
   def __init__(
     self,
@@ -43,20 +43,29 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
 
-  def get_label(self, sample_id) -> np.ndarray:
-    return self.sample_labels[sample_id].astype("float32")
+  def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
+    label = self.sample_labels[sample_id]
+
+    if task == "segmentation":
+      label = np.concatenate((label, [0.]))  # Add void class.
+
+    return label
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
+      classes = CLASSES
+      colors = COLORS
       void_class = 7
       bg_class = 1  # can I call this pinoptic?
     else:
+      classes = CLASSES[:-1]
+      colors = COLORS[:-1]
       void_class = None
       bg_class = 1
 
     return base.DatasetInfo(
-      classes=CLASSES,
-      colors=COLORS,
+      classes=classes,
+      colors=colors,
       bg_class=bg_class,
       void_class=void_class,
     )

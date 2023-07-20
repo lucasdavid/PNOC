@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.label_dir, split="train")
   tt = datasets.get_affinity_transforms(args.min_image_size, args.max_image_size, args.image_size)
-  train_dataset = datasets.AffinityDataset(ts, path_index=path_index, transform=tt)
+  train_dataset = datasets.AffinityDataset(data_source=ts, path_index=path_index, transform=tt)
 
   train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
   train_iterator = datasets.Iterator(train_loader)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
   torch.autograd.set_detect_anomaly(True)
 
   for step in range(step_init, step_max):
-    images, labels = train_iterator.get()
+    _, images, _, labels = train_iterator.get()
 
     images = images.to(DEVICE)
 

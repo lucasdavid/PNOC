@@ -26,7 +26,7 @@
 
 if [[ "`hostname`" == "sdumont"* ]]; then
   ENV=sdumont
-  WORK_DIR=$SCRATCH/PuzzleCAM
+  WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
   WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
@@ -59,20 +59,11 @@ TRAINABLE_STEM=true
 MODE=normal
 S4_OUT_FEATURES=1024
 
-# IMAGE_SIZE=224
-# MIN_IMAGE_SIZE=$IMAGE_SIZE
-# MAX_IMAGE_SIZE=$IMAGE_SIZE
-# ARCH=rn50
-# ARCHITECTURE=resnet50
-# VALIDATE_MAX_STEPS=16
-# EPOCHS=2
-# BATCH_SIZE=16
-
 ALPHA=0.25
 HINT_W=1.0
 LR=0.001
 
-FG_T=0.3
+FG_T=0.4
 # BG_T=0.1
 
 INF_FG_T=0.2
@@ -207,7 +198,7 @@ poolnet_inference() {
 }
 
 evaluate_saliency_detection() {
-  WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh,pn" \
+  WANDB_TAGS="$DATASET,domain:$DOMAIN,ccamh" \
     $PY scripts/ccam/evaluate.py \
     --experiment_name "$TAG" \
     --dataset $DATASET \
@@ -219,31 +210,27 @@ evaluate_saliency_detection() {
     --crf_t $CRF_T \
     --crf_gt_prob $CRF_GT_PROB \
     --data_dir $DATA_DIR \
-    --num_workers $WORKERS_INFER
+    --num_workers $WORKERS_INFER;
 }
 
+## ================================================
 ## Pascal VoC 2012
-##
-# FG_T=0.4
-# CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-ls0.1-ow0.0-1.0-1.0-cams-0.2-octis1-amp@rs269ra-r3@train@scale=0.5,1.0,1.5,2.0
-# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rw269pnoc@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-
-FG_T=0.4
 CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE-r4@rw269pnoc@rs269-rals
-
-
+PRIORS_TAG=rw269pnoc-r4@rs269-rals
 ##
 ## ================================================
-
 ## MS COCO 2014
 ##
 # FG_T=0.3
 # LR=0.0005
-# CAMS_DIR=experiments/predictions/pnoc/coco14-rs269-pnoc-b16-a2-lr0.05-ls0-ow0.0-1.0-1.0-c0.2-is1@rs269ra-r1@train@scale=0.5,1.0,1.5,2.0
-# CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH@rs269pnoc-lr0.05@rs269@b$BATCH_SIZE-fg$FG_T-lr$LR-b$BATCH_SIZE
-##
+# CAMS_DIR=experiments/predictions/pnoc/coco-rs269-pnoc-b16-lr0.05-ls@rs269-lsra-r1@train@scale=0.5,1.0,1.5,2.0
+# PRIORS_TAG=rw269pnoc-r1@rs269-rals
 ## ================================================
+
+FG_T=0.3
+
+CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
+PN_TAG=$DATASET-pn@ccamh-rs269-fg$FG_T@rw269pnoc@rs269-rals
 
 ccamh_training
 ccamh_inference
@@ -252,17 +239,22 @@ ccamh_pseudo_masks_crf
 ## PoolNet Training and Inference
 ## ==============================
 
+PN_CKPT=$WORK_DIR/poolnet/results/run-2/models/epoch_9.pth
+
+SAL_PRIORS_DIR=$WORK_DIR/experiments/predictions/$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0@t=$INF_FG_T@crf=$CRF_T
+
 poolnet_training
 poolnet_inference
 
-PN_CKPT=$WORK_DIR/poolnet/results/run-0/models/epoch_9.pth
 cp $PN_CKPT $WORK_DIR/experiments/models/saliency/$PN_TAG.pth
+
 mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
 
 ## Evaluation
 ## ==============================
 
 CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_saliency_detection
+
 CRF_T=0 TAG=saliency/$PN_TAG evaluate_saliency_detection
 
 ##

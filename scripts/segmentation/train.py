@@ -150,12 +150,12 @@ if __name__ == '__main__':
   # torch.autograd.set_detect_anomaly(True)
 
   for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0):
-    _, images, _, targets = train_iterator.get()
-    images, targets = images.to(DEVICE), targets.to(DEVICE)
+    _, images, _, masks = train_iterator.get()
+    images, masks = images.to(DEVICE), masks.to(DEVICE)
 
     with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
       logits = model(images)
-      loss = class_loss_fn(logits, targets)
+      loss = class_loss_fn(logits, masks)
 
     scaler.scale(loss / args.accumulate_steps).backward()
 
@@ -193,28 +193,18 @@ if __name__ == '__main__':
 
       model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-        miou, iou, val_time = segmentation_validation_step(model, valid_loader, train_dataset.info, DEVICE, log_samples)
+        metric_results = segmentation_validation_step(model, valid_loader, train_dataset.info, DEVICE, log_samples)
+      metric_results["iteration"] = step + 1
       model.train()
 
-      if miou_best < miou:
-        miou_best = miou
-        wandb.run.summary['val/best_miou'] = miou
-        wandb.run.summary['val/best_iou'] = iou
+      wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+      print(*(f"{metric}={value}" for metric, value in metric_results.items()))
+
+      if metric_results["miou"] > miou_best:
+        miou_best = metric_results["miou"]
+        for k in ("miou", "iou"):
+          wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
         save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
-      data = {
-        'iteration': step + 1,
-        'mIoU': miou,
-        'iou': iou,
-        'best_valid_mIoU': miou_best,
-        'time': val_time,
-      }
-      wandb.log({f'val/{k}': v for k, v in data.items()})
-
-      print(
-        'step={iteration:,} mIoU={mIoU:.2f}% best_valid_mIoU={best_valid_mIoU:.2f}% time={time:.0f}sec'.format(**data)
-      )
-
-  print(TAG)
   wb_run.finish()

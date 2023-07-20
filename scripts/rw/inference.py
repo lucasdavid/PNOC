@@ -13,7 +13,7 @@ from torch.utils.data import Subset
 from pickle import UnpicklingError
 
 import datasets
-from core.aff_utils import propagate_to_edge
+from core.aff_utils import propagate_to_edge, PathIndex
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -77,7 +77,7 @@ def run(args):
   # Network
   model = AffinityNet(
     args.architecture,
-    path_index,
+    path_index=path_index,
     mode=args.mode,
     dilated=args.dilated,
   )
@@ -110,7 +110,6 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    # for x, image_id, label in dataset:
     for image_id, _, _ in dataset:
       cam_path = os.path.join(cams_dir, image_id + '.npy')
       npy_path = os.path.join(preds_dir, image_id + '.npy')

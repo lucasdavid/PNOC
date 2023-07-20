@@ -81,11 +81,11 @@ def get_classification_transforms(
   tt += [RandomHorizontalFlip()]
   if 'colorjitter' in augment:
     tt += [transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)]
-  if 'randaugment' in augment:
-    tt += [RandAugmentMC(n=2, m=10)]
   if "clahe" in augment:
     tt += [CLAHE()]
     tv += [CLAHE()]
+  if 'randaugment' in augment:
+    tt += [RandAugmentMC(n=2, m=10)]
   tt += [Normalize(mean, std)]
   if 'cutmix' not in augment:
     tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.

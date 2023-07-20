@@ -117,7 +117,7 @@ class CustomDataSource(metaclass=ABCMeta):
     return mask
 
   @abstractmethod
-  def get_label(self, sample_id) -> np.ndarray:
+  def get_label(self, sample_id: str, task: Optional[str] = None) -> np.ndarray:
     raise NotImplementedError
 
 
@@ -130,7 +130,9 @@ class ClassificationDataset(torch.utils.data.Dataset):
   IGNORE_BG_IMAGES: bool = True
 
   def __init__(
-    self, data_source: CustomDataSource, transform: transforms.Compose = None,
+    self,
+    data_source: CustomDataSource,
+    transform: transforms.Compose = None,
     ignore_bg_images: bool = None,
     task: Optional[str] = None,
   ):
@@ -152,9 +154,9 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
   def get_valid_sample(self, index):
     sample_id = self.data_source.sample_ids[index]
-    label = self.data_source.get_label(sample_id)
+    label = self.data_source.get_label(sample_id, task=self.task)
 
-    if self.ignore_bg_images and label.sum() == 0:
+    if self.ignore_bg_images and label is not None and label.sum() == 0:
       return self.get_valid_sample(index + 1)
 
     return sample_id, label
@@ -194,8 +196,9 @@ class SaliencyDataset(SegmentationDataset):
 
   def __getitem__(self, index):
     sample_id, image, label, mask = super().__getitem__(index)
-
-    mask = (mask != self.info.bg_class).astype("int8")
+    unknown = mask == 255
+    mask = (mask != self.info.bg_class).astype("uint8")
+    mask[unknown] = 255
 
     return sample_id, image, label, mask
 

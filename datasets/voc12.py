@@ -47,10 +47,19 @@ class VOC12DataSource(base.CustomDataSource):
     self.xml_dir = xml_dir or os.path.join(root_dir, 'Annotations/')
     self.root_dir = root_dir
 
-  def get_label(self, sample_id) -> np.ndarray:
-    _, tags = read_xml(self.xml_dir + sample_id + '.xml')
-    label = [self.classification_info.class_ids[tag] for tag in tags]
-    label = one_hot_embedding(label, len(self.classification_info.classes))
+  def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
+    if task == "segmentation":
+      info = self.segmentation_info
+    else:
+      info = self.classification_info
+
+    xml_file = self.xml_dir + sample_id + '.xml'
+    if not os.path.exists(xml_file):
+      return None
+
+    _, tags = read_xml(xml_file)
+    label = [info.class_ids[tag] for tag in tags]
+    label = one_hot_embedding(label, len(info.classes))
 
     return label
 

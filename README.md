@@ -14,21 +14,21 @@ In summary, P-NOC is trained by alternatively optimizing two objectives:
 ```
 where $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
 
-![Diagram for the proposed P-NOC (Puzzle-Not so Ordinary Classifier) training setup.](assets/diagram-p-noc.png)
+![Diagram for the proposed training method P-NOC.](assets/diagram-p-noc.png)
 
 ## Results
 ### Pascal VOC 2012 (test)
 
 | Method | bg | a.plane | bike | bird  | boat  | bottle | bus   | car   | cat   | chair | cow   | d.table | dog   | horse | m.bike | person | p.plant | sheep | sofa  | train | tv | Overall |
 | ---------- | ---------- | --------- | ------- | ----- | ----- | ------ | ----- | ----- | ----- | ----- | ----- | ----------- | ----- | ----- | --------- | ------ | ----------- | ----- | ----- | ----- | --------- | ------- |
-| P-OC | 91.55      | 86.74     | 38.28   | 89.29 | 61.13 | 74.81  | 92.01 | 86.57 | 89.91 | 20.53 | 85.81 | 56.98       | 90.21 | 83.53 | 83.38     | 80.78  | 67.99       | 86.96 | 47.09 | 62.76 | 43.09     | 72.35   |
-| P-NOC | 91.36      | 86.70     | 35.18   | 87.84 | 62.89 | 71.57  | 92.97 | 86.33 | 92.34 | 30.43 | 85.79 | 60.68       | 91.73 | 81.70 | 82.72     | 66.30  | 65.85       | 88.75 | 48.71 | 72.48 | 44.48     | 72.70   |
+| P-OC | 91.6 | 86.7 | 38.3 | 89.3 | 61.1 | 74.8 | 92.0 | 86.6 | 89.9 | 20.5 | 85.8 | 57.0 | 90.2 | 83.5 | 83.4 | 80.8 | 68.0 | 87.0 | 47.1 | 62.8 | 43.1 | 72.4 |
+| P-NOC | 91.7 | 87.9 | 38.1 | 80.9 | 66.1 | 69.8 | 93.8 | 86.4 | 93.2 | 37.4 | 83.6 | 60.9 | 92.3 | 84.7 | 83.8 | 80.5 | 62.3 | 81.9 | 53.1 | 77.7 | 36.7 | 73.5 |
 
 ### MS COCO 2014 (val)
 
-| Method | frisbee | skis | snowboard | sports ball | kite | baseball bat | baseball glove | skateboard | surfboard | tennis racket | bottle | wine glass | cup | fork | knife | spoon | bowl | banana | apple | sandwich | orange | broccoli | carrot | hot dog | pizza | donut | cake | chair | couch | potted plant | bed | dining table | toilet | tv | laptop | mouse | remote | keyboard | cell phone | microwave | oven | toaster | sink | refrigerator | book | clock | vase | scissors | teddy bear | hair drier | toothbrush | mIoU |
+| Method | person | bicycle | car | motorcycle | airplane | bus | train | truck | boat | traffic light | fire hydrant | stop sign | parking meter | bench | bird | cat | dog | horse | sheep | cow | elephant | bear | zebra | giraffe | backpack | umbrella | handbag | tie | suitcase | frisbee | skis | snowboard | sports ball | kite | baseball bat | baseball glove | skateboard | surfboard | tennis racket | bottle | wine glass | cup | fork | knife | spoon | bowl | banana | apple | sandwich | orange | broccoli | carrot | hot dog | pizza | donut | cake | chair | couch | potted plant | bed | dining table | toilet | tv | laptop | mouse | remote | keyboard | cell phone | microwave | oven | toaster | sink | refrigerator | book | clock | vase | scissors | teddy bear | hair drier | toothbrush |
 | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| P-NOC | 51.01 | 4.88 | 38.23 | 47.6 | 52.41 | 19.91 | 12.16 | 29.33 | 35.3 | 24.73 | 39.83 | 52.14 | 32.73 | 27.16 | 30.61 | 17.83 | 13.88 | 66.68 | 53.38 | 55.49 | 67.76 | 35.56 | 29.03 | 56.26 | 66.46 | 67.79 | 52.73 | 21.4 | 30.02 | 20.05 | 46.51 | 12.61 | 66.04 | 41.53 | 60.33 | 24.88 | 33.13 | 60.94 | 65.85 | 38.99 | 35.53 | 25.06 | 34.14 | 27.63 | 40.1 | 24.18 | 37.42 | 50.07 | 72.15 | 27.29 | 35.36 | 48.12 |
+| P-NOC | 81.8 | 55.1 | 55.3 | 47.4 | 70.3 | 56.3 | 76.8 | 68.4 | 54.6 | 49.0 | 46.6 | 77.4 | 74.4 | 71.5 | 40.4 | 62.3 | 76.5 | 76.1 | 68.1 | 75.3 | 78.5 | 80.6 | 85.0 | 80.7 | 73.6 | 28.0 | 63.3 | 14.4 | 15.5 | 54.1 | 50.4 | 8.2 | 42.7 | 54.5 | 46.3 | 19.1 | 14.2 | 26.5 | 34.9 | 20.0 | 40.0 | 42.7 | 36.2 | 23.2 | 27.8 | 17.3 | 16.6 | 62.9 | 53.3 | 46.4 | 62.1 | 41.1 | 28.4 | 55.1 | 62.7 | 66.4 | 54.3 | 25.2 | 34.3 | 25.4 | 44.5 | 13.7 | 65.1 | 40.7 | 55.9 | 23.2 | 30.0 | 60.1 | 65.5 | 46.4 | 36.2 | 36.5 | 34.4 | 27.7 | 37.9 | 25.3 | 35.8 | 54.1 | 71.8 | 29.1 | 37.3 | 47.7 |
 
 ## Setup
 Check the [SETUP.md](SETUP.md) file for information regarding the setup of the Pascal VOC 2012 and MS COCO 2014 datasets.

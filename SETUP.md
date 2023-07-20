@@ -7,6 +7,9 @@ Thus, these steps may overlap with other repositories.
 ## Common
 
 ```shell
+git clone https://github.com/lucasdavid/PNOC.git
+cd PNOC/
+
 export PYTHONPATH=$(pwd)
 
 PY=python3.9     # path to python
@@ -16,6 +19,8 @@ WORKERS=24       # number of workers spawn during dCRF refinement and evaluation
 
 $PIP install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu111
 $PIP install -r requirements.txt
+$PIP install --force-reinstall cython==0.29.36
+$PIP install --no-build-isolation git+https://github.com/lucasb-eyer/pydensecrf.git
 
 # WANDB_PROJECT=some-project-id  # Specify project to export training reports
 # wandb disabled                 # Otherwise, no metrics exported.

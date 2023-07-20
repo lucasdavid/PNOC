@@ -1,3 +1,4 @@
+from logging import warning
 import cv2
 import numpy as np
 
@@ -124,4 +125,12 @@ def log_masks(
 
 def _predictions_to_names(predictions, classes, threshold=0.5):
   if predictions is not None:
+    if len(classes) != len(predictions[0]):
+      warning(f"len(classes) != len(predictions[0]) ({len(classes)}) != ({len(predictions[0])})")
+      # `classes`` may contain "background" and "void" classes,
+      # which are not predicted by the model. Remove them.
+      if classes[0] == "background":
+        classes = classes[1:]
+      classes = classes[:len(predictions[0])]
+
     return [classes[p > threshold].tolist() for p in predictions]

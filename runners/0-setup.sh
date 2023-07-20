@@ -28,7 +28,7 @@ echo "[puzzle/train.sequana] started running at $(date +'%Y-%m-%d %H:%M:%S')."
 
 nodeset -e $SLURM_JOB_NODELIST
 
-cd $SCRATCH/PuzzleCAM
+cd $SCRATCH/pnoc
 
 module load sequana/current
 # module load gcc/7.4_sequana python/3.9.1_sequana cudnn/8.2_cuda-11.1_sequana

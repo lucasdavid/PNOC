@@ -189,7 +189,7 @@ if __name__ == '__main__':
   # Train
   train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])
   train_timer = Timer()
-  best_train_mIoU = -1
+  miou_best = -1
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)

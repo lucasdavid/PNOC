@@ -84,11 +84,11 @@ def compare(args, dataset, classes, start, step, TP, P, T):
         s_pred = 1 - s_pred
 
       if args.crf_t:
-        with Image.open(image_path) as img:
+        with dataset.data_source.get_image(image_id) as img:
           img = np.asarray(img.convert("RGB"))
         s_pred = crf_inference_label(img, s_pred, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
 
-      with Image.open(mask_path) as y_true:
+      with dataset.data_source.get_mask(image_id) as y_true:
         y_true = np.asarray(y_true)
       valid_mask = y_true < 255
 
@@ -196,7 +196,19 @@ def run(args, dataset):
   if args.eval_mode == "saliency":
     classes = ["background", "foreground"]
   else:
-    classes = ["background"] + dataset.info.classes.tolist()
+    classes = dataset.info.classes.tolist()
+    include_bg = dataset.info.bg_class is None
+    if include_bg:
+      classes = ["background"] + classes
+    bg_class = dataset.info.bg_class or 0
+    bg_class = classes[bg_class]
+
+    if dataset.info.void_class is not None:
+      try: classes.pop(dataset.info.void_class)
+      except IndexError: ...
+
+  print("classes evaluated:", classes)
+
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 

@@ -340,15 +340,9 @@ if __name__ == '__main__':
 
   ## Train
   # torch.autograd.set_detect_anomaly(True)
-
+  train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'ot_loss', 'alpha', 'oc_alpha', 'ot_weight', 'k'])
   train_timer = Timer()
-  eval_timer = Timer()
-
-  train_metrics = MetricsContainer(
-    ['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'ot_loss', 'alpha', 'oc_alpha', 'ot_weight', 'k']
-  )
-
-  best_train_mIoU = -1
+  miou_best = -1
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)

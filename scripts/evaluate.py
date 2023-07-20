@@ -302,6 +302,9 @@ if __name__ == "__main__":
   PRED_DIR = args.pred_dir or f"./experiments/predictions/{args.experiment_name}/"
   SAL_DIR = args.sal_dir
 
+  if not os.path.exists(PRED_DIR):
+    raise ValueError(f"Predictions cannot be found at `{PRED_DIR}`. Directory does not exist.")
+
   wb_run = wandb_utils.setup(TAG, args, job_type="evaluation")
   wandb.define_metric("evaluation/t")
 

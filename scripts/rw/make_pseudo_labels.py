@@ -59,9 +59,7 @@ def _work(
     subset = tqdm(subset, mininterval=5.)
 
   with torch.no_grad():
-
-
-    for image_id, image_path, mask_path in subset:
+    for image_id, _, _ in subset:
       png_path = os.path.join(PRED_DIR, image_id + '.png')
       cam_path = os.path.join(CAM_DIR, image_id + '.npy')
       sal_file = os.path.join(SAL_DIR, image_id + '.png') if SAL_DIR else None

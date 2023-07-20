@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=96:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -26,7 +26,7 @@
 
 if [[ "`hostname`" == "sdumont"* ]]; then
   ENV=sdumont
-  WORK_DIR=$SCRATCH/PuzzleCAM
+  WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
   WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
@@ -317,25 +317,16 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-# IMAGE_SIZE=128
-# MIN_IMAGE_SIZE=$IMAGE_SIZE
-# MAX_IMAGE_SIZE=$IMAGE_SIZE
-# ARCH=rs101
-# ARCHITECTURE=resnest101
-# VALIDATE_MAX_STEPS=16
-# EPOCHS=2
-# BATCH_SIZE=32
-
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-EID=r1
+EID=r4
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
 train_vanilla
 
-# BATCH_SIZE=16
-# ACCUMULATE_STEPS=2
-# LABELSMOOTHING=0.1
-# AUGMENT=colorjitter
+BATCH_SIZE=16
+ACCUMULATE_STEPS=2
+LABELSMOOTHING=0.1
+AUGMENT=colorjitter  # none for DeepGlobe
 
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
@@ -347,9 +338,10 @@ TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+train_pnoc
 
-# DOMAIN=$DOMAIN_TRAIN inference_priors
-# DOMAIN=$DOMAIN_VALID inference_priors
+DOMAIN=$DOMAIN_TRAIN inference_priors
+DOMAIN=$DOMAIN_VALID inference_priors
+DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-# DOMAIN=$DOMAIN_VALID TAG=$TAG@$DOMAIN_VALID@scale=0.5,1.0,1.5,2.0 evaluate_priors
+DOMAIN=$DOMAIN_VALID TAG=$TAG@$DOMAIN_VALID@scale=0.5,1.0,1.5,2.0 evaluate_priors
