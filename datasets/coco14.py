@@ -73,10 +73,6 @@ class COCO14DataSource(base.CustomDataSource):
 
   def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
     label = self.sample_labels[sample_id]
-
-    if task == "segmentation":
-      label = np.concatenate(([0.], label, [0.]))  # Add background and void classes.
-
     return label
 
   def get_sample_ids(self, domain) -> List[str]:

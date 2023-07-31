@@ -45,10 +45,6 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
 
   def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
     label = self.sample_labels[sample_id]
-
-    if task == "segmentation":
-      label = np.concatenate((label, [0.]))  # Add void class.
-
     return label
 
   def get_info(self, task: str) -> base.DatasetInfo:

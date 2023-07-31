@@ -48,10 +48,7 @@ class VOC12DataSource(base.CustomDataSource):
     self.root_dir = root_dir
 
   def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
-    if task == "segmentation":
-      info = self.segmentation_info
-    else:
-      info = self.classification_info
+    info = self.classification_info
 
     xml_file = self.xml_dir + sample_id + '.xml'
     if not os.path.exists(xml_file):

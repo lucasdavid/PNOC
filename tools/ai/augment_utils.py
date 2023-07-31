@@ -356,8 +356,17 @@ class ResizeMask:
 class CLAHE:
 
   def __init__(self, clip_limit: float = 2.0, width: int = 8, height: int = 8):
+    self.clip_limit = clip_limit
+    self.width = width
+    self.height = height
 
-    self.clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(width, height))
+  _clahe: "cv2.CLAHE" = None
+
+  @property
+  def clahe(self):
+    if self._clahe is None:
+      self._clahe = cv2.createCLAHE(clipLimit=self.clip_limit, tileGridSize=(self.width, self.height))
+    return self._clahe
 
   def __call__(self, data):
     if isinstance(data, dict):
