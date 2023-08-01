@@ -191,9 +191,6 @@ class SegmentationDataset(ClassificationDataset):
 
 class SaliencyDataset(SegmentationDataset):
 
-  TASK: str = "segmentation"
-  IGNORE_BG_IMAGES: bool = False
-
   def __getitem__(self, index):
     sample_id, image, label, mask = super().__getitem__(index)
     unknown = mask == 255

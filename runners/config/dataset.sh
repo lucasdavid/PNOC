@@ -44,8 +44,8 @@ if [[ $DATASET == deepglobe ]]; then
   MAX_IMAGE_SIZE=$IMAGE_SIZE
 
   VALIDATE_MAX_STEPS=0
-  # single th because the bg class is not added based on thresholding.
-  # We assume bg=agriculture_land (most frequent).
+  # A single threshold is used because the bg class is not added based on
+  # thresholding. We assume bg=agriculture_land (the most frequent class).
   VALIDATE_THRESHOLDS=0.5
 
   LR=0.1
