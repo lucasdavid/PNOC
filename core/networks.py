@@ -104,11 +104,13 @@ class Backbone(nn.Module):
     dilated=False,
     strides=None,
     trainable_stem=True,
+    trainable_backbone=True,
   ):
     super().__init__()
 
     self.mode = mode
     self.trainable_stem = trainable_stem
+    self.trainable_backbone = trainable_backbone
     self.not_training = []
     self.from_scratch_layers = []
 
@@ -131,7 +133,11 @@ class Backbone(nn.Module):
       set_trainable_layers(backbone, torch.nn.BatchNorm2d, trainable=False)
       self.not_training.extend([m for m in backbone.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
-    if not self.trainable_stem:
+    if not self.trainable_backbone:
+      for s in stages:
+        set_trainable_layers(s, trainable=False)
+      self.not_training.extend(stages)
+    elif not self.trainable_stem:
       set_trainable_layers(self.stage1, trainable=False)
       self.not_training.extend([self.stage1])
 
@@ -195,9 +201,17 @@ class Classifier(Backbone):
     dilated=False,
     strides=(2, 2, 2, 1),
     regularization=None,
-    trainable_stem=True
+    trainable_stem=True,
+    trainable_backbone=True,
   ):
-    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides, trainable_stem=trainable_stem)
+    super().__init__(
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_stem=trainable_stem,
+      trainable_backbone=trainable_backbone,
+    )
 
     self.num_classes = num_classes
     self.regularization = regularization
