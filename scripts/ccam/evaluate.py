@@ -1,17 +1,17 @@
-import traceback
 import argparse
 import multiprocessing
 import os
 import sys
+import traceback
 
 import numpy as np
-from PIL import Image
 from tqdm import tqdm
 
-import wandb
 import datasets
-from tools.general import wandb_utils
+import wandb
 from tools.ai.demo_utils import crf_inference_label
+from tools.ai.log_utils import log_config
+from tools.general import wandb_utils
 from tools.general.io_utils import load_saliency_file, str2bool
 
 parser = argparse.ArgumentParser()
@@ -207,7 +207,7 @@ def run(args, dataset):
       try: classes.pop(dataset.info.void_class)
       except IndexError: ...
 
-  print("classes evaluated:", classes)
+  print("classes evaluated:", *classes)
 
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
@@ -293,6 +293,7 @@ if __name__ == "__main__":
     job_type="evaluation-saliency",
   )
   wandb.define_metric("evaluation/t")
+  log_config(vars(args), TAG)
 
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds, ignore_bg_images=True)

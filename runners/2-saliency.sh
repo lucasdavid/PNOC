@@ -29,7 +29,7 @@ if [[ "`hostname`" == "sdumont"* ]]; then
   WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
-  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+  WORK_DIR=/home/ldavid/workspace/repos/research/wsss/pnoc
 fi
 
 # Dataset
@@ -71,6 +71,13 @@ CRF_T=10
 CRF_GT_PROB=0.7
 
 DOMAIN=$DOMAIN_TRAIN
+
+# Evaluation
+EVAL_MIN_TH=0.05
+EVAL_MAX_TH=0.81
+EVAL_MODE=saliency
+EVAL_FILE_MODE=npy
+
 
 ccam_training() {
   echo "=================================================================="
@@ -203,10 +210,10 @@ evaluate_saliency_detection() {
     --experiment_name "$TAG" \
     --dataset $DATASET \
     --domain $DOMAIN \
-    --min_th 0.05 \
-    --max_th 0.81 \
-    --mode npy \
-    --eval_mode saliency \
+    --min_th $EVAL_MIN_TH \
+    --max_th $EVAL_MAX_TH \
+    --mode $EVAL_FILE_MODE \
+    --eval_mode $EVAL_MODE \
     --crf_t $CRF_T \
     --crf_gt_prob $CRF_GT_PROB \
     --data_dir $DATA_DIR \
@@ -215,22 +222,21 @@ evaluate_saliency_detection() {
 
 ## ================================================
 ## Pascal VoC 2012
-CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-PRIORS_TAG=rw269pnoc-r4@rs269-rals
 ##
+CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+PRIORS_TAG=rs269pnoc-r4@rs269-rals
+FG_T=0.4
 ## ================================================
 ## MS COCO 2014
 ##
 # FG_T=0.3
 # LR=0.0005
 # CAMS_DIR=experiments/predictions/pnoc/coco-rs269-pnoc-b16-lr0.05-ls@rs269-lsra-r1@train@scale=0.5,1.0,1.5,2.0
-# PRIORS_TAG=rw269pnoc-r1@rs269-rals
+# PRIORS_TAG=rs269pnoc-r1@rs269-rals
 ## ================================================
 
-FG_T=0.3
-
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
-PN_TAG=$DATASET-pn@ccamh-rs269-fg$FG_T@rw269pnoc@rs269-rals
+PN_TAG=$DATASET-pn@ccamh-rs269-fg$FG_T@$PRIORS_TAG
 
 ccamh_training
 ccamh_inference
@@ -253,9 +259,6 @@ mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
 ## Evaluation
 ## ==============================
 
-CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_saliency_detection
+CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 DOMAIN=$DOMAIN_VALID evaluate_saliency_detection
 
-CRF_T=0 TAG=saliency/$PN_TAG evaluate_saliency_detection
-
-##
-## ====================
+CRF_T=0  TAG=saliency/$PN_TAG DOMAIN=$DOMAIN_VALID evaluate_saliency_detection

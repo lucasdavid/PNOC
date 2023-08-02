@@ -29,7 +29,7 @@ if [[ "`hostname`" == "sdumont"* ]]; then
   WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
-  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+  WORK_DIR=/home/ldavid/workspace/repos/research/wsss/pnoc
 fi
 
 # Dataset

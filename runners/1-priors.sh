@@ -29,7 +29,7 @@ if [[ "`hostname`" == "sdumont"* ]]; then
   WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
-  WORK_DIR=/home/ldavid/workspace/repos/research/pnoc
+  WORK_DIR=/home/ldavid/workspace/repos/research/wsss/pnoc
 fi
 
 # Dataset
@@ -302,10 +302,11 @@ inference_priors() {
 }
 
 evaluate_priors() {
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT,priors" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT,ccamh" \
   CUDA_VISIBLE_DEVICES="" \
   $PY scripts/evaluate.py \
     --experiment_name $TAG \
+    --sal_dir $SAL_DIR \
     --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
