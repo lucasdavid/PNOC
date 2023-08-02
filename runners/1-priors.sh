@@ -318,9 +318,12 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
-EID=r4
+
+EID=r1  # Experiment ID
+
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
 train_vanilla
 
