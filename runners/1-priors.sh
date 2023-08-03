@@ -33,8 +33,8 @@ else
 fi
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
-# DATASET=coco14  # MS COCO 2014
+# DATASET=voc12  # Pascal VOC 2012
+DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
@@ -189,6 +189,7 @@ train_poc() {
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_poc.py \
     --tag $TAG \
+    --lr $LR \
     --num_workers $WORKERS_TRAIN \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
@@ -225,7 +226,7 @@ train_poc() {
     --dataset $DATASET \
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
-    --data_dir $DATA_DIR
+    --data_dir $DATA_DIR;
 }
 
 train_pnoc() {
@@ -306,7 +307,6 @@ evaluate_priors() {
   CUDA_VISIBLE_DEVICES="" \
   $PY scripts/evaluate.py \
     --experiment_name $TAG \
-    --sal_dir $SAL_DIR \
     --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
@@ -335,10 +335,10 @@ AUGMENT=colorjitter  # none for DeepGlobe
 OC_NAME="$ARCH"-lsra
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
-TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
+# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
 # train_puzzle
 
-TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
@@ -348,4 +348,4 @@ DOMAIN=$DOMAIN_TRAIN inference_priors
 DOMAIN=$DOMAIN_VALID inference_priors
 DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-DOMAIN=$DOMAIN_VALID TAG=$TAG@$DOMAIN_VALID@scale=0.5,1.0,1.5,2.0 evaluate_priors
+DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@$DOMAIN_VALID_SEG@scale=0.5,1.0,1.5,2.0 evaluate_priors
