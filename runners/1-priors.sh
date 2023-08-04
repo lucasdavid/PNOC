@@ -297,6 +297,7 @@ inference_priors() {
     --trainable-stem $TRAINABLE_STEM \
     --mode $MODE \
     --tag $TAG \
+    --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
     --device $DEVICE
@@ -325,7 +326,7 @@ LABELSMOOTHING=0.1
 EID=r1  # Experiment ID
 
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
-train_vanilla
+# train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -338,14 +339,14 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
 # train_puzzle
 
-# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+# train_pnoc
 
-DOMAIN=$DOMAIN_TRAIN inference_priors
-DOMAIN=$DOMAIN_VALID inference_priors
+# DOMAIN=$DOMAIN_TRAIN inference_priors
+# DOMAIN=$DOMAIN_VALID inference_priors
 DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@$DOMAIN_VALID_SEG@scale=0.5,1.0,1.5,2.0 evaluate_priors
