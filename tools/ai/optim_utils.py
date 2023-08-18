@@ -3,7 +3,7 @@ import torch
 from .torch_utils import *
 
 
-class PolyOptimizer(torch.optim.SGD):
+class PolyOptimizerMixin:
 
   def __init__(self, params, lr, max_step, momentum=0.9):
     super().__init__(params, lr)
@@ -26,34 +26,44 @@ class PolyOptimizer(torch.optim.SGD):
     self.global_step += 1
 
 
-def get_optimizer(lr, wd, max_step, param_groups):
-  return PolyOptimizer(
-    [
-      {
-        'params': param_groups[0],
-        'lr': lr,
-        'weight_decay': wd
-      },
-      {
-        'params': param_groups[1],
-        'lr': 2 * lr,
-        'weight_decay': 0
-      },
-      {
-        'params': param_groups[2],
-        'lr': 10 * lr,
-        'weight_decay': wd
-      },
-      {
-        'params': param_groups[3],
-        'lr': 20 * lr,
-        'weight_decay': 0
-      },
-    ],
-    lr=lr,
-    momentum=0.9,
-    max_step=max_step,
-  )
+class PolyOptimizer(PolyOptimizerMixin, torch.optim.SGD):
+  ...
+
+
+def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd"):
+  params = [
+    {
+      'params': param_groups[0],
+      'lr': lr,
+      'weight_decay': wd
+    },
+    {
+      'params': param_groups[1],
+      'lr': 2 * lr,
+      'weight_decay': 0
+    },
+    {
+      'params': param_groups[2],
+      'lr': 10 * lr,
+      'weight_decay': wd
+    },
+    {
+      'params': param_groups[3],
+      'lr': 20 * lr,
+      'weight_decay': 0
+    },
+  ]
+
+  if algorithm == "sgd":
+    return PolyOptimizer(params, lr=lr, momentum=0.9, max_step=max_step)
+  elif algorithm == "lion":
+    from lion_pytorch import Lion
+    class LionPolyOptimizer(PolyOptimizerMixin, Lion):
+      ...
+
+    return LionPolyOptimizer(params, lr=lr, max_step=max_step)
+  else:
+    raise NotImplementedError(f"Optimizer {algorithm} not implemented.")
 
 
 def linear_schedule(step, max_step, a_0=0., a_n=1.0, schedule=1.0, contraint=min):

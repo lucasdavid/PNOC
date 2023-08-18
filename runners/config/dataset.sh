@@ -15,6 +15,7 @@ if [[ $DATASET == voc12 ]]; then
   VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
 
   LR=0.1
+  WD=0.0001
 fi
 if [[ $DATASET == coco14 ]]; then
   DOMAIN_TRAIN=train2014
@@ -31,6 +32,7 @@ if [[ $DATASET == coco14 ]]; then
   VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
 
   LR=0.05
+  WD=0.0001
 fi
 if [[ $DATASET == deepglobe ]]; then
   DOMAIN_TRAIN=train75
@@ -49,4 +51,5 @@ if [[ $DATASET == deepglobe ]]; then
   VALIDATE_THRESHOLDS=0.5
 
   LR=0.1
+  WD=0.0001
 fi

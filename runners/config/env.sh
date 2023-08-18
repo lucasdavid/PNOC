@@ -5,6 +5,7 @@
 if [[ $ENV == sdumont ]]; then
   ### Sdumont
   PY=python3.8
+  PIP=pip3.8
   DEVICE=cuda
   DEVICES=0,1,2,3
   WORKERS_TRAIN=8
@@ -18,6 +19,7 @@ if [[ $ENV == sdumont ]]; then
 else
   ### Local
   PY=python
+  PIP=pip
   DEVICE=cuda
   DEVICES=0
   WORKERS_TRAIN=8

@@ -236,9 +236,6 @@ class AffinityDataset(SegmentationDataset):
 
 class CAMsDataset(ClassificationDataset):
 
-  TASK: str = "segmentation"
-  IGNORE_BG_IMAGES: bool = True
-
   def __getitem__(self, index):
     sample_id, label = self.get_valid_sample(index)
 
@@ -248,14 +245,17 @@ class CAMsDataset(ClassificationDataset):
     cams = np.load(cams_path, allow_pickle=True).item()
     cams = cams['hr_cam']
 
-    if not self.info.bg_class:
+    if self.info.bg_class is None:
+      # If the bg is not in the classification task,
+      # only positive hints are drawn from CAMs.
       cams = cams.max(0, keepdims=True)
     else:
-      # TODO: fix this.
-      bg_cam = cams[cams["keys"] == self.info.bg_class]
-      cams = (1 - bg_cam)
-      if len(cams.shape) == 2:
-        cams = cams[np.newaxis, ...]
+      labels = cams["keys"][1:] - 1  # invert op done in cam/inference.
+      fg_cam = cams[labels != self.info.bg_class]
+      bg_cam = cams[labels == self.info.bg_class]
+      cams = fg_cam.max(0, keepdims=True)
+      if np.prod(bg_cam.shape) > 0:
+        cams -= bg_cam
 
     cams = torch.from_numpy(cams)
 

@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=24:00:00
+#SBATCH --time=28:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -33,8 +33,8 @@ else
 fi
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
-DATASET=coco14  # MS COCO 2014
+DATASET=voc12  # Pascal VOC 2012
+# DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
@@ -54,6 +54,7 @@ REGULAR=none
 
 # Training
 # LR=0.1  # defined in dataset.sh
+OPTIMIZER=sgd
 EPOCHS=15
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
@@ -111,6 +112,8 @@ train_vanilla() {
     $PY scripts/cam/train_vanilla.py \
     --tag $TAG_VANILLA \
     --lr $LR \
+    --wd $WD \
+    --optimizer $OPTIMIZER \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
@@ -241,6 +244,7 @@ train_pnoc() {
     --tag $TAG \
     --num_workers $WORKERS_TRAIN \
     --lr $LR \
+    --optimizer $OPTIMIZER \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
@@ -319,34 +323,38 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+$PIP install lion-pytorch
 
+OPTIMIZER=lion
+LR=0.01
+WD=0.001
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 
 EID=r1  # Experiment ID
 
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-ls-ra-$EID
-# train_vanilla
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-lion-$EID
+train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
 LABELSMOOTHING=0.1
 AUGMENT=colorjitter  # none for DeepGlobe
 
-OC_NAME="$ARCH"-lsra
+OC_NAME="$ARCH"-rals-lion
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
 # train_puzzle
 
-TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls-lion@$OC_NAME-$EID"
+train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN inference_priors
 # DOMAIN=$DOMAIN_VALID inference_priors
 DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@$DOMAIN_VALID_SEG@scale=0.5,1.0,1.5,2.0 evaluate_priors
+DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0 evaluate_priors
