@@ -67,8 +67,12 @@ def priors_validation_step(
 
   preds_ = np.concatenate(preds_, axis=0)
   targets_ = np.concatenate(targets_, axis=0)
-  precision, recall, f_score, _ = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average="macro")
-  roc = skmetrics.roc_auc_score(targets_, preds_, average="macro")
+
+  try:
+    precision, recall, f_score, _ = skmetrics.precision_recall_fscore_support(targets_, preds_.round(), average="macro")
+    roc = skmetrics.roc_auc_score(targets_, preds_, average="macro")
+  except ValueError:
+    precision = recall = f_score = roc = 0.
 
   results = maximum_miou_from_thresholds(meters)
   results.update({

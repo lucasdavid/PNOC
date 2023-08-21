@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=28:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -59,6 +59,9 @@ EPOCHS=15
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
 
+LR_ALPHA_SCRATCH=10.0
+LR_ALPHA_BIAS=2.0
+
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
 
@@ -106,7 +109,7 @@ train_vanilla() {
   echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
@@ -114,6 +117,8 @@ train_vanilla() {
     --lr $LR \
     --wd $WD \
     --optimizer $OPTIMIZER \
+    --lr_alpha_scratch $LR_ALPHA_SCRATCH \
+    --lr_alpha_bias $LR_ALPHA_BIAS \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
@@ -238,12 +243,14 @@ train_pnoc() {
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,pnoc" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,pnoc" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T \
     $PY scripts/cam/train_pnoc.py \
     --tag $TAG \
     --num_workers $WORKERS_TRAIN \
     --lr $LR \
+    --lr_alpha_scratch $LR_ALPHA_SCRATCH \
+    --lr_alpha_bias $LR_ALPHA_BIAS \
     --optimizer $OPTIMIZER \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
@@ -308,7 +315,7 @@ inference_priors() {
 }
 
 evaluate_priors() {
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT,ccamh" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
   CUDA_VISIBLE_DEVICES="" \
   $PY scripts/evaluate.py \
     --experiment_name $TAG \
@@ -328,6 +335,14 @@ WD=0.001
 ARCH=rn101
 ARCHITECTURE=resnet101
 OC_ARCHITECTURE=$ARCHITECTURE
+
+# $PIP install lion-pytorch
+
+# OPTIMIZER=lion
+# LR_ALPHA_SCRATCH=1.0
+# LR_ALPHA_BIAS=1.0
+# LR=0.00001
+# WD=0.01
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
