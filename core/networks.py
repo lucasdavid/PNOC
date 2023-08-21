@@ -28,14 +28,6 @@ def group_norm(features):
 
 
 def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
-  if dilated:
-    dilation, dilated = 4, True
-  else:
-    dilation, dilated = 2, False
-
-  if not strides:
-    strides = [1, 2, 2, 1]
-
   if 'resnet38d' == name:
     from .arch_resnet import resnet38d
     out_features = 4096
@@ -54,7 +46,13 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
 
     if 'resnet' in name:
       from .arch_resnet import resnet
-      model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, batch_norm_fn=norm_fn)
+      if dilated:
+        strides = strides or (1, 2, 1, 1)
+        dilations = (1, 1, 2, 4)
+      else:
+        strides = strides or (1, 2, 2, 1)
+        dilations = (1, 1, 1, 2)
+      model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, dilations=dilations, batch_norm_fn=norm_fn)
 
       if weights == 'imagenet':
         print(f'loading weights from {resnet.urls_dic[name]}')
@@ -65,6 +63,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
         model.load_state_dict(state_dict)
     elif 'resnest' in name:
       from .arch_resnest import resnest
+      dilation = 4 if dilated else 2
 
       model_fn = getattr(resnest, name)
       model = model_fn(pretrained=weights == 'imagenet', dilated=dilated, dilation=dilation, norm_layer=norm_fn)
@@ -75,7 +74,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
       from .res2net import res2net_v1b
 
       model_fn = getattr(res2net_v1b, name)
-      model = model_fn(pretrained=weights == 'imagenet', strides=strides, norm_layer=norm_fn)
+      model = model_fn(pretrained=weights == 'imagenet', strides=strides or (1, 2, 2, 2), norm_layer=norm_fn)
 
       del model.avgpool
       del model.fc
@@ -199,7 +198,7 @@ class Classifier(Backbone):
     num_classes=20,
     mode='fix',
     dilated=False,
-    strides=(2, 2, 2, 1),
+    strides=None,
     regularization=None,
     trainable_stem=True,
     trainable_backbone=True,
@@ -255,7 +254,7 @@ class CCAM(Backbone):
     weights='imagenet',
     mode='fix',
     dilated=False,
-    strides=(2, 2, 2, 1),
+    strides=None,
     trainable_stem=True,
     stage4_out_features=1024
   ):
@@ -297,7 +296,7 @@ class CCAM(Backbone):
 
 class AffinityNet(Backbone):
 
-  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=(2, 2, 2, 1)):
+  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
     in_features = self.out_features
