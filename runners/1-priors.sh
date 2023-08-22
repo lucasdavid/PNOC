@@ -54,7 +54,7 @@ REGULAR=none
 
 # Training
 # LR=0.1  # defined in dataset.sh
-OPTIMIZER=sgd
+OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
 BATCH_SIZE=32
 ACCUMULATE_STEPS=1
@@ -329,7 +329,6 @@ evaluate_priors() {
     --mode npy \
     --num_workers $WORKERS_INFER;
 }
-
 LR=0.01
 WD=0.001
 ARCH=rn101
