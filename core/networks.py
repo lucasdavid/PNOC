@@ -65,16 +65,22 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
       from .arch_resnest import resnest
       dilation = 4 if dilated else 2
 
+      pretrained = weights == "imagenet"
       model_fn = getattr(resnest, name)
-      model = model_fn(pretrained=weights == 'imagenet', dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+      model = model_fn(pretrained=pretrained, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+      if pretrained:
+        print(f'loading weights from {resnest.resnest_model_urls[name]}')
 
       del model.avgpool
       del model.fc
     elif 'res2net' in name:
       from .res2net import res2net_v1b
 
+      pretrained = weights == "imagenet"
       model_fn = getattr(res2net_v1b, name)
-      model = model_fn(pretrained=weights == 'imagenet', strides=strides or (1, 2, 2, 2), norm_layer=norm_fn)
+      model = model_fn(pretrained=pretrained, strides=strides or (1, 2, 2, 2), norm_layer=norm_fn)
+      if pretrained:
+        print(f'loading pretrained weights')
 
       del model.avgpool
       del model.fc

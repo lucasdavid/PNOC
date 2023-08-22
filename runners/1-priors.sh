@@ -323,17 +323,18 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-$PIP install lion-pytorch
-
-OPTIMIZER=lion
 LR=0.01
 WD=0.001
+ARCH=rn101
+ARCHITECTURE=resnet101
+OC_ARCHITECTURE=$ARCHITECTURE
+
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 
 EID=r1  # Experiment ID
 
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-lion-$EID
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-wd$WD-rals-$EID
 train_vanilla
 
 BATCH_SIZE=16
@@ -341,7 +342,7 @@ ACCUMULATE_STEPS=2
 LABELSMOOTHING=0.1
 AUGMENT=colorjitter  # none for DeepGlobe
 
-OC_NAME="$ARCH"-rals-lion
+OC_NAME="$ARCH"-rals
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
@@ -350,11 +351,12 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls-lion@$OC_NAME-$EID"
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-wd$WD-ls@$OC_NAME-$EID"
 train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN inference_priors
-# DOMAIN=$DOMAIN_VALID inference_priors
-DOMAIN=$DOMAIN_VALID_SEG inference_priors
+DOMAIN=$DOMAIN_VALID inference_priors
+# DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0 evaluate_priors
+DOMAIN=$DOMAIN_VALID TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors  # FIXME
+# DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0 evaluate_priors  # FIXME
