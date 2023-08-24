@@ -37,6 +37,7 @@ parser.add_argument('--device', default='cuda', type=str)
 # parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
+parser.add_argument('--pred_dir', default=None, type=str)
 parser.add_argument('--sample_ids', default=None, type=str)
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
@@ -168,7 +169,7 @@ if __name__ == '__main__':
   TAG += '@train' if 'train' in args.domain else '@val'
   TAG += '@scale=%s' % args.scales
 
-  PREDS_DIR = create_directory(f'./experiments/predictions/{TAG}/')
+  PREDS_DIR = create_directory(args.pred_dir or f'./experiments/predictions/{TAG}/')
   WEIGHTS_PATH = './experiments/models/' + f'{args.weights or args.tag}.pth'
 
   set_seed(SEED)

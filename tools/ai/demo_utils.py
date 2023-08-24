@@ -119,3 +119,27 @@ def crf_inference_label(img, labels, t=10, n_labels=21, gt_prob=0.7):
   q = d.inference(t)
 
   return np.argmax(np.array(q).reshape((n_labels, h, w)), axis=0)
+
+
+def crf_inference_softmax(image, probs, t=10, pos_w=3, pos_xy_std=1, bi_w=4, bi_xy_std=67, bi_rgb_std=3):
+  # Parameters from DeepLabV2 <https://github.com/kazuto1011/deeplab-pytorch/>.
+
+  import pydensecrf.densecrf as dcrf
+  from pydensecrf.utils import unary_from_softmax
+
+  C, H, W = probs.shape
+
+  U = unary_from_softmax(probs)
+  U = np.ascontiguousarray(U)
+
+  image = np.ascontiguousarray(image)
+
+  d = dcrf.DenseCRF2D(W, H, C)
+  d.setUnaryEnergy(U)
+  d.addPairwiseGaussian(sxy=pos_xy_std, compat=pos_w)
+  d.addPairwiseBilateral(sxy=bi_xy_std, srgb=bi_rgb_std, rgbim=image, compat=bi_w)
+
+  Q = d.inference(t)
+  Q = np.array(Q).reshape((C, H, W))
+
+  return Q

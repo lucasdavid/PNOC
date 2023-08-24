@@ -62,6 +62,15 @@ ACCUMULATE_STEPS=1
 LR_ALPHA_SCRATCH=10.0
 LR_ALPHA_BIAS=2.0
 
+# =========================
+# $PIP install lion-pytorch
+# OPTIMIZER=lion
+# LR_ALPHA_SCRATCH=1.0
+# LR_ALPHA_BIAS=1.0
+# LR=0.00001
+# WD=0.01
+# =========================
+
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
 
@@ -249,6 +258,7 @@ train_pnoc() {
     --tag $TAG \
     --num_workers $WORKERS_TRAIN \
     --lr $LR \
+    --wd $WD \
     --lr_alpha_scratch $LR_ALPHA_SCRATCH \
     --lr_alpha_bias $LR_ALPHA_BIAS \
     --optimizer $OPTIMIZER \
@@ -329,26 +339,13 @@ evaluate_priors() {
     --mode npy \
     --num_workers $WORKERS_INFER;
 }
-LR=0.01
-WD=0.001
-ARCH=rn101
-ARCHITECTURE=resnet101
-OC_ARCHITECTURE=$ARCHITECTURE
-
-# $PIP install lion-pytorch
-
-# OPTIMIZER=lion
-# LR_ALPHA_SCRATCH=1.0
-# LR_ALPHA_BIAS=1.0
-# LR=0.00001
-# WD=0.01
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 
 EID=r1  # Experiment ID
 
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-wd$WD-rals-$EID
+TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-$EID
 train_vanilla
 
 BATCH_SIZE=16
@@ -365,12 +362,13 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-wd$WD-ls@$OC_NAME-$EID"
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN inference_priors
 DOMAIN=$DOMAIN_VALID inference_priors
 # DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-DOMAIN=$DOMAIN_VALID TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors  # FIXME
-# DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0 evaluate_priors  # FIXME
+DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 CRF_T=10 evaluate_priors
+# DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
