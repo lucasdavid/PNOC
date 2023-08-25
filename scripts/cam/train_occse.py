@@ -1,22 +1,15 @@
 import argparse
-import copy
-import math
 import os
-import random
-import shutil
-import sys
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from core.training import priors_validation_step
 
 import datasets
+import wandb
 from core import occse
 from core.networks import *
-from core.puzzle_utils import *
+from core.training import priors_validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -24,8 +17,8 @@ from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
 from tools.ai.randaugment import *
 from tools.ai.torch_utils import *
+from tools.general import wandb_utils
 from tools.general.io_utils import *
-from tools.general.json_utils import *
 from tools.general.time_utils import *
 
 parser = argparse.ArgumentParser()
@@ -33,7 +26,7 @@ parser = argparse.ArgumentParser()
 # Dataset
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--seed', default=0, type=int)
-parser.add_argument('--num_workers', default=8, type=int)
+parser.add_argument('--num_workers', default=4, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--domain_train', default=None, type=str)
@@ -50,7 +43,8 @@ parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
-parser.add_argument('--oc-strategy', default='random', type=str)
+parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
+parser.add_argument('--oc-mask-globalnorm', default=True, type=str2bool)
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
 parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 
@@ -58,6 +52,9 @@ parser.add_argument('--oc-focal-gamma', default=2.0, type=float)
 parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--first_epoch', default=0, type=int)
 parser.add_argument('--max_epoch', default=15, type=int)
+parser.add_argument('--accumulate_steps', default=1, type=int)
+parser.add_argument('--mixed_precision', default=False, type=str2bool)
+parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
 parser.add_argument('--validate_max_steps', default=None, type=int)
 parser.add_argument('--validate_thresholds', default=None, type=str)
@@ -84,31 +81,30 @@ parser.add_argument('--oc-k', default=1.0, type=float)
 parser.add_argument('--oc-k-init', default=1.0, type=float)
 parser.add_argument('--oc-k-schedule', default=0.0, type=float)
 
+try:
+  GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+except KeyError:
+  GPUS = "0"
+GPUS = GPUS.split(",")
+GPUS_COUNT = len(GPUS)
+THRESHOLDS = list(np.arange(0.10, 0.50, 0.05))
+
 if __name__ == '__main__':
-  # Arguments
   args = parser.parse_args()
 
-  print('Train Configuration')
-  pad = max(map(len, vars(args))) + 1
-  for k, v in vars(args).items():
-    print(f'{k.ljust(pad)}: {v}')
-  print('===================')
+  TAG = args.tag
+  SEED = args.seed
+  DEVICE = args.device if torch.cuda.is_available() else "cpu"
+  if args.validate_thresholds:
+      THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
 
-  log_dir = create_directory(f'./experiments/logs/')
-  data_dir = create_directory(f'./experiments/data/')
-  model_dir = create_directory('./experiments/models/')
+  wb_run = wandb_utils.setup(TAG, args)
+  log_config(vars(args), TAG)
 
-  log_path = log_dir + f'{args.tag}.txt'
-  data_path = data_dir + f'{args.tag}.json'
-  model_path = model_dir + f'{args.tag}.pth'
+  MODEL_PATH = os.path.join('./experiments/models/', f"{TAG}.pth")
 
-  set_seed(args.seed)
-  log = lambda string='': log_print(string, log_path)
+  set_seed(SEED)
 
-  log('[i] {}'.format(args.tag))
-  log()
-
-  # Transform, Dataset, DataLoader
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
@@ -121,17 +117,14 @@ if __name__ == '__main__':
   train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
-  val_iteration = len(train_loader)
-  log_iteration = int(val_iteration * args.print_ratio)
-  step_init = args.first_epoch * val_iteration
-  step_max = args.max_epoch * val_iteration
-
-  log('[i] log_iteration : {:,}'.format(log_iteration))
-  log('[i] val_iteration : {:,}'.format(val_iteration))
-  log('[i] max_iteration : {:,}'.format(step_max))
+  step_val = len(train_loader)
+  step_log = int(step_val * args.print_ratio)
+  step_init = args.first_epoch * step_val
+  step_max = args.max_epoch * step_val
+  print(f"Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}")
 
   # Network
-  model = Classifier(
+  cgnet = Classifier(
     args.architecture,
     train_dataset.info.num_classes,
     mode=args.mode,
@@ -141,75 +134,46 @@ if __name__ == '__main__':
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
-    model.load_state_dict(torch.load(args.restore), strict=True)
-  param_groups = model.get_parameter_groups()
-
-  model = model.cuda()
-  model.train()
-
-  log('[i] Architecture is {}'.format(args.architecture))
-  log('[i] Regularization is {}'.format(args.regularization))
-  log('[i] Total Params: %.2fM' % (calculate_parameters(model)))
-  log()
+    cgnet.load_state_dict(torch.load(args.restore), strict=True)
+  log_model("CGNet", cgnet, args)
 
   # Ordinary Classifier.
   print(f'Build OC {args.oc_architecture} (weights from `{args.oc_pretrained}`)')
-  if 'mcar' in args.oc_architecture:
-    ps = 'avg'
-    topN = 4
-    threshold = 0.5
-    oc_nn = mcar_resnet101(train_dataset.info.num_classes, ps, topN, threshold, inference_mode=True, with_logits=True)
-    ckpt = torch.load(args.oc_pretrained)
-    oc_nn.load_state_dict(ckpt['state_dict'], strict=True)
-  else:
-    oc_nn = Classifier(
-      args.oc_architecture, train_dataset.info.num_classes, mode=args.mode, regularization=args.oc_regularization
-    )
-    oc_nn.load_state_dict(torch.load(args.oc_pretrained), strict=True)
+  ocnet = Classifier(
+    model_name=args.oc_architecture,
+    num_classes=train_dataset.info.num_classes,
+    mode=args.mode,
+    regularization=args.oc_regularization,
+  )
+  ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
-  oc_nn = oc_nn.cuda()
-  oc_nn.eval()
-  for child in oc_nn.children():
+  cg_param_groups = cgnet.get_parameter_groups()
+
+  cgnet = cgnet.to(DEVICE)
+  ocnet = ocnet.to(DEVICE)
+  cgnet.train()
+  ocnet.eval()
+
+  for child in ocnet.children():
     for param in child.parameters():
       param.requires_grad = False
 
-  try:
-    use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
-  except KeyError:
-    use_gpu = '0'
-
-  GPUS_COUNT = len(use_gpu.split(','))
   if GPUS_COUNT > 1:
-    log('[i] the number of gpu : {}'.format(GPUS_COUNT))
-    model = nn.DataParallel(model)
-    oc_nn = nn.DataParallel(oc_nn)
+    print(f"GPUs={GPUS_COUNT}")
+    cgnet = torch.nn.DataParallel(cgnet)
+    ocnet = torch.nn.DataParallel(ocnet)
 
-  # Loss, Optimizer
-  class_loss_fn = nn.MultiLabelSoftMarginLoss(reduction='none').cuda()
+  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
 
-  # if args.re_loss == 'L1_Loss':
-  #   r_loss_fn = L1_Loss
-  # else:
-  #   r_loss_fn = L2_Loss
+  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups)
+  scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
-  log('[i] The number of pretrained weights : {}'.format(len(param_groups[0])))
-  log('[i] The number of pretrained bias : {}'.format(len(param_groups[1])))
-  log('[i] The number of scratched weights : {}'.format(len(param_groups[2])))
-  log('[i] The number of scratched bias : {}'.format(len(param_groups[3])))
-
-  optimizer = get_optimizer(args.lr, args.wd, step_max, param_groups)
+  log_opt_params("CGNet", cg_param_groups)
 
   # Train
-  data_dic = {'train': [], 'validation': []}
-
+  train_metrics = MetricsContainer(['loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'])
   train_timer = Timer()
-  eval_timer = Timer()
-
-  train_meter = MetricsContainer(['loss', 'c_loss', 'o_loss', 'oc_alpha', 'k'])
-
-  best_train_mIoU = -1
-  DEVICE = "cuda"
-  THRESHOLDS = list(map(float, args.validate_thresholds.split(","))) if args.validate_thresholds else list(np.arange(0.10, 0.50, 0.05))
+  miou_best = -1
 
   choices = torch.ones(train_dataset.info.num_classes)
   focal_factor = torch.ones(train_dataset.info.num_classes)
@@ -217,30 +181,33 @@ if __name__ == '__main__':
   for step in range(step_init, step_max):
     _, images, targets = train_iterator.get()
 
-    images = images.cuda()
+    images = images.to(DEVICE)
     targets = targets.float()
 
-    # ap = linear_schedule(step, step_max, args.alpha_init, args.alpha, args.alpha_schedule)
     ao = linear_schedule(step, step_max, args.oc_alpha_init, args.oc_alpha, args.oc_alpha_schedule)
-    k = round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
+    k = 1  # round(linear_schedule(step, step_max, args.oc_k_init, args.oc_k, args.oc_k_schedule))
 
-    logits, features = model(images, with_cam=True)
+    with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+      # Normal
+      logits, features = cgnet(images, with_cam=True)
 
-    c_loss = class_loss_fn(logits, label_smoothing(targets, args.label_smoothing).to(logits)).mean()
+      labels_sm = label_smoothing(targets, args.label_smoothing).to(DEVICE)
+      c_loss = class_loss_fn(logits, labels_sm).mean()
 
-    # OC-CSE
-    labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
-    cl_logits = oc_nn(occse.soft_mask_images(images, features, labels_mask.cuda()))
+      labels_mask, _ = occse.split_label(targets, k, choices, focal_factor, args.oc_strategy)
+      labels_oc = (targets - labels_mask).clip(min=0)
 
-    labels_oc = targets - labels_mask
-    labels_oc_sm = label_smoothing(labels_oc, args.label_smoothing)
-    o_loss = class_loss_fn(cl_logits, labels_oc_sm.to(cl_logits)).mean()
+      cl_logits = ocnet(occse.soft_mask_images(images, features, labels_mask, globalnorm=args.oc_mask_globalnorm))
+      o_loss = class_loss_fn(cl_logits, label_smoothing(labels_oc, args.label_smoothing).to(cl_logits)).mean()
 
-    loss = (c_loss + ao * o_loss)
+      loss = c_loss + ao * o_loss
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+    scaler.scale(loss).backward()
+
+    if (step + 1) % args.accumulate_steps == 0:
+      scaler.step(optimizer)
+      scaler.update()
+      optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
 
     occse.update_focal(
       targets,
@@ -251,80 +218,75 @@ if __name__ == '__main__':
       gamma=args.oc_focal_gamma
     )
 
-    # region logging
-    train_meter.update({'loss': loss.item(), 'c_loss': c_loss.item(), 'o_loss': o_loss.item(), 'oc_alpha': ao, 'k': k})
+    epoch = step // step_val
+    do_logging = (step + 1) % step_log == 0
+    do_validation = args.validate and (step + 1) % step_val == 0
 
-    do_logging = (step + 1) % log_iteration == 0
-    do_validation = args.validate and (step + 1) % val_iteration == 0
+    train_metrics.update(
+      {
+        'loss': loss.item(),
+        'c_loss': c_loss.item(),
+        'o_loss': o_loss.item(),
+        'oc_alpha': ao,
+        'k': k
+      }
+    )
 
     if do_logging:
-      (loss, c_loss, o_loss, ao, k) = train_meter.get(clear=True)
+      (loss, c_loss, o_loss, ap, ao, k) = train_metrics.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(optimizer))
+      cs = to_numpy(choices.int()).tolist()
+      ffs = to_numpy(focal_factor).astype(float).round(2).tolist()
 
       data = {
         'iteration': step + 1,
         'lr': lr,
-        # 'alpha': ap,
         'loss': loss,
         'c_loss': c_loss,
-        # 'p_loss': p_loss,
-        # 're_loss': re_loss,
         'o_loss': o_loss,
         'oc_alpha': ao,
         'k': k,
+        'choices': cs,
+        'focal_factor': ffs,
         'time': train_timer.tok(clear=True),
-        'focal_factor': focal_factor.cpu().detach().numpy().tolist()
       }
-      data_dic['train'].append(data)
-      write_json(data_path, data_dic)
 
-      log(
-        '\niteration  = {iteration:,}\n'
+      wb_logs = {f"train/{k}": v for k, v in data.items()}
+      wb_logs["train/epoch"] = epoch
+      wandb.log(wb_logs, commit=not do_validation)
+
+      print(
+        'iteration    = {iteration:,}\n'
         'time         = {time:.0f} sec\n'
         'lr           = {lr:.4f}\n'
-        # 'alpha        = {alpha:.2f}\n'
         'loss         = {loss:.4f}\n'
         'c_loss       = {c_loss:.4f}\n'
-        # 'p_loss       = {p_loss:.4f}\n'
-        # 're_loss       = {re_loss:.4f}\n'
         'o_loss       = {o_loss:.4f}\n'
         'oc_alpha     = {oc_alpha:.4f}\n'
         'k            = {k}\n'
-        'focal_factor = {focal_factor}'.format(**data)
+        'focal_factor = {focal_factor}\n'
+        'choices      = {choices}\n'.format(**data)
       )
-
-      # endregion
-
-    # region evaluation
 
     if do_validation:
-      model.eval()
-      metric_results = priors_validation_step(
-        model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
-      )
+      cgnet.eval()
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+        metric_results = priors_validation_step(
+          cgnet, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        )
       metric_results["iteration"] = step + 1
-      model.train()
+      cgnet.train()
 
+      wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
       if metric_results["miou"] > miou_best:
         miou_best = metric_results["miou"]
+        for k in ("threshold", "miou", "iou"):
+          wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
-      data_dic['validation'].append(metric_results)
-      write_json(data_path, data_dic)
+      save_model(cgnet, MODEL_PATH, parallel=GPUS_COUNT > 1)
 
-      log(
-        '\niteration       = {iteration:,}\n'
-        'time            = {time:.0f} sec\n'
-        'threshold       = {threshold:.2f}\n'
-        'train_mIoU      = {train_mIoU:.2f}%\n'
-        'best_train_mIoU = {best_train_mIoU:.2f}%\n'.format(**metric_results)
-      )
-
-    # endregion
-
-  write_json(data_path, data_dic)
-
-  log(f'[i] {args.tag} saved at {model_path}')
-  save_model(model, model_path, parallel=GPUS_COUNT > 1)
+  print(TAG)
+  wb_run.finish()

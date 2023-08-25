@@ -28,6 +28,8 @@ parser = argparse.ArgumentParser()
 
 
 # region Arguments
+parser.add_argument('--tag', default='', type=str)
+parser.add_argument('--print_ratio', default=0.25, type=float)
 
 # Dataset
 parser.add_argument('--seed', default=0, type=int)
@@ -79,9 +81,7 @@ parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
 
-parser.add_argument('--print_ratio', default=0.25, type=float)
-
-parser.add_argument('--tag', default='', type=str)
+# Augmentation
 parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--cutmix_prob', default=1.0, type=float)
 parser.add_argument('--mixup_prob', default=1.0, type=float)
@@ -91,10 +91,11 @@ parser.add_argument('--num_pieces', default=4, type=int)
 parser.add_argument('--loss_option', default='cl_pcl_re', type=str)
 parser.add_argument('--re_loss', default='L1_Loss', type=str)  # 'L1_Loss', 'L2_Loss'
 
-parser.add_argument('--alpha', default=1.0, type=float)
+parser.add_argument('--alpha', default=4.0, type=float)
 parser.add_argument('--alpha_init', default=0.0, type=float)
 parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
+# For OC-CSE
 parser.add_argument('--oc-alpha', default=1.0, type=float)
 parser.add_argument('--oc-alpha-init', default=0.3, type=float)
 parser.add_argument('--oc-alpha-schedule', default=1.0, type=float)
@@ -102,6 +103,7 @@ parser.add_argument('--oc-k', default=1.0, type=float)
 parser.add_argument('--oc-k-init', default=1.0, type=float)
 parser.add_argument('--oc-k-schedule', default=0, type=float)
 
+# For NOC
 parser.add_argument('--ow', default=0.5, type=float)
 parser.add_argument('--ow-init', default=0, type=float)
 parser.add_argument('--ow-schedule', default=1.0, type=float)

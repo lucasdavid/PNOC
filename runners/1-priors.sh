@@ -155,6 +155,58 @@ train_vanilla() {
     --num_workers $WORKERS_TRAIN
 }
 
+train_occse() {
+  echo "=================================================================="
+  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
+  # default OC-CSE parameters <https://github.com/KAIST-vilab/OC-CSE>
+  MODE=fix
+  TRAINABLE_STEM=false
+  DILATED=true
+
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,oc-cse" \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-occse" \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
+    $PY scripts/cam/train_occse.py \
+    --tag $TAG \
+    --lr $LR \
+    --num_workers $WORKERS_TRAIN \
+    --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
+    --architecture $ARCHITECTURE \
+    --dilated $DILATED \
+    --mode "$MODE" \
+    --trainable-stem $TRAINABLE_STEM \
+    --regularization $REGULAR \
+    --oc-architecture $OC_ARCHITECTURE \
+    --oc-pretrained $OC_PRETRAINED \
+    --oc-regularization $OC_REGULAR \
+    --oc-mask-globalnorm $OC_MASK_GN \
+    --image_size $IMAGE_SIZE \
+    --min_image_size $MIN_IMAGE_SIZE \
+    --max_image_size $MAX_IMAGE_SIZE \
+    --augment $AUGMENT \
+    --cutmix_prob $CUTMIX \
+    --mixup_prob $MIXUP \
+    --label_smoothing $LABELSMOOTHING \
+    --max_epoch $EPOCHS \
+    --oc-alpha $OC_ALPHA \
+    --oc-alpha-init $OC_INIT \
+    --oc-alpha-schedule $OC_SCHEDULE \
+    --oc-strategy $OC_STRATEGY \
+    --oc-focal-momentum $OC_F_MOMENTUM \
+    --oc-focal-gamma $OC_F_GAMMA \
+    --validate $PERFORM_VALIDATION \
+    --validate_max_steps $VALIDATE_MAX_STEPS \
+    --validate_thresholds $VALIDATE_THRESHOLDS \
+    --dataset $DATASET \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID \
+    --data_dir $DATA_DIR;
+}
+
 train_puzzle() {
   echo "=================================================================="
   echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."

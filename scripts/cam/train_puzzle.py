@@ -84,7 +84,7 @@ parser.add_argument('--re_loss_option', default='masking', type=str)  # 'none', 
 
 # parser.add_argument('--branches', default='0,0,0,0,0,1', type=str)
 
-parser.add_argument('--alpha', default=1.0, type=float)
+parser.add_argument('--alpha', default=4.0, type=float)
 parser.add_argument('--alpha_schedule', default=0.50, type=float)
 
 import cv2
