@@ -10,7 +10,7 @@ import wandb
 import datasets
 from tools.general import wandb_utils
 from tools.ai.demo_utils import crf_inference_label
-from tools.general.io_utils import load_saliency_file
+from tools.general.io_utils import load_saliency_file, str2bool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)

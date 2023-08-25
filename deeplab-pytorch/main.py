@@ -104,9 +104,7 @@ def main(ctx):
     "--cuda/--cpu", default=True, help="Enable CUDA if available [default: --cuda]"
 )
 def train(config_path, cuda):
-    """
-    Training DeepLab by v2 protocol
-    """
+    print("Training DeepLab by v2 protocol")
 
     # Configuration
     CONFIG = OmegaConf.load(config_path)
@@ -201,7 +199,7 @@ def train(config_path, cuda):
         CONFIG.DATASET.SPLIT.TRAIN,
     )
     makedirs(checkpoint_dir)
-    print("Checkpoint dst:", checkpoint_dir)
+    print("Checkpoint dst:", checkpoint_dir, flush=True)
 
     # Freeze the batch norm pre-trained on COCO
     model.train()
@@ -302,9 +300,7 @@ def train(config_path, cuda):
     "--cuda/--cpu", default=True, help="Enable CUDA if available [default: --cuda]"
 )
 def test(config_path, model_path, cuda):
-    """
-    Evaluation on validation set
-    """
+    print("Evaluation on validation set")
 
     # Configuration
     CONFIG = OmegaConf.load(config_path)
@@ -359,7 +355,7 @@ def test(config_path, model_path, cuda):
     )
     makedirs(save_dir)
     save_path = os.path.join(save_dir, "scores.json")
-    print("Score dst:", save_path)
+    print("Score dst:", save_path, flush=True)
 
     preds, gts = [], []
     for image_ids, images, gt_labels in tqdm(
@@ -411,9 +407,7 @@ def test(config_path, model_path, cuda):
     help="Number of parallel jobs",
 )
 def crf(config_path, n_jobs):
-    """
-    CRF post-processing on pre-computed logits
-    """
+    print("CRF post-processing on pre-computed logits")
 
     # Configuration
     CONFIG = OmegaConf.load(config_path)
@@ -464,7 +458,7 @@ def crf(config_path, n_jobs):
     )
     makedirs(save_dir)
     save_path = os.path.join(save_dir, "scores_crf.json")
-    print("Score dst:", save_path)
+    print("Score dst:", save_path, flush=True)
 
     # Process per sample
     def process(i):

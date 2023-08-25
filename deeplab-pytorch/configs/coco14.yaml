@@ -10,8 +10,8 @@ DATASET:
     IGNORE_LABEL: 255
     SCALES: [0.5, 0.75, 1.0, 1.25, 1.5]
     SPLIT:
-        TRAIN: train2014
-        VAL: val2014
+        TRAIN: train
+        VAL: val
         TEST: no
 
 DATALOADER:

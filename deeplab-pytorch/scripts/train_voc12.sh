@@ -60,9 +60,9 @@ TXT_FILE=data/datasets/voc12/VOCdevkit/VOC2012/ImageSets/Segmentation/test.txt
 MODEL_PATH=data/models/$EXP_ID/deeplabv2_resnet101_msc/train_aug/checkpoint_final.pth
 PRED_DIR=data/features/$EXP_ID/deeplabv2_resnet101_msc/test/preds
 
-CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.yaml
-CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py test   --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH
-CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py crf    --config-path configs/$EXP_ID.yaml
+# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.yaml
+# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py test   --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH
+# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py crf    --config-path configs/$EXP_ID.yaml
 
-CUDA_VISIBLE_DEVICES=$DEVICES $PY demo.py single --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH \
+CUDA_VISIBLE_DEVICES=$DEVICES $PY demo_testvoc.py single --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH \
   --img-dir $IMAGES_DIR --txt-file $TXT_FILE --save-dir $PRED_DIR --crf

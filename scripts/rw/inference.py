@@ -128,12 +128,12 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       try:
         cam_dict = np.load(cam_path, allow_pickle=True).item()
       except UnpicklingError as error:
-        errors.append(cam_path)
+        errors.append(image_id)
         if args.verbose >= 3:
           print(f"{image_id} skipped (cam error={error})")
         continue
       except FileNotFoundError:
-        missing.append(cam_path)
+        missing.append(image_id)
         if args.verbose >= 3:
           print(f"{image_id} skipped (cam missing)")
         continue
@@ -181,10 +181,16 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
       if args.verbose >= 2:
         print(f"{image_id} ok")
 
-    if missing: print(f"{len(missing)} files were missing and were not processed:", *missing, sep='\n  - ', flush=True)
-    if errors: print(f"{len(errors)} CAM files could not be read:", *errors, sep="\n  - ", flush=True)
+    if missing:
+      print(f"{len(missing)} files were missing and were not processed", flush=True)
+      if args.verbose > 1:
+        print(*missing[:10], flush=True)
+    if errors:
+      print(f"{len(errors)} CAM files could not be read", flush=True)
+      if args.verbose > 1:
+        print(*errors[:10], flush=True)
 
-    print(f"{processed} images successfully processed")
+    print(f"{processed} images successfully processed", flush=True)
 
 
 if __name__ == '__main__':

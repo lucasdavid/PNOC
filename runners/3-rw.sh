@@ -170,8 +170,8 @@ RW_EXP=8
 PARAMS="beta=$RW_BETA@exp_times=$RW_EXP@rw"
 
 # DOMAIN=$DOMAIN_TRAIN     rw_inference
-# DOMAIN=$DOMAIN_VALID     rw_inference
-CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@$DOMAIN_VALID_SEG@scale=0.5,1.0,1.5,2.0
+DOMAIN=$DOMAIN_VALID     rw_inference
+CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@val@scale=0.5,1.0,1.5,2.0
 DOMAIN=$DOMAIN_VALID_SEG rw_inference
 
 CRF_T=1

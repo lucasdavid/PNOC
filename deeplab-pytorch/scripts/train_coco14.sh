@@ -2,9 +2,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
-#SBATCH -J dv2-voc
+#SBATCH -J dv2-coco14
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-coco.out
-#SBATCH --time=32:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -64,5 +64,5 @@ CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.y
 CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py test   --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH
 CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py crf    --config-path configs/$EXP_ID.yaml
 
-CUDA_VISIBLE_DEVICES=$DEVICES $PY demo.py single --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH \
+CUDA_VISIBLE_DEVICES=$DEVICES $PY demo_testvoc.py single --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH \
   --img-dir $IMAGES_DIR --txt-file $TXT_FILE --save-dir $PRED_DIR --crf
