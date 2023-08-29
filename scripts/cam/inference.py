@@ -119,10 +119,10 @@ def _work(
 
       cams = [forward_tta(model, image, scale, device) for scale in scales]
 
-      cams_st = [resize_for_tensors(c.unsqueeze(0), strided_size)[0] for c in cams]
+      cams_st = [resize_tensor(c.unsqueeze(0), strided_size)[0] for c in cams]
       cams_st = torch.sum(torch.stack(cams_st), dim=0)
 
-      cams_hr = [resize_for_tensors(cams.unsqueeze(0), strided_up_size)[0] for cams in cams]
+      cams_hr = [resize_tensor(cams.unsqueeze(0), strided_up_size)[0] for cams in cams]
       cams_hr = torch.sum(torch.stack(cams_hr), dim=0)[:, :H, :W]
 
       keys = torch.nonzero(torch.from_numpy(label))[:, 0]

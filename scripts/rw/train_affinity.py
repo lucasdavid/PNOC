@@ -131,7 +131,7 @@ if __name__ == '__main__':
       'params': param_groups,
       'lr': args.lr,
       'weight_decay': args.wd
-    }], lr=args.lr, momentum=0.9, max_step=step_max
+    }], lr=args.lr, momentum_sched=0.9, max_step=step_max
   )
 
   # Train

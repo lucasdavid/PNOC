@@ -50,12 +50,12 @@ def log_opt_params(name, params):
 
 def log_print(message='', path=None):
   """This function shows message and saves message.
-    
+
     Args:
-        pred_tags: 
+        pred_tags:
             The type of variable is list.
             The type of each element is string.
-        
+
         gt_tags:
             The type of variable is list.
             the type of each element is string.
@@ -81,7 +81,7 @@ class MetricsContainer:
     for n, v in data.items():
       self._metrics_history[n].append(v)
 
-  def get(self, metrics=None, clear=False):
+  def get(self, metrics=None, clear=False, as_map=False):
     if metrics is None:
       metrics = self.metric_names
 
@@ -89,6 +89,9 @@ class MetricsContainer:
 
     if clear:
       self.clear()
+
+    if as_map:
+      return dict(zip(self.metric_names, metric_values))
 
     if len(metric_values) == 1:
       metric_values = metric_values[0]

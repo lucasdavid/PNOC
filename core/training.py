@@ -11,7 +11,7 @@ from tools.ai.evaluate_utils import (MIoUCalcFromNames, MIoUCalculator,
                                      accumulate_batch_iou_priors,
                                      accumulate_batch_iou_saliency,
                                      maximum_miou_from_thresholds)
-from tools.ai.torch_utils import make_cam, resize_for_tensors, to_numpy
+from tools.ai.torch_utils import make_cam, resize_tensor, to_numpy
 from tools.general import wandb_utils
 
 
@@ -103,7 +103,7 @@ def segmentation_validation_step(
 
       logits = model(inputs.to(device))
       preds = torch.argmax(logits, dim=1).cpu()
-      preds = resize_for_tensors(
+      preds = resize_tensor(
         preds.float().unsqueeze(1), (H, W), mode="nearest"
       ).squeeze().to(masks)
       preds = to_numpy(preds)
@@ -148,7 +148,7 @@ def saliency_validation_step(
 
       _, _, ccams = model(images.to(device))
 
-      ccams = resize_for_tensors(ccams.cpu().float(), (H, W))
+      ccams = resize_tensor(ccams.cpu().float(), (H, W))
       ccams = to_numpy(make_cam(ccams).squeeze())
       masks = to_numpy(masks)
 

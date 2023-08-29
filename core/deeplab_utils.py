@@ -99,8 +99,8 @@ class Decoder(nn.Module):
 
     self.classifier = nn.Sequential(
       nn.Conv2d(304, 256, kernel_size=3, stride=1, padding=1, bias=False), norm_fn(256), nn.ReLU(inplace=True),
-      nn.Dropout(0.5), nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False), norm_fn(256),
-      nn.ReLU(inplace=True), nn.Dropout(0.1), nn.Conv2d(256, num_classes, kernel_size=1, stride=1)
+      nn.Dropout(0.5), nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False), norm_fn(256), nn.ReLU(inplace=True),
+      nn.Dropout(0.1), nn.Conv2d(256, num_classes, kernel_size=1, stride=1)
     )
 
     self.initialize([self.conv1, self.bn1] + list(self.classifier.modules()))

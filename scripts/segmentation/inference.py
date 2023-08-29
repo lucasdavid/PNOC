@@ -93,7 +93,7 @@ def run(args):
 def forward_tta(model, images, image_size, device):
   images = images.to(device)
   logits = model(images)
-  logits = resize_for_tensors(logits, image_size).cpu().float()
+  logits = resize_tensor(logits, image_size).cpu().float()
   logits = logits[0] + logits[1].flip(-1)
 
   return logits

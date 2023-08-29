@@ -145,7 +145,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         cams = cam_dict['hr_cam']
         cams = torch.as_tensor(cams)
         size = cams.shape[1:]
-        cams = resize_for_tensors(cams.unsqueeze(0), get_strided_size(size, 4))[0]
+        cams = resize_tensor(cams.unsqueeze(0), get_strided_size(size, 4))[0]
         # print(f"{image_id} hr-cam resized {tuple(size)} -> {tuple(cams.shape)}")
 
       # preprocessing

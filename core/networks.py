@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 
-from tools.ai.torch_utils import (gap2d, resize_for_tensors,
+from tools.ai.torch_utils import (gap2d, resize_tensor,
                                   set_trainable_layers)
 
 from . import ccam, regularizers
@@ -161,28 +161,40 @@ class Backbone(nn.Module):
     names = ([], [], [], [])
     groups = ([], [], [], [])
 
-    for name, param in self.named_parameters():
-      if param.requires_grad:
+    scratch_parameters = set()
+    all_parameters = set()
+
+    for layer in self.from_scratch_layers:
+      for name, param in layer.named_parameters():
+        if param in all_parameters:
+          continue
+        scratch_parameters.add(param)
+        all_parameters.add(param)
+
+        if not param.requires_grad:
+          continue
         for p in exclude_partial_names:
           if p in name:
             continue
 
-        if 'model' in name:
-          if 'weight' in name:
-            names[0].append(name)
-            groups[0].append(param)
-          else:
-            names[1].append(name)
-            groups[1].append(param)
+        idx = 2 if "weight" in name else 3
+        names[idx].append(name)
+        groups[idx].append(param)
 
-        # scracthed weights
-        else:
-          if 'weight' in name:
-            names[2].append(name)
-            groups[2].append(param)
-          else:
-            names[3].append(name)
-            groups[3].append(param)
+    for name, param in self.named_parameters():
+      if param in all_parameters:
+        continue
+      all_parameters.add(param)
+
+      if not param.requires_grad or param in scratch_parameters:
+        continue
+      for p in exclude_partial_names:
+        if p in name:
+          continue
+
+      idx = 0 if "weight" in name else 1
+      names[idx].append(name)
+      groups[idx].append(param)
 
     if with_names:
       return groups, names
@@ -281,23 +293,6 @@ class CCAM(Backbone):
     feats = torch.cat([x2, x1], dim=1)
 
     return self.ac_head(feats)
-
-  def get_parameter_groups(self):
-    groups = ([], [], [], [])
-    for m in self.modules():
-      if (isinstance(m, nn.Conv2d) or isinstance(m, nn.modules.normalization.GroupNorm)):
-        if m.weight.requires_grad:
-          if m in self.from_scratch_layers:
-            groups[2].append(m.weight)
-          else:
-            groups[0].append(m.weight)
-
-        if m.bias is not None and m.bias.requires_grad:
-          if m in self.from_scratch_layers:
-            groups[3].append(m.bias)
-          else:
-            groups[1].append(m.bias)
-    return groups
 
 
 class AffinityNet(Backbone):
@@ -415,15 +410,11 @@ class DeepLabV3Plus(Backbone):
   def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=None, use_group_norm=False):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
-    if use_group_norm:
-      norm_fn_for_extra_modules = group_norm
-    else:
-      norm_fn_for_extra_modules = self.norm_fn
-
     in_features = self.out_features
+    norm_fn = group_norm if use_group_norm else nn.BatchNorm2d
 
-    self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn_for_extra_modules)
-    self.decoder = Decoder(num_classes, 256, norm_fn_for_extra_modules)
+    self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn)
+    self.decoder = Decoder(num_classes, 256, norm_fn)
 
   def forward(self, x, with_cam=False):
     inputs = x
@@ -438,6 +429,6 @@ class DeepLabV3Plus(Backbone):
 
     x = self.aspp(x)
     x = self.decoder(x, x_low_level)
-    x = resize_for_tensors(x, inputs.size()[2:], align_corners=True)
+    x = resize_tensor(x, inputs.size()[2:], align_corners=True)
 
     return x
