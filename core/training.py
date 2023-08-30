@@ -113,6 +113,7 @@ def segmentation_validation_step(
 
       if step == 0 and log_samples:
         inputs = to_numpy(inputs)
+        masks[masks == 255] = info.void_class
         wandb_utils.log_masks(ids, inputs, targets, masks, preds, info.classes)
 
   miou, miou_fg, iou, FP, FN = meter.get(clear=True, detail=True)
