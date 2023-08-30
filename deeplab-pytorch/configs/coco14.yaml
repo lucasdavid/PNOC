@@ -1,9 +1,9 @@
 EXP:
-    ID: coco14
+    ID: coco14_640px
     OUTPUT_DIR: data_coco
 
 DATASET:
-    NAME: coco
+    NAME: coco14
     ROOT: ./data/datasets/coco14
     LABELS: ./data/datasets/coco14/labels.txt
     N_CLASSES: 81

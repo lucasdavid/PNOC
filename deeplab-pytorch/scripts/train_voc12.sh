@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J dv2-voc12_513px
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-voc12_513px.out
-#SBATCH --time=24:00:00
+#SBATCH --time=10:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -24,7 +24,7 @@
 # Train a DeepLabV2 model to perform semantic segmentation.
 #
 
-if [[ "`hostname`" == "sdumont"* ]]; then
+if [[ "`hostname`" == "sdumont8"* ]]; then
   ENV=sdumont
   WORK_DIR=$SCRATCH/deeplab-pytorch
 
@@ -37,9 +37,23 @@ if [[ "`hostname`" == "sdumont"* ]]; then
   nodeset -e $SLURM_JOB_NODELIST
   module load sequana/current
   module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+elif [[ "`hostname`" == "sdumont3"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/deeplab-pytorch
+
+  ### Sdumont
+  PY=python
+  PIP=pip
+  DEVICES=0,1
+
+  # export OMP_NUM_THREADS=4
+  nodeset -e $SLURM_JOB_NODELIST
+  module load gcc/7.4 cudnn/8.2_cuda-11.3
+
+  source $SCRATCH/envs/torch1.12/bin/activate
 else
   ENV=local
-  WORK_DIR=/home/ldavid/workspace/repos/research/wsss/deeplab-pytorch
+  WORK_DIR=$HOME/workspace/repos/research/wsss/deeplab-pytorch
 
   ### Local
   PY=python
@@ -53,16 +67,16 @@ cd $SCRATCH/deeplab-pytorch
 # $PIP -qq install click tqdm addict joblib omegaconf opencv-python torchnet tensorboard
 # echo "Done."
 
-EXP_ID=voc12_513px  # voc12  # (321px)
+EXP_ID=voc12_513px  # voc12_513px  # voc12  # (321px)
 
 IMAGES_DIR=data/datasets/voc12/VOCdevkit/VOC2012/JPEGImages
 TXT_FILE=data/datasets/voc12/VOCdevkit/VOC2012/ImageSets/Segmentation/test.txt
 MODEL_PATH=data/models/$EXP_ID/deeplabv2_resnet101_msc/train_aug/checkpoint_final.pth
 PRED_DIR=data/features/$EXP_ID/deeplabv2_resnet101_msc/test/preds
 
-# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.yaml
-# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py test   --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH
-# CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py crf    --config-path configs/$EXP_ID.yaml
+CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.yaml
+CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py test   --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH
+CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py crf    --config-path configs/$EXP_ID.yaml
 
 CUDA_VISIBLE_DEVICES=$DEVICES $PY demo_testvoc.py single --config-path configs/$EXP_ID.yaml --model-path $MODEL_PATH \
   --img-dir $IMAGES_DIR --txt-file $TXT_FILE --save-dir $PRED_DIR --crf

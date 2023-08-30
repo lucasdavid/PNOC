@@ -1,0 +1,8 @@
+click
+tqdm
+addict
+joblib
+omegaconf
+opencv-python
+torchnet
+tensorboard

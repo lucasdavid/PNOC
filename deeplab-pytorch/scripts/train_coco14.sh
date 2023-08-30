@@ -6,6 +6,7 @@
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-coco.out
 #SBATCH --time=48:00:00
 
+
 # Copyright 2023 Lucas Oliveira David
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +25,7 @@
 # Train a DeepLabV2 model to perform semantic segmentation.
 #
 
-if [[ "`hostname`" == "sdumont"* ]]; then
+if [[ "`hostname`" == "sdumont8"* ]]; then
   ENV=sdumont
   WORK_DIR=$SCRATCH/deeplab-pytorch
 
@@ -37,9 +38,23 @@ if [[ "`hostname`" == "sdumont"* ]]; then
   nodeset -e $SLURM_JOB_NODELIST
   module load sequana/current
   module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
+elif [[ "`hostname`" == "sdumont3"* ]]; then
+  ENV=sdumont
+  WORK_DIR=$SCRATCH/deeplab-pytorch
+
+  ### Sdumont
+  PY=python
+  PIP=pip
+  DEVICES=0,1
+
+  # export OMP_NUM_THREADS=4
+  nodeset -e $SLURM_JOB_NODELIST
+  module load gcc/7.4 cudnn/8.2_cuda-11.3
+
+  source $SCRATCH/envs/torch1.12/bin/activate
 else
   ENV=local
-  WORK_DIR=/home/ldavid/workspace/repos/research/wsss/deeplab-pytorch
+  WORK_DIR=$HOME/workspace/repos/research/wsss/deeplab-pytorch
 
   ### Local
   PY=python
@@ -53,7 +68,7 @@ cd $SCRATCH/deeplab-pytorch
 # $PIP -qq install click tqdm addict joblib omegaconf opencv-python torchnet tensorboard
 # echo "Done."
 
-EXP_ID=coco14
+EXP_ID=coco14_640px
 
 IMAGES_DIR=data/datasets/coco14/JPEGImages
 TXT_FILE=data/datasets/coco14/val.txt

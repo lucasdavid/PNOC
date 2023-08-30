@@ -1,5 +1,5 @@
 EXP:
-    ID: voc12
+    ID: voc12_418px
     OUTPUT_DIR: data
 
 DATASET:
@@ -24,7 +24,7 @@ IMAGE:
         B: 104.008
     SIZE:
         BASE: # None
-        TRAIN: 321
+        TRAIN: 418
         TEST: 513
 
 MODEL:
@@ -35,7 +35,7 @@ MODEL:
 
 SOLVER:
     BATCH_SIZE:
-        TRAIN: 5
+        TRAIN: 16
         TEST: 1
     ITER_MAX: 20000
     ITER_SIZE: 2
@@ -56,3 +56,5 @@ CRF:
     BI_W: 4
     BI_XY_STD: 67
     BI_RGB_STD: 3
+
+    # INIT_MODEL: data/models/coco/deeplabv1_resnet101/caffemodel/deeplabv1_resnet101-coco.pth

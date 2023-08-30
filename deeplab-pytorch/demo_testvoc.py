@@ -162,6 +162,8 @@ def single(config_path, model_path, img_dir, txt_file, save_dir, cuda, crf):
     device = get_device(cuda)
     torch.set_grad_enabled(False)
 
+    os.makedirs(save_dir, exist_ok=True)
+
     classes = get_classtable(CONFIG)
     postprocessor = setup_postprocessor(CONFIG) if crf else None
 
