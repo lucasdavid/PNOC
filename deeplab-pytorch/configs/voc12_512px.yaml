@@ -1,5 +1,5 @@
 EXP:
-    ID: voc12_513px
+    ID: voc12_512px
     OUTPUT_DIR: data
 
 DATASET:
@@ -24,7 +24,7 @@ IMAGE:
         B: 104.008
     SIZE:
         BASE: # None
-        TRAIN: 500
+        TRAIN: 512
         TEST: 513
 
 MODEL:

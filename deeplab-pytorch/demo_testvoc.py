@@ -26,6 +26,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
+
 def get_device(cuda):
     cuda = cuda and torch.cuda.is_available()
     device = torch.device("cuda" if cuda else "cpu")
@@ -142,7 +143,7 @@ def main(ctx):
 @click.option(
     "-s",
     "--save-dir",
-    type=click.Path(exists=True),
+    type=click.Path(),
     required=True,
     help="Directory to be saved",
 )

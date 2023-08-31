@@ -249,7 +249,9 @@ def train(config_path, cuda):
 
         # TensorBoard
         if iteration % CONFIG.SOLVER.ITER_TB == 0:
-            writer.add_scalar("loss/train", average_loss.value()[0], iteration)
+            _average_loss = average_loss.value()[0]
+            writer.add_scalar("loss/train", _average_loss, iteration)
+            print(f"step={iteration} loss={_average_loss}")
             for i, o in enumerate(optimizer.param_groups):
                 writer.add_scalar("lr/group_{}".format(i), o["lr"], iteration)
             for i in range(torch.cuda.device_count()):

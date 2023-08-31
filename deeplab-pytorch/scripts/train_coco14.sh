@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J dv2-coco14
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-coco.out
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 
 
 # Copyright 2023 Lucas Oliveira David

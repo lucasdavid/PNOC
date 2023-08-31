@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J dv2-voc12_513px
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-voc12_513px.out
-#SBATCH --time=10:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -67,7 +67,7 @@ cd $SCRATCH/deeplab-pytorch
 # $PIP -qq install click tqdm addict joblib omegaconf opencv-python torchnet tensorboard
 # echo "Done."
 
-EXP_ID=voc12_513px  # voc12_513px  # voc12  # (321px)
+EXP_ID=voc12_512px  # voc12_418px  # voc12  # (321px)
 
 IMAGES_DIR=data/datasets/voc12/VOCdevkit/VOC2012/JPEGImages
 TXT_FILE=data/datasets/voc12/VOCdevkit/VOC2012/ImageSets/Segmentation/test.txt
