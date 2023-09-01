@@ -38,7 +38,7 @@ def cams_to_wb_images(images, cams):
   return wb_images, wb_cams
 
 
-def masks_to_wb_images(images, masks, preds, classes):
+def masks_to_wb_images(images, masks, preds, classes, void_class=0):
   indices = dict(enumerate(classes.tolist()))
   samples = min(len(images), 8)
   stats = imagenet_stats()
@@ -48,6 +48,9 @@ def masks_to_wb_images(images, masks, preds, classes):
     masks = masks + 1
     preds = preds + 1
     indices = {i+1: c for i, c in indices.items()}
+
+  pixel_ignore = masks == 255
+  masks[pixel_ignore] = void_class
 
   return [
     wandb.Image(denormalize(images[b], *stats), masks={
@@ -102,9 +105,10 @@ def log_masks(
   masks,
   preds,
   classes,
+  void_class=0,
   commit=False,
 ):
-  wb_images = masks_to_wb_images(images, masks, preds, classes)
+  wb_images = masks_to_wb_images(images, masks, preds, classes, void_class)
   wb_targets = _predictions_to_names(targets, classes)
 
   columns = ("Id", "Image", "Labels")

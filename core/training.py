@@ -95,7 +95,8 @@ def segmentation_validation_step(
 ):
   start = time.time()
 
-  meter = MIoUCalculator(info.classes, bg_class=info.bg_class, include_bg=False)
+  classes = [c for i, c in enumerate(info.classes) if i != info.void_class]
+  meter = MIoUCalculator(classes, bg_class=info.bg_class, include_bg=False)
 
   with torch.no_grad():
     for step, (ids, inputs, targets, masks) in enumerate(loader):
@@ -113,11 +114,10 @@ def segmentation_validation_step(
 
       if step == 0 and log_samples:
         inputs = to_numpy(inputs)
-        masks[masks == 255] = info.void_class
-        wandb_utils.log_masks(ids, inputs, targets, masks, preds, info.classes)
+        wandb_utils.log_masks(ids, inputs, targets, masks, preds, info.classes, info.void_class)
 
   miou, miou_fg, iou, FP, FN = meter.get(clear=True, detail=True)
-  iou = [round(iou[c], 2) for c in info.classes]
+  iou = [round(iou[c], 2) for c in classes]
 
   elapsed = time.time() - start
 
