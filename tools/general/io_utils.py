@@ -3,6 +3,7 @@
 
 import argparse
 import os
+from typing import Tuple
 
 import numpy as np
 from PIL import Image
@@ -25,7 +26,27 @@ def str2bool(v):
     raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def load_saliency_file(sal_file, kind='saliency'):
+def load_cam_file(cam_file: str, allow_pickle: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+  data = np.load(cam_file, allow_pickle=allow_pickle).item()
+
+  if "keys" in data:
+    # Affinity/Puzzle/PNOC
+    keys = data["keys"]
+
+    if "hr_cam" in data.keys():
+      cam = data["hr_cam"]
+    elif "rw" in data.keys():
+      cam = data["rw"]
+  else:
+    # OC-CSE
+    keys = list(data.keys())
+    cam = np.stack([data[k] for k in keys], 0)
+    keys = np.asarray([0] + [k+1 for k in keys])
+
+  return cam, keys
+
+
+def load_saliency_file(sal_file: str, kind: str = 'saliency') -> np.ndarray:
 
   with Image.open(sal_file) as s:
     s = np.asarray(s)

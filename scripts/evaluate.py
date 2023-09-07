@@ -6,13 +6,11 @@ import sys
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-import torch
-from torch.nn import functional as F
-import wandb
 import datasets
+import wandb
+from tools.ai.demo_utils import crf_inference_label
 from tools.general import wandb_utils
-from tools.ai.demo_utils import crf_inference_dlv2_softmax, crf_inference_label
-from tools.general.io_utils import load_saliency_file, str2bool
+from tools.general.io_utils import load_cam_file, load_saliency_file
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)
@@ -30,7 +28,7 @@ parser.add_argument("--sal_threshold", default=None, type=float)
 parser.add_argument("--crf_t", default=0, type=int)
 parser.add_argument("--crf_gt_prob", default=0.7, type=float)
 
-parser.add_argument("--mode", default="npy", type=str, choices=["npy", "png", "rw", "deeplab"])  # png, rw, deeplab
+parser.add_argument("--mode", default="npy", type=str, choices=["png", "npy", "rw"])
 parser.add_argument("--threshold", default=None, type=float)
 parser.add_argument("--min_th", default=0.05, type=float)
 parser.add_argument("--max_th", default=0.81, type=float)
@@ -67,45 +65,17 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
         cam = cam.reshape(y_pred.shape)
 
       elif os.path.exists(npy_file):
-        if args.mode == "deeplab":
-          logit = np.load(npy_file)
-          H, W = y_true.shape
-          logit = torch.as_tensor(logit[None, ...], dtype=torch.float32)
-          logit = F.interpolate(logit, size=(H, W), mode="bilinear", align_corners=False)
-          prob = F.softmax(logit, dim=1)[0].numpy()
-          cam = np.argmax(prob, axis=0)
-          keys = np.arange(prob.shape[0], dtype="uint8")
-          del logit
+        cam, keys = load_cam_file(npy_file)
+
+        if sal_file:
+          sal = load_saliency_file(sal_file, args.sal_mode)
+          bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
+
+          cam = np.concatenate((bg, cam), axis=0)
         else:
-          try:
-            data = np.load(npy_file, allow_pickle=True).item()
-          except:
-            corrupted.append(image_id)
-            continue
+          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
 
-          if "keys" in data:
-            # Affinity/Puzzle/PNOC
-            keys = data["keys"]
-
-            if "hr_cam" in data.keys():
-              cam = data["hr_cam"]
-            elif "rw" in data.keys():
-              cam = data["rw"]
-          else:
-            # OC-CSE
-            keys = list(data.keys())
-            cam = np.stack([data[k] for k in keys], 0)
-            keys = np.asarray([0] + [k+1 for k in keys])
-
-          if sal_file:
-            sal = load_saliency_file(sal_file, args.sal_mode)
-            bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
-
-            cam = np.concatenate((bg, cam), axis=0)
-          else:
-            cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
-
-          cam = np.argmax(cam, axis=0)
+        cam = np.argmax(cam, axis=0)
       else:
         missing.append(image_id)
         continue
@@ -114,12 +84,9 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
         try:
           with Image.open(image_path) as img:
             img = np.asarray(img.convert("RGB"))
-          # if args.mode == "deeplab":
-          #   cam = crf_inference_dlv2_softmax(img, prob)
-          # else:
           cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
         except ValueError as error:
-          if args.verbose > 1:
+          if args.verbose > 2:
             print(
               f"dCRF inference error for id={image_id} img.size={img.shape} "
               f"cam={cam.shape} labels={keys}:",
@@ -146,10 +113,10 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if args.verbose > 1 and missing:
-    print(f"Missing files: {', '.join(missing)}")
-  if args.verbose > 1 and corrupted:
-    print(f"Corrupted files: {', '.join(corrupted)}")
+  if args.verbose > 0 and missing:
+    print(f"Missing files ({len(missing)}): {' '.join(missing[:30])}")
+  if args.verbose > 0 and corrupted:
+    print(f"Corrupted files ({len(corrupted)}): {' '.join(corrupted[:30])}")
   if args.verbose > 0 and start == 0 and (missing or corrupted):
     read = compared + len(missing) + len(corrupted)
     print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
@@ -205,11 +172,7 @@ def do_python_eval(dataset, classes, num_workers=8):
 
 def run(args, dataset: datasets.PathsDataset):
   classes = dataset.info.classes.tolist()
-  include_bg = dataset.info.bg_class is None
-  if include_bg:
-    classes = ["background"] + classes
-  bg_class = dataset.info.bg_class or 0
-  bg_class = classes[bg_class]
+  bg_class = classes[dataset.info.bg_class]
 
   if dataset.info.void_class is not None:
     try: classes.pop(dataset.info.void_class)
@@ -226,7 +189,7 @@ def run(args, dataset: datasets.PathsDataset):
 
   thresholds = (
     np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and SAL_DIR is None and args.mode not in ("png", "deeplab") else [args.threshold]
+    if args.threshold is None and SAL_DIR is None and args.mode not in ("png",) else [args.threshold]
   )
 
   try:
