@@ -1,18 +1,18 @@
 EXP:
-    ID: coco14_640px
-    OUTPUT_DIR: data_coco
+    ID: coco
+    OUTPUT_DIR: data_coco_RIB
 
 DATASET:
-    NAME: coco14
-    ROOT: ./data/datasets/coco14
-    LABELS: ./data/datasets/coco14/labels.txt
+    NAME: coco
+    ROOT: ./data/datasets/coco_2014
+    LABELS: ./data_coco/datasets/coco/labels.txt
     N_CLASSES: 81
     IGNORE_LABEL: 255
-    SCALES: [0.5, 0.75, 1.0, 1.25, 1.5]
+    SCALES: [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
     SPLIT:
-        TRAIN: train
-        VAL: val
-        TEST: no
+        TRAIN: train_2014
+        VAL: val_2014
+        TEST: test
 
 DATALOADER:
     NUM_WORKERS: 8
@@ -24,8 +24,8 @@ IMAGE:
         B: 104.008
     SIZE:
         BASE: # None
-        TRAIN: 640
-        TEST: 640
+        TRAIN: 481
+        TEST: 513
 
 MODEL:
     NAME: DeepLabV2_ResNet101_MSC
@@ -38,16 +38,18 @@ SOLVER:
         TRAIN: 10
         TEST: 1
     ITER_MAX: 100000
-    ITER_SIZE: 2
-    ITER_SAVE: 10000
-    ITER_TB: 100
+    ITER_SIZE: 1
+    ITER_SAVE: 2500
+    ITER_TB: 20
     LR_DECAY: 10
-    LR: 2e-4
+    LR: 2.5e-4
     MOMENTUM: 0.9
     OPTIMIZER: sgd
     POLY_POWER: 0.9
     WEIGHT_DECAY: 5.0e-4
     AVERAGE_LOSS: 20
+    FREEZE_BN: True
+    BALANCE_LOSS: True
 
 CRF:
     ITER_MAX: 10
@@ -56,3 +58,4 @@ CRF:
     BI_W: 4
     BI_XY_STD: 67
     BI_RGB_STD: 3
+

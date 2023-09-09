@@ -1,5 +1,5 @@
 EXP:
-    ID: coco14
+    ID: coco14_481px
     OUTPUT_DIR: data_coco
 
 DATASET:
@@ -24,7 +24,7 @@ IMAGE:
         B: 104.008
     SIZE:
         BASE: # None
-        TRAIN: 321
+        TRAIN: 481
         TEST: 513
 
 MODEL:

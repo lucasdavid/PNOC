@@ -68,11 +68,11 @@ cd $SCRATCH/deeplab-pytorch
 # $PIP -qq install click tqdm addict joblib omegaconf opencv-python torchnet tensorboard
 # echo "Done."
 
-EXP_ID=coco14_640px
+EXP_ID=coco14
 
 IMAGES_DIR=data/datasets/coco14/JPEGImages
 TXT_FILE=data/datasets/coco14/val.txt
-MODEL_PATH=data_coco/models/$EXP_ID/deeplabv2_resnet101_msc/train_aug/checkpoint_final.pth
+MODEL_PATH=data_coco/models/$EXP_ID/deeplabv2_resnet101_msc/train/checkpoint_final.pth
 PRED_DIR=data_coco/features/$EXP_ID/deeplabv2_resnet101_msc/test/preds
 
 CUDA_VISIBLE_DEVICES=$DEVICES $PY main.py train  --config-path configs/$EXP_ID.yaml

@@ -1,18 +1,17 @@
-EXP:
-    ID: coco14
+EXD: coco
     OUTPUT_DIR: data_coco
 
 DATASET:
-    NAME: coco14
-    ROOT: ./data/datasets/coco14
-    LABELS: ./data/datasets/coco14/labels.txt
+    NAME: coco
+    ROOT: ./data/datasets/coco_2014
+    LABELS: ./data/datasets/coco_2014/mask
     N_CLASSES: 81
     IGNORE_LABEL: 255
-    SCALES: [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+    SCALES: [0.5, 0.75, 1.0, 1.25, 1.5]
     SPLIT:
-        TRAIN: train
-        VAL: val
-        TEST: val
+        TRAIN: train2014
+        VAL: val2014
+        TEST: no
 
 DATALOADER:
     NUM_WORKERS: 8
@@ -39,8 +38,8 @@ SOLVER:
         TEST: 1
     ITER_MAX: 100000
     ITER_SIZE: 2
-    ITER_SAVE: 10000
-    ITER_TB: 100
+    ITER_SAVE: 5000
+    ITER_TB: 20
     LR_DECAY: 10
     LR: 2e-4
     MOMENTUM: 0.9
@@ -56,3 +55,4 @@ CRF:
     BI_W: 4
     BI_XY_STD: 67
     BI_RGB_STD: 3
+
