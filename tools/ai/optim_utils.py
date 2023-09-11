@@ -5,18 +5,18 @@ from .torch_utils import *
 
 class PolyOptimizerMixin:
 
-  def __init__(self, params, lr, max_step, momentum_sched=0.9, **kwargs):
+  def __init__(self, params, lr, max_step, poly_power=0.9, start_step=0, **kwargs):
     super().__init__(params, lr, **kwargs)
 
-    self.global_step = 0
+    self.global_step = start_step
     self.max_step = max_step
-    self.momentum_sched = momentum_sched
+    self.poly_power = poly_power
 
     self.__initial_lr = [group['lr'] for group in self.param_groups]
 
   def step(self, closure=None):
     if self.global_step < self.max_step:
-      lr_mult = (1 - self.global_step / self.max_step)**self.momentum_sched
+      lr_mult = (1 - self.global_step / self.max_step)**self.poly_power
 
       for i in range(len(self.param_groups)):
         self.param_groups[i]['lr'] = self.__initial_lr[i] * lr_mult
@@ -55,7 +55,7 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
   ]
 
   if algorithm == "sgd":
-    return PolyOptimizer(params, lr=lr, momentum_sched=0.9, max_step=max_step, **kwargs)
+    return PolyOptimizer(params, lr=lr, poly_power=0.9, max_step=max_step, **kwargs)
   elif algorithm == "lion":
     from lion_pytorch import Lion
     class LionPolyOptimizer(PolyOptimizerMixin, Lion):
