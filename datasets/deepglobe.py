@@ -5,8 +5,8 @@ import numpy as np
 
 from . import base
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'deepglobe')
-CLASSES = ['urban_land', 'agriculture_land', 'rangeland', 'forest_land', 'water', 'barren_land', 'unknown', "void"]
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "deepglobe")
+CLASSES = ["urban_land", "agriculture_land", "rangeland", "forest_land", "water", "barren_land", "unknown"]
 COLORS = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [127, 127, 127]]
 
 
@@ -21,7 +21,7 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
 
   @classmethod
   def _load_labels_from_npy(cls):
-    filepath = os.path.join(DATA_DIR, 'cls_labels_unbalanced.npy')
+    filepath = os.path.join(DATA_DIR, "cls_labels_unbalanced.npy")
     return {k: v.astype("float32") for k, v in np.load(filepath, allow_pickle=True).item().items()}
 
   def __init__(
@@ -43,23 +43,26 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
     self.root_dir = root_dir
     self.sample_labels = self._load_labels_from_npy()
 
-  def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
+  def get_label(self, sample_id) -> np.ndarray:
     label = self.sample_labels[sample_id]
     return label
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
+      num_classes = 7
       classes = CLASSES
       colors = COLORS
       void_class = 7
-      bg_class = 1  # can I call this pinoptic?
+      bg_class = 1
     else:
-      classes = CLASSES[:-1]
-      colors = COLORS[:-1]
+      num_classes = 7
+      classes = CLASSES[:]
+      colors = COLORS[:]
       void_class = None
       bg_class = 1
 
     return base.DatasetInfo(
+      num_classes=num_classes,
       classes=classes,
       colors=colors,
       bg_class=bg_class,

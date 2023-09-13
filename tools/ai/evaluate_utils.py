@@ -68,6 +68,13 @@ class MIoUCalculator:
 
     self.clear()
 
+  @classmethod
+  def from_dataset_info(cls, info) -> "MIoUCalculator":
+    # if dataset does not have a background class, add it at i=0.
+    include_bg = info.bg_class is None
+    bg_class = info.bg_class or 0
+    return cls(info.classes, bg_class=bg_class, include_bg=include_bg)
+
   def get_data(self, pred_mask, gt_mask):
     obj_mask = gt_mask < 255
     correct_mask = (pred_mask == gt_mask) * obj_mask
@@ -146,14 +153,3 @@ class MIoUCalculator:
       self.TP.append(0)
       self.P.append(0)
       self.T.append(0)
-
-
-class MIoUCalcFromNames(MIoUCalculator):
-
-  def __init__(self, class_names, bg_class: int = 0, include_bg: bool = False):
-    self.bg_class = bg_class
-    self.include_bg = include_bg
-    self.class_names = class_names
-    self.classes = len(self.class_names)
-
-    self.clear()

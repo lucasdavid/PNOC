@@ -18,14 +18,15 @@ class DatasetInfo:
 
   def __init__(
       self,
+      num_classes: int,
       classes: List[str],
       colors: List[Tuple[int, int, int]],
       bg_class: Optional[int],
       void_class: Optional[int],
   ):
+    self.num_classes = num_classes
     self.classes = np.asarray(classes)
     self.colors = np.asarray(colors)
-    self.num_classes = len(classes) if void_class is None else len(classes) - 1
     self.bg_class = bg_class
     self.void_class = void_class
 
@@ -117,7 +118,7 @@ class CustomDataSource(metaclass=ABCMeta):
     return mask
 
   @abstractmethod
-  def get_label(self, sample_id: str, task: Optional[str] = None) -> np.ndarray:
+  def get_label(self, sample_id: str) -> np.ndarray:
     raise NotImplementedError
 
 
@@ -154,7 +155,7 @@ class ClassificationDataset(torch.utils.data.Dataset):
 
   def get_valid_sample(self, index):
     sample_id = self.data_source.sample_ids[index]
-    label = self.data_source.get_label(sample_id, task=self.task)
+    label = self.data_source.get_label(sample_id)
 
     if self.ignore_bg_images and label is not None and label.sum() == 0:
       return self.get_valid_sample(index + 1)

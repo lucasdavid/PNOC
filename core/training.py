@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from datasets import DatasetInfo
-from tools.ai.evaluate_utils import (MIoUCalcFromNames, MIoUCalculator,
+from tools.ai.evaluate_utils import (MIoUCalculator,
                                      accumulate_batch_iou_priors,
                                      accumulate_batch_iou_saliency,
                                      maximum_miou_from_thresholds)
@@ -30,10 +30,7 @@ def priors_validation_step(
 
   """
 
-  # if dataset does not have a background class, add it at i=0.
-  include_bg = info.bg_class is None
-  bg_class = info.bg_class or 0
-  meters = {t: MIoUCalculator(info.classes, bg_class=bg_class, include_bg=include_bg) for t in thresholds}
+  meters = {t: MIoUCalculator.from_dataset_info(info) for t in thresholds}
 
   start = time.time()
 
@@ -94,9 +91,7 @@ def segmentation_validation_step(
     log_samples: bool = True,
 ):
   start = time.time()
-
-  classes = [c for i, c in enumerate(info.classes) if i != info.void_class]
-  meter = MIoUCalculator(classes, bg_class=info.bg_class, include_bg=False)
+  meter = MIoUCalculator(info.classes, bg_class=info.bg_class, include_bg=False)
 
   with torch.no_grad():
     for step, (ids, inputs, targets, masks) in enumerate(loader):
@@ -117,7 +112,7 @@ def segmentation_validation_step(
         wandb_utils.log_masks(ids, inputs, targets, masks, preds, info.classes, info.void_class)
 
   miou, miou_fg, iou, FP, FN = meter.get(clear=True, detail=True)
-  iou = [round(iou[c], 2) for c in classes]
+  iou = [round(iou[c], 2) for c in info.classes]
 
   elapsed = time.time() - start
 
@@ -141,19 +136,19 @@ def saliency_validation_step(
   start = time.time()
 
   classes = ['background', 'foreground']
-  iou_meters = {th: MIoUCalcFromNames(classes, bg_class=0) for th in thresholds}
+  iou_meters = {th: MIoUCalculator(classes, bg_class=0, include_bg=False) for th in thresholds}
 
   with torch.no_grad():
     for step, (_, images, _, masks) in enumerate(loader):
       B, C, H, W = images.size()
 
-      _, _, ccams = model(images.to(device))
+      _, _, preds = model(images.to(device))
 
-      ccams = resize_tensor(ccams.cpu().float(), (H, W))
-      ccams = to_numpy(make_cam(ccams).squeeze())
+      preds = resize_tensor(preds.cpu().float(), (H, W))
+      preds = to_numpy(make_cam(preds).squeeze())
       masks = to_numpy(masks)
 
-      accumulate_batch_iou_saliency(masks, ccams, iou_meters)
+      accumulate_batch_iou_saliency(masks, preds, iou_meters)
 
       if max_steps and step >= max_steps:
         break

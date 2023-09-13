@@ -10,7 +10,7 @@ from . import base
 
 CLASSES = [
   'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-  'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor', 'void'
+  'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
 ]
 COLORS = [
   [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128], [128, 128, 128],
@@ -47,7 +47,7 @@ class VOC12DataSource(base.CustomDataSource):
     self.xml_dir = xml_dir or os.path.join(root_dir, 'Annotations/')
     self.root_dir = root_dir
 
-  def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
+  def get_label(self, sample_id) -> np.ndarray:
     info = self.classification_info
 
     xml_file = self.xml_dir + sample_id + '.xml'
@@ -62,18 +62,21 @@ class VOC12DataSource(base.CustomDataSource):
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
+      num_classes = 21
       classes = CLASSES
       colors = COLORS
       bg_class = 0
       void_class = 21
     else:
       # without bg and void:
-      classes = CLASSES[1:-1]
-      colors = COLORS[1:-1]
+      num_classes = 20
+      classes = CLASSES[1:]
+      colors = COLORS[1:]
       bg_class = None
       void_class = None
 
     return base.DatasetInfo(
+      num_classes=num_classes,
       classes=classes,
       colors=colors,
       bg_class=bg_class,

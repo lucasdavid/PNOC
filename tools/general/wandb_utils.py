@@ -44,10 +44,14 @@ def masks_to_wb_images(images, masks, preds, classes, void_class=0):
   stats = imagenet_stats()
 
   if classes[0] != "background":
-    # If BG is not first class, then display all classes.
-    masks = masks + 1
-    preds = preds + 1
+    # Wandb does not show class 0. Increase indices by 1
+    # if BG is not first class, hence showing all classes.
     indices = {i+1: c for i, c in indices.items()}
+    masks += 1
+    preds += 1
+    void_class += 1
+  if void_class not in indices:
+    indices[void_class] = "void"
 
   pixel_ignore = masks == 255
   masks[pixel_ignore] = void_class

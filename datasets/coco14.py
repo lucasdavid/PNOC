@@ -12,7 +12,7 @@ CLASSES = [
   "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon",
   "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
   "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
-  "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "void"
+  "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
 
 COLORS = [
@@ -71,7 +71,7 @@ class COCO14DataSource(base.CustomDataSource):
   def get_image_path(self, sample_id) -> str:
     return os.path.join(self.images_dir, f"COCO_{self.domain}_{sample_id}.jpg")
 
-  def get_label(self, sample_id, task: Optional[str] = None) -> np.ndarray:
+  def get_label(self, sample_id) -> np.ndarray:
     label = self.sample_labels[sample_id]
     return label
 
@@ -81,18 +81,21 @@ class COCO14DataSource(base.CustomDataSource):
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
+      num_classes = 81
       classes = CLASSES
       colors = COLORS
       bg_class = 0
       void_class = 81
     else:
       # without bg and void:
-      classes = CLASSES[1:-1]
-      colors = COLORS[1:-1]
+      num_classes = 80
+      classes = CLASSES[1:]
+      colors = COLORS[1:]
       bg_class = None
       void_class = None
 
     return base.DatasetInfo(
+      num_classes=num_classes,
       classes=classes,
       colors=colors,
       bg_class=bg_class,
