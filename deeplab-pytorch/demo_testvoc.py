@@ -41,9 +41,15 @@ def get_device(cuda):
 def get_classtable(CONFIG):
     with open(CONFIG.DATASET.LABELS) as f:
         classes = {}
-        for label in f:
-            label = label.rstrip().split("\t")
-            classes[int(label[0])] = label[1].split(",")[0]
+        eof = False
+        for i, label in enumerate(f):
+            label = label.rstrip()
+            if label:
+              if eof:
+                  print(f"Line {i} in {CONFIG.DATASET.LABELS} is empty. It was ignored.")
+              label = label.split("\t")
+              classes[int(label[0])] = label[1].split(",")[0]
+              eof = True
     return classes
 
 

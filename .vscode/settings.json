@@ -36,5 +36,6 @@
   },
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false,
-  "search.followSymlinks": false
+  "search.followSymlinks": false,
+  "files.trimFinalNewlines": true
 }
