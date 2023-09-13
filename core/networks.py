@@ -134,17 +134,18 @@ class Backbone(nn.Module):
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
 
-    if self.mode == "fix":
-      set_trainable_layers(backbone, torch.nn.BatchNorm2d, trainable=False)
-      self.not_training.extend([m for m in backbone.modules() if isinstance(m, torch.nn.BatchNorm2d)])
-
     if not self.trainable_backbone:
       for s in stages:
         set_trainable_layers(s, trainable=False)
       self.not_training.extend(stages)
-    elif not self.trainable_stem:
-      set_trainable_layers(self.stage1, trainable=False)
-      self.not_training.extend([self.stage1])
+    else:
+      if not self.trainable_stem:
+        set_trainable_layers(self.stage1, trainable=False)
+        self.not_training.extend([self.stage1])
+
+      if self.mode == "fix":
+        set_trainable_layers(backbone, torch.nn.BatchNorm2d, trainable=False)
+        self.not_training.extend([m for m in backbone.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
   def initialize(self, modules):
     for m in modules:
@@ -407,8 +408,25 @@ class AffinityNet(Backbone):
 
 class DeepLabV3Plus(Backbone):
 
-  def __init__(self, model_name, num_classes=21, mode='fix', dilated=False, strides=None, use_group_norm=False):
-    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
+  def __init__(
+      self,
+      model_name,
+      num_classes=21,
+      mode='fix',
+      dilated=False,
+      strides=None,
+      use_group_norm=False,
+      trainable_stem=True,
+      trainable_backbone=True,
+  ):
+    super().__init__(
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_stem=trainable_stem,
+      trainable_backbone=trainable_backbone,
+    )
 
     in_features = self.out_features
     norm_fn = group_norm if use_group_norm else nn.BatchNorm2d

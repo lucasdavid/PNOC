@@ -25,7 +25,7 @@ class DatasetInfo:
   ):
     self.classes = np.asarray(classes)
     self.colors = np.asarray(colors)
-    self.num_classes = len(classes)
+    self.num_classes = len(classes) if void_class is None else len(classes) - 1
     self.bg_class = bg_class
     self.void_class = void_class
 
