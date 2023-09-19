@@ -70,14 +70,14 @@ def normalize(cam, epsilon=1e-5):
   return np.maximum(cam - epsilon, 0) / (max_value + epsilon)
 
 
-def crf_inference(img, probs, t=10, scale_factor=1, gt_prob=0.7):
+def crf_inference(img, probs, t=10, scale_factor=1, gt_prob=1):
   import pydensecrf.densecrf as dcrf
   from pydensecrf.utils import unary_from_softmax
 
-  h, w = img.shape[:2]
-  labels = probs.shape[0]
+  H, W = img.shape[:2]
+  C = probs.shape[0]
 
-  d = dcrf.DenseCRF2D(w, h, labels)
+  d = dcrf.DenseCRF2D(W, H, C)
 
   unary = unary_from_softmax(probs, scale=gt_prob)
   unary = np.ascontiguousarray(unary)
@@ -87,7 +87,7 @@ def crf_inference(img, probs, t=10, scale_factor=1, gt_prob=0.7):
   d.addPairwiseBilateral(sxy=50 / scale_factor, srgb=5, rgbim=np.copy(img), compat=10)
   Q = d.inference(t)
 
-  return np.array(Q).reshape((labels, h, w))
+  return np.array(Q).reshape((C, H, W))
 
 
 def crf_with_alpha(ori_image, cams, alpha):

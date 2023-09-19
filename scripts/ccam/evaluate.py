@@ -2,7 +2,6 @@ import argparse
 import multiprocessing
 import os
 import sys
-import traceback
 
 import numpy as np
 from tqdm import tqdm
@@ -192,20 +191,13 @@ def do_python_eval(args, dataset, classes, num_workers=8):
   return loglist
 
 
-def run(args, dataset):
+def run(args, dataset: datasets.PathsDataset):
   if args.eval_mode == "saliency":
     classes = ["background", "foreground"]
+    bg_class = "background"
   else:
-    classes = dataset.info.classes.tolist()
-    include_bg = dataset.info.bg_class is None
-    if include_bg:
-      classes = ["background"] + classes
-    bg_class = dataset.info.bg_class or 0
-    bg_class = classes[bg_class]
-
-    if dataset.info.void_class is not None:
-      try: classes.pop(dataset.info.void_class)
-      except IndexError: ...
+    classes = dataset.data_source.segmentation_info.classes.tolist()
+    bg_class = classes[dataset.data_source.segmentation_info.bg_class]
 
   print("classes evaluated:", *classes)
 
@@ -233,7 +225,7 @@ def run(args, dataset):
 
       print(
         f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% "
-        f"iou=[{r['background']:.3f}, {100*r['miou_foreground']:.3f}] "
+        f"iou=[{r[bg_class]:.3f}, {100*r['miou_foreground']:.3f}] "
         f"FP_bg={r['fp_bg']:.3%} "
         f"FN_bg={r['fn_bg']:.3%} "
         f"FP_fg={r['fp_all']:.3%} "
@@ -249,7 +241,7 @@ def run(args, dataset):
         "evaluation/t": t,
         "evaluation/miou": r["mIoU"],
         "evaluation/miou_fg": r["miou_foreground"],
-        "evaluation/miou_bg": r["background"],
+        "evaluation/miou_bg": r[bg_class],
         "evaluation/fp": r["fp_all"],
         "evaluation/fn": r["fn_all"],
         "evaluation/iou": wandb.Table(columns=columns, data=report_iou)

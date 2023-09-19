@@ -48,7 +48,7 @@ parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--domain', default='val', type=str)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--crf_t', default=0, type=int)
-parser.add_argument('--crf_gt_prob', default=0.7, type=float)
+parser.add_argument('--crf_gt_prob', default=1, type=float)
 
 try:
   GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
@@ -110,6 +110,10 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
     model = model.cuda()
 
     for image_id, _, _ in dataset:
+      save_path = os.path.join(preds_dir, image_id + '.png')
+      if os.path.exists(save_path):
+        continue
+
       image = data_source.get_image(image_id)
       W, H = image.size
 
@@ -137,9 +141,8 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
 
       p = np.argmax(p, axis=0)
 
-      p = Image.fromarray(p.astype(np.uint8))
-      p.save(os.path.join(preds_dir, image_id + '.png'))
-      p.close()
+      with Image.fromarray(p.astype(np.uint8)) as p:
+        p.save(save_path)
       image.close()
 
 

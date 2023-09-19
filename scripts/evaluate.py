@@ -9,6 +9,7 @@ from PIL import Image, UnidentifiedImageError
 import datasets
 import wandb
 from tools.ai.demo_utils import crf_inference_label
+from tools.ai.log_utils import log_config
 from tools.general import wandb_utils
 from tools.general.io_utils import load_cam_file, load_saliency_file
 
@@ -174,10 +175,6 @@ def run(args, dataset: datasets.PathsDataset):
   classes = dataset.info.classes.tolist()
   bg_class = classes[dataset.info.bg_class]
 
-  if dataset.info.void_class is not None:
-    try: classes.pop(dataset.info.void_class)
-    except IndexError: ...
-
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 
@@ -283,6 +280,7 @@ if __name__ == "__main__":
 
   wb_run = wandb_utils.setup(TAG, args, job_type="evaluation")
   wandb.define_metric("evaluation/t")
+  log_config(vars(args), TAG)
 
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds, ignore_bg_images=False)
