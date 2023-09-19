@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J dv2-coco14
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-dv2-coco.out
-#SBATCH --time=72:00:00
+#SBATCH --time=10:00:00
 
 
 # Copyright 2023 Lucas Oliveira David
@@ -68,7 +68,7 @@ cd $SCRATCH/deeplab-pytorch
 # $PIP -qq install click tqdm addict joblib omegaconf opencv-python torchnet tensorboard
 # echo "Done."
 
-EXP_ID=coco14
+EXP_ID=coco14_481px
 
 IMAGES_DIR=data/datasets/coco14/JPEGImages
 TXT_FILE=data/datasets/coco14/val.txt

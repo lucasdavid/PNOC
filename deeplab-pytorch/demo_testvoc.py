@@ -10,13 +10,11 @@ from configparser import Interpolation
 
 import click
 import cv2
-import matplotlib
-import matplotlib.cm as cm
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import multiprocessing
 from omegaconf import OmegaConf
 
 from libs.models import *
@@ -41,15 +39,13 @@ def get_device(cuda):
 def get_classtable(CONFIG):
     with open(CONFIG.DATASET.LABELS) as f:
         classes = {}
-        eof = False
         for i, label in enumerate(f):
             label = label.rstrip()
-            if label:
-              if eof:
-                  print(f"Line {i} in {CONFIG.DATASET.LABELS} is empty. It was ignored.")
-              label = label.split("\t")
-              classes[int(label[0])] = label[1].split(",")[0]
-              eof = True
+            if not label:
+                print(f"Line {i} in {CONFIG.DATASET.LABELS} is empty. It was ignored.")
+                continue
+            label = label.split("\t")
+            classes[int(label[0])] = label[1].split(",")[0]
     return classes
 
 
@@ -178,27 +174,60 @@ def single(config_path, model_path, img_dir, txt_file, save_dir, cuda, crf):
     state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(state_dict)
     model.eval()
-    model.to(device)
+    # model.to(device)
 
     print("Model:", CONFIG.MODEL.NAME)
 
     testnames = pd.read_csv(txt_file,header=None)[0].to_list()
 
-    for testname in tqdm(testnames):
-        testname = testname.strip().split(" ")[0]  # removel label, if any.
-        testname = os.path.split(testname)[-1]     # remove path, if any.
+    if GPUS_COUNT > 1:
+      multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, postprocessor, device, testnames, img_dir, save_dir, CONFIG, GPUS_COUNT), join=True)
+    else:
+      _work(0, model, postprocessor, device, testnames, img_dir, save_dir, CONFIG, 1)
 
-        img_path = os.path.join(img_dir,testname + ".jpg")
-        save_path = os.path.join(save_dir,testname + ".png")
 
-        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
+def _work(
+    process_id: int,
+    model,
+    postprocessor,
+    device,
+    testnames,
+    img_dir: str,
+    save_dir: str,
+    CONFIG,
+    workers,
+):
+    with torch.no_grad(), torch.cuda.device(process_id):
+        model.cuda()
 
-        image, raw_image, scale = preprocessing(image, device, CONFIG)
-        labelmap = inference(model, image, raw_image, postprocessor)
+        testnames = testnames[process_id::workers]
 
-        output = cv2.resize(labelmap, dsize=None, fx= 1/scale, fy=1/scale, interpolation=cv2.INTER_NEAREST)
+        for testname in tqdm(testnames):
+            testname = testname.strip().split(" ")[0]  # removel label, if any.
+            testname = os.path.split(testname)[-1].split(".")[0]  # remove path, if any.
 
-        cv2.imwrite(save_path, output)
+            img_path = os.path.join(img_dir, testname + ".jpg")
+            save_path = os.path.join(save_dir, testname + ".png")
+
+            if os.path.exists(save_path):
+                continue
+
+            image = cv2.imread(img_path, cv2.IMREAD_COLOR)
+
+            image, raw_image, scale = preprocessing(image, device, CONFIG)
+            labelmap = inference(model, image, raw_image, postprocessor)
+
+            output = cv2.resize(labelmap, dsize=None, fx= 1/scale, fy=1/scale, interpolation=cv2.INTER_NEAREST)
+
+            cv2.imwrite(save_path, output)
+
 
 if __name__ == "__main__":
+    try:
+      GPUS = os.environ["CUDA_VISIBLE_DEVICES"]
+    except KeyError:
+      GPUS = "0"
+    GPUS = GPUS.split(",")
+    GPUS_COUNT = len(GPUS)
+
     main()

@@ -37,5 +37,6 @@
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false,
   "search.followSymlinks": false,
-  "files.trimFinalNewlines": true
+  "files.trimFinalNewlines": true,
+  "python.analysis.typeCheckingMode": "off"
 }

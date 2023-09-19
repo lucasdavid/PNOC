@@ -8,10 +8,12 @@ from PIL import Image, UnidentifiedImageError
 
 import datasets
 import wandb
-from tools.ai.demo_utils import crf_inference_label
+from tqdm import tqdm
+
+from tools.ai.demo_utils import crf_inference_dlv2_softmax, crf_inference_label
 from tools.ai.log_utils import log_config
 from tools.general import wandb_utils
-from tools.general.io_utils import load_cam_file, load_saliency_file
+from tools.general.io_utils import load_cam_file, load_saliency_file, load_dlv2_seg_file
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)
@@ -27,9 +29,9 @@ parser.add_argument("--sal_mode", default="saliency", type=str, choices=("salien
 parser.add_argument("--sal_threshold", default=None, type=float)
 
 parser.add_argument("--crf_t", default=0, type=int)
-parser.add_argument("--crf_gt_prob", default=0.7, type=float)
+parser.add_argument("--crf_gt_prob", default=None, type=float)
 
-parser.add_argument("--mode", default="npy", type=str, choices=["png", "npy", "rw"])
+parser.add_argument("--mode", default="npy", type=str, choices=["png", "npy", "rw", "deeplab-pytorch"])
 parser.add_argument("--threshold", default=None, type=float)
 parser.add_argument("--min_th", default=0.05, type=float)
 parser.add_argument("--max_th", default=0.81, type=float)
@@ -43,9 +45,12 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
 
   steps = range(start, len(dataset), step)
 
+  if args.verbose > 1 and start == 0:
+    steps = tqdm(steps, mininterval=2.0)
+
   try:
     for idx in steps:
-      image_id, image_path, _ = dataset[idx]
+      image_id, image_path, mask_path = dataset[idx]
 
       y_true = np.asarray(dataset.data_source.get_mask(image_id))
       valid_mask = y_true < 255
@@ -54,7 +59,7 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
       png_file = os.path.join(PRED_DIR, image_id + ".png")
       sal_file = os.path.join(SAL_DIR, image_id + ".png") if SAL_DIR else None
 
-      if os.path.exists(png_file):
+      if args.mode == "png":
         try:
           with Image.open(png_file) as y_pred:
             y_pred = np.asarray(y_pred)
@@ -65,7 +70,7 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
         keys, cam = np.unique(y_pred, return_inverse=True)
         cam = cam.reshape(y_pred.shape)
 
-      elif os.path.exists(npy_file):
+      elif args.mode in ("npy", "rw"):
         cam, keys = load_cam_file(npy_file)
 
         if sal_file:
@@ -77,15 +82,27 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
           cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
 
         cam = np.argmax(cam, axis=0)
-      else:
-        missing.append(image_id)
-        continue
+
+      elif args.mode == "deeplab-pytorch":
+        if not os.path.exists(npy_file):
+          missing.append(image_id)
+          continue
+
+        keys, cam, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
 
       if args.crf_t:
         try:
-          with Image.open(image_path) as img:
-            img = np.asarray(img.convert("RGB"))
-          cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+          with dataset.data_source.get_image(image_id) as img:
+            img = np.asarray(img)
+            if args.mode != "deeplab-pytorch":
+              cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
+            else:
+              # DeepLab-pytorch's CRF
+              prob = crf_inference_dlv2_softmax(img.astype(np.uint8), prob, t=args.crf_t)
+              y_pred = np.argmax(prob, axis=0)
+              keys, cam = np.unique(y_pred, return_inverse=True)
+              cam = cam.reshape(y_pred.shape)
+
         except ValueError as error:
           if args.verbose > 2:
             print(
@@ -184,10 +201,10 @@ def run(args, dataset: datasets.PathsDataset):
   miou_history = []
   fp_history = []
 
-  thresholds = (
-    np.arange(args.min_th, args.max_th, args.step_th).tolist()
-    if args.threshold is None and SAL_DIR is None and args.mode not in ("png",) else [args.threshold]
-  )
+  thresholds = np.arange(args.min_th, args.max_th, args.step_th).tolist()
+  if args.threshold or SAL_DIR or args.mode in ("png", "deeplab-pytorch"):
+    # No threshold-range used in these cases. Assume the default (None) or the passed one.
+    thresholds = [args.threshold]
 
   try:
     for t in thresholds:

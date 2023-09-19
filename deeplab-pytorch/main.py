@@ -360,9 +360,7 @@ def test(config_path, model_path, cuda):
     print("Score dst:", save_path, flush=True)
 
     preds, gts = [], []
-    for image_ids, images, gt_labels in tqdm(
-        loader, total=len(loader), dynamic_ncols=True
-    ):
+    for image_ids, images, gt_labels in tqdm(loader):
         # Image
         images = images.to(device)
 
