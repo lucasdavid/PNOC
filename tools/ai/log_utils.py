@@ -32,11 +32,12 @@ def log_dataset(name, dataset, tt, tv):
 
 
 def log_model(name, model, args):
-  properties = "architecture mode dilated regularization trainable_stem use_gn".split()
+  properties = "architecture mode dilated regularization trainable_backbone trainable_stem use_gn".split()
   config = [(p, getattr(args, p)) for p in properties if hasattr(args, p)]
 
   print(
-    f"{name}\n", *(f"{p:>14} = {v}\n" for p, v in config), f"  total params   = {calculate_parameters(model):.2f}M\n"
+    f"{name}\n", *(f"{p:>18} = {v}\n" for p, v in config),
+    f"  total params = {calculate_parameters(model):.2f}M\n"
   )
 
 
