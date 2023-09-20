@@ -434,6 +434,8 @@ class DeepLabV3Plus(Backbone):
     self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn)
     self.decoder = Decoder(num_classes, 256, norm_fn)
 
+    self.from_scratch_layers += [*self.aspp.modules(), *self.decoder.modules()]
+
   def forward(self, x, with_cam=False):
     inputs = x
 
