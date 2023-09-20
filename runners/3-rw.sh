@@ -54,6 +54,7 @@ MIXED_PRECISION=true # false
 
 CRF_T=1
 CRF_GT=0.7
+EVAL_MODE=npy
 
 rw_make_affinity_labels() {
   echo "=================================================================="
@@ -125,10 +126,10 @@ make_pseudo_labels() {
     --num_workers $WORKERS_INFER
 }
 
-run_evaluation() {
+evaluate_rw_masks() {
   CUDA_VISIBLE_DEVICES="" \
     WANDB_RUN_GROUP="$W_GROUP" \
-    WANDB_TAGS="$W_TAGS" \
+    WANDB_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,crf:$CRF_T-$CRF_GT" \
     $PY scripts/evaluate.py \
     --experiment_name $RW_MASKS \
     --dataset $DATASET \
@@ -138,7 +139,8 @@ run_evaluation() {
     --max_th $MAX_TH \
     --crf_t $CRF_T \
     --crf_gt_prob $CRF_GT \
-    --num_workers $WORKERS_INFER
+    --num_workers $WORKERS_INFER \
+    --mode $EVAL_MODE
 }
 
 ## 3.1 Make Affinity Labels
@@ -147,7 +149,8 @@ run_evaluation() {
 PRIORS_TAG=rs269-pnoc-ls-r4@rs269-rals
 W_GROUP=$DATASET-$PRIORS_TAG
 
-CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+CAMS_TRAIN_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
+CAMS_VALID_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@val@scale=0.5,1.0,1.5,2.0
 SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269-fg0.4@rw269pnoc@rs269-rals
 FG=0.40
 BG=0.10
@@ -155,7 +158,7 @@ CRF_T=10
 CRF_GT=0.7
 
 AFF_LABELS_TAG=rw/$DATASET-an@ccamh@$PRIORS_TAG@crf$CRF_T-gt$CRF_GT
-rw_make_affinity_labels
+CAMS_DIR=$CAMS_TRAIN_DIR rw_make_affinity_labels
 
 ## 3.2. Affinity Net Train
 ##
@@ -169,32 +172,34 @@ RW_BETA=10
 RW_EXP=8
 PARAMS="beta=$RW_BETA@exp_times=$RW_EXP@rw"
 
-# DOMAIN=$DOMAIN_TRAIN     rw_inference
-DOMAIN=$DOMAIN_VALID     rw_inference
-CAMS_DIR=./experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@val@scale=0.5,1.0,1.5,2.0
-DOMAIN=$DOMAIN_VALID_SEG rw_inference
+CAMS_DIR=$CAMS_TRAIN_DIR DOMAIN=$DOMAIN_TRAIN     rw_inference
+CAMS_DIR=$CAMS_TRAIN_DIR DOMAIN=$DOMAIN_VALID     rw_inference
+CAMS_DIR=$CAMS_VALID_DIR DOMAIN=$DOMAIN_VALID_SEG rw_inference
 
 CRF_T=1
-MIN_TH=0.05
-MAX_TH=0.81
+CRF_GT=.9
+MIN_TH=0.25  # 0.05
+MAX_TH=0.36  # 0.81
 
 ## 3.4. Evaluate Refined Pseudo Masks (Optional)
 ##
-DOMAIN=$DOMAIN_VALID_SEG
-RW_MASKS=$AFF_TAG@$DOMAIN@$PARAMS
-W_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,crf:$CRF_T-$CRF_GT"
-run_evaluation
 
-## 3.4 Make Pseudo Masks
-##
+# DOMAIN=$DOMAIN_VALID     RW_MASKS=$AFF_TAG@$DOMAIN_VALID@$PARAMS     evaluate_rw_masks
+DOMAIN=$DOMAIN_VALID_SEG RW_MASKS=$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS evaluate_rw_masks
+
+# 3.4 Make Pseudo Masks
+#
 
 THRESHOLD=0.3  # May need adjustment (Default in OC-CSE, AffinityNet, Puzzle...)
 
 DOMAIN=$DOMAIN_TRAIN     RW_MASKS=$AFF_TAG@train@$PARAMS             make_pseudo_labels
 DOMAIN=$DOMAIN_VALID_SEG RW_MASKS=$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS make_pseudo_labels
 
-# Move everything (train/val) into a single folder.
-RW_MASKS_DIR=./experiments/predictions/$AFF_TAG@$PARAMS@crf=$CRF_T
+# # Move everything (train/val) into a single folder.
+RW_MASKS=$AFF_TAG@$PARAMS@crf=$CRF_T
+RW_MASKS_DIR=./experiments/predictions/$RW_MASKS
 mv ./experiments/predictions/$AFF_TAG@train@$PARAMS@crf=$CRF_T $RW_MASKS_DIR
 mv ./experiments/predictions/$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS@crf=$CRF_T/* $RW_MASKS_DIR/
 rm -r ./experiments/predictions/$AFF_TAG@$DOMAIN_VALID_SEG@$PARAMS@crf=$CRF_T
+
+# CRF_T=0 EVAL_MODE=png DOMAIN=$DOMAIN_VALID_SEG evaluate_rw_masks

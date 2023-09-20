@@ -8,6 +8,7 @@ import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 from torch import multiprocessing
 from torch.utils.data import Subset
 from pickle import UnpicklingError
@@ -56,7 +57,7 @@ parser.add_argument('--cam_dir', default='', type=str)
 parser.add_argument('--beta', default=10, type=int)
 parser.add_argument('--exp_times', default=8, type=int)
 
-parser.add_argument('--verbose', default=0, type=int)
+parser.add_argument('--verbose', default=1, type=int)
 
 
 try:
@@ -101,6 +102,11 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
 
   dataset = dataset[process_id]
   data_source = dataset.dataset.data_source
+  data_iterator = (
+    dataset
+    if args.verbose == 0 or process_id > 0
+    else tqdm(dataset, mininterval=5.0)
+  )
 
   errors = []
   missing = []
@@ -110,7 +116,7 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
   with torch.no_grad(), torch.cuda.device(process_id):
     model.cuda()
 
-    for image_id, _, _ in dataset:
+    for image_id, _, _ in data_iterator:
       cam_path = os.path.join(cams_dir, image_id + '.npy')
       npy_path = os.path.join(preds_dir, image_id + '.npy')
 

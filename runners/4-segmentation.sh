@@ -24,7 +24,7 @@
 # Segmentation with Pseudo Semantic Segmentation Masks
 #
 
-if [[ "`hostname`" == "sdumont"* ]]; then
+if [[ "$(hostname)" == "sdumont"* ]]; then
   ENV=sdumont
   WORK_DIR=$SCRATCH/pnoc
 else
@@ -33,7 +33,7 @@ else
 fi
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12 # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
@@ -48,9 +48,9 @@ ARCH=rs269
 ARCHITECTURE=resnest269
 GROUP_NORM=true
 DILATED=false
-MODE=normal  # fix
+MODE=normal # fix
 
-LR=0.007  # voc12
+LR=0.007 # voc12
 # LR=0.004  # coco14
 # LR=0.01  # deepglobe
 
@@ -152,7 +152,7 @@ evaluate_masks() {
 ##
 
 LABELSMOOTHING=0.1
-AUGMENT=none  # colorjitter_randaug_cutmix_mixup_cutormixup
+AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 
 ## For supervised segmentation:
 PRIORS_TAG=sup
@@ -163,10 +163,11 @@ PRIORS_TAG=pnoc-rals-r4-ccamh-rw
 MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
 TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$MODE-$PRIORS_TAG
-# segm_training
+segm_training
 
-## 4.2 DeepLabV3+ Inference
-##
+# 4.2 DeepLabV3+ Inference
+#
+
 CRF_T=10
 CRF_GT=1
 SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
@@ -174,8 +175,7 @@ DOMAIN=$DOMAIN_VALID     segm_inference
 DOMAIN=$DOMAIN_VALID_SEG segm_inference
 DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=1 segm_inference
 
-## 4.3. Evaluation
-##
-# CRF_T is 0, as we are not running CRF during evaluation.
+# 4.3. Evaluation
 #
+
 CRF_T=0 DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks

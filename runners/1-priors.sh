@@ -417,10 +417,10 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
-# DOMAIN=$DOMAIN_TRAIN inference_priors
-DOMAIN=$DOMAIN_VALID inference_priors
-# DOMAIN=$DOMAIN_VALID_SEG inference_priors
+DOMAIN=$DOMAIN_TRAIN     inference_priors
+DOMAIN=$DOMAIN_VALID     inference_priors
+DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 CRF_T=10 evaluate_priors
-# DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors

@@ -223,8 +223,8 @@ evaluate_saliency_detection() {
 ## ================================================
 ## Pascal VoC 2012
 ##
-CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train@scale=0.5,1.0,1.5,2.0
-PRIORS_TAG=rs269pnoc-r4@rs269-rals
+CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-rals-r1@train@scale=0.5,1.0,1.5,2.0
+PRIORS_TAG=rs269pnoc@rs269-rals-r1
 FG_T=0.4
 ## ================================================
 ## MS COCO 2014
@@ -232,7 +232,7 @@ FG_T=0.4
 # FG_T=0.3
 # LR=0.0005
 # CAMS_DIR=experiments/predictions/pnoc/coco-rs269-pnoc-b16-lr0.05-ls@rs269-lsra-r1@train@scale=0.5,1.0,1.5,2.0
-# PRIORS_TAG=rs269pnoc-r1@rs269-rals
+# PRIORS_TAG=rs269pnoc@rs269-rals-r1
 ## ================================================
 
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG

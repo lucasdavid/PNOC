@@ -29,7 +29,7 @@ parser.add_argument("--sal_mode", default="saliency", type=str, choices=("salien
 parser.add_argument("--sal_threshold", default=None, type=float)
 
 parser.add_argument("--crf_t", default=0, type=int)
-parser.add_argument("--crf_gt_prob", default=None, type=float)
+parser.add_argument("--crf_gt_prob", default=0.7, type=float)
 
 parser.add_argument("--mode", default="npy", type=str, choices=["png", "npy", "rw", "deeplab-pytorch"])
 parser.add_argument("--threshold", default=None, type=float)
