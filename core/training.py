@@ -55,7 +55,7 @@ def priors_validation_step(
         inputs = to_numpy(inputs)
         wandb_utils.log_cams(ids, inputs, targets, cams, preds, classes=info.classes)
 
-      accumulate_batch_iou_priors(masks, cams, meters, include_bg=include_bg)
+      accumulate_batch_iou_priors(masks, cams, meters, include_bg=info.bg_class is None)
 
       if max_steps and step >= max_steps:
         break
