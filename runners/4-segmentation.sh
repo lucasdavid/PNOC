@@ -67,8 +67,8 @@ LABELSMOOTHING=0 # 0.1
 # Infrastructure
 MIXED_PRECISION=true
 
-CRF_T=0
-CRF_GT=0.9
+CRF_T=10
+CRF_GT=1
 MIN_TH=0.20
 MAX_TH=0.81
 
@@ -131,9 +131,11 @@ segm_inference() {
 }
 
 evaluate_masks() {
+  # dCRF is not re-applied during evaluation (crf_t=0)
+
   CUDA_VISIBLE_DEVICES="" \
     WANDB_RUN_GROUP="$W_GROUP" \
-    WANDB_TAGS="$DATASET,domain:$DOMAIN,$ARCH,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT" \
+    WANDB_TAGS="$DATASET,domain:$DOMAIN_VALID,$ARCH,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT" \
     $PY scripts/evaluate.py \
     --experiment_name $TAG \
     --pred_dir $SEGM_PRED_DIR \
@@ -142,10 +144,10 @@ evaluate_masks() {
     --data_dir $DATA_DIR \
     --min_th $MIN_TH \
     --max_th $MAX_TH \
-    --crf_t $CRF_T \
     --crf_gt_prob $CRF_GT \
-    --mode $EVAL_MODE \
-    --num_workers $WORKERS_INFER
+    --num_workers $WORKERS_INFER \
+    --crf_t 0 \
+    --mode png
 }
 
 ## 4.1 DeepLabV3+ Training
@@ -170,12 +172,13 @@ segm_training
 
 CRF_T=10
 CRF_GT=1
+
 SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
 DOMAIN=$DOMAIN_VALID     segm_inference
 DOMAIN=$DOMAIN_VALID_SEG segm_inference
-DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=1 segm_inference
+DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
 # 4.3. Evaluation
 #
-
-CRF_T=0 DOMAIN=$DOMAIN_VALID_SEG EVAL_MODE=png evaluate_masks
+DOMAIN=$DOMAIN_VALID     evaluate_masks
+DOMAIN=$DOMAIN_VALID_SEG evaluate_masks

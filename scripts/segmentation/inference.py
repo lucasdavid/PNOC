@@ -141,8 +141,13 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
 
       p = np.argmax(p, axis=0)
 
-      with Image.fromarray(p.astype(np.uint8)) as p:
-        p.save(save_path)
+      try:
+        with Image.fromarray(p.astype(np.uint8)) as p:
+          p.save(save_path)
+      except:
+        if os.path.exists(save_path):
+          os.remove(save_path)
+        raise
       image.close()
 
 
