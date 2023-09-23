@@ -134,13 +134,14 @@ def log_masks(
 def _predictions_to_names(predictions, classes, threshold=0.5):
   if predictions is not None:
     if len(classes) != len(predictions[0]):
-      warning(f"len(classes) != len(predictions[0]) ({len(classes)}) != ({len(predictions[0])})")
       # `classes`` may contain "background" and "void" classes,
-      # which are not predicted by the model. Remove them.
+      # which are not predicted by a classification model.
       classes = classes[~np.isin(classes, ("background", "void"))]
 
       if len(classes) != len(predictions[0]):
-        raise ValueError(f"Cannot fix classes mismatch. ({len(classes)}) != ({len(predictions[0])})")
-
+        raise ValueError(
+          f"Predicted signals and class names don't match: classes={classes} "
+          f"shape=({len(classes)}) != predictions shape=({len(predictions[0])})"
+        )
 
     return [classes[p > threshold].tolist() for p in predictions]
