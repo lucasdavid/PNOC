@@ -55,13 +55,21 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
   ]
 
   if algorithm == "sgd":
-    return PolyOptimizer(params, lr=lr, poly_power=0.9, max_step=max_step, **kwargs)
+    return PolyOptimizer(params, lr=lr, max_step=max_step, **kwargs)
+
+  elif algorithm == "adamw":
+    class PolyAdamW(PolyOptimizerMixin, torch.optim.AdamW):
+      ...
+
+    return PolyAdamW(params, lr=lr, max_step=max_step, **kwargs)
+
   elif algorithm == "lion":
     from lion_pytorch import Lion
     class LionPolyOptimizer(PolyOptimizerMixin, Lion):
       ...
 
     return LionPolyOptimizer(params, lr=lr, max_step=max_step, betas=(0.9, 0.99), **kwargs)
+
   else:
     raise NotImplementedError(f"Optimizer {algorithm} not implemented.")
 

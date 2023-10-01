@@ -79,6 +79,7 @@ def log_cams(
   predictions,
   classes,
   oc_predictions=None,
+  tag="val",
   commit=False,
 ):
   wb_images, wb_cams = cams_to_wb_images(images, cams)
@@ -99,7 +100,7 @@ def log_cams(
   data = [list(row) for row in zip(*entries_v)]
   table = wandb.Table(columns=columns_v, data=data)
 
-  wandb.log({"val/predictions": table, "val/cams": wb_cams}, commit=commit)
+  wandb.log({f"{tag}/predictions": table, f"{tag}/cams": wb_cams}, commit=commit)
 
 
 def log_masks(
@@ -110,6 +111,7 @@ def log_masks(
   preds,
   classes,
   void_class=0,
+  tag="val",
   commit=False,
 ):
   wb_images = masks_to_wb_images(images, masks, preds, classes, void_class)
@@ -128,7 +130,7 @@ def log_masks(
   data = [list(row) for row in zip(*entries_v)]
   table = wandb.Table(columns=columns_v, data=data)
 
-  wandb.log({"val/predictions": table, "val/masks": wb_images}, commit=commit)
+  wandb.log({f"{tag}/predictions": table, f"{tag}/masks": wb_images}, commit=commit)
 
 
 def _predictions_to_names(predictions, classes, threshold=0.5):
