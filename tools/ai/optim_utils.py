@@ -30,6 +30,10 @@ class PolyOptimizer(PolyOptimizerMixin, torch.optim.SGD):
   ...
 
 
+class PolyAdamW(PolyOptimizerMixin, torch.optim.AdamW):
+  ...
+
+
 def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch=10., alpha_bias=2., **kwargs):
   params = [
     {
@@ -58,9 +62,6 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
     return PolyOptimizer(params, lr=lr, max_step=max_step, **kwargs)
 
   elif algorithm == "adamw":
-    class PolyAdamW(PolyOptimizerMixin, torch.optim.AdamW):
-      ...
-
     return PolyAdamW(params, lr=lr, max_step=max_step, **kwargs)
 
   elif algorithm == "lion":

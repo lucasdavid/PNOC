@@ -41,12 +41,30 @@ def log_model(name, model, args):
   )
 
 
-def log_opt_params(name, params):
-  print(
-    f"{name} Parameters\n"
-    f"  pretrained:\n    w={len(params[0])} b={len(params[1])}\n"
-    f"  scratch:\n    w={len(params[2])} b={len(params[3])}\n"
+def log_opt_params(name, params, verbose=1):
+  _names = lambda p: ", ".join(p)
+
+  if verbose == 0:
+    _report_fields = (len(params[0]), len(params[1]), len(params[2]), len(params[3]))
+  elif verbose == 1:
+    _report_fields = (
+      f"({len(params[0])}) {_names(params[0][:32])}{'...' if len(params[0]) > 32 else ''}",
+      f"({len(params[1])}) {_names(params[1][:32])}{'...' if len(params[1]) > 32 else ''}",
+      f"({len(params[2])}) {_names(params[2][:32])}{'...' if len(params[2]) > 32 else ''}",
+      f"({len(params[3])}) {_names(params[3][:32])}{'...' if len(params[3]) > 32 else ''}",
+    )
+  elif verbose > 1:
+    _report_fields = (_names(params[0]), _names(params[1]), _names(params[2]), _names(params[3]))
+
+  _report_lines = (
+    f"  pretrained:",
+    f"     weights: {_report_fields[0]}",
+    f"     biases:  {_report_fields[1]}",
+    f"  scratch:",
+    f"     weights: {_report_fields[2]}",
+    f"     biases:  {_report_fields[3]}",
   )
+  print("Optimizer Parameters", *_report_lines, sep="\n", end="\n\n",)
 
 
 def log_print(message='', path=None):
