@@ -463,6 +463,39 @@ def rand_bbox(h, w, lam):
   return h1, w1, h2, w2
 
 
+def cutmix(batch_a, batch_b, alpha):
+  id_a, image_a, label_a, mask_a = batch_a
+  id_b, image_b, label_b, mask_b = batch_b
+
+  # Cut random bbox.
+  Hb, Wb = image_b.shape[1:]
+  bh1, bw1, bh2, bw2 = rand_bbox(Hb, Wb, alpha)
+  image_b = image_b[:, bh1:bh2, bw1:bw2]
+
+  # Central crop if B larger than A.
+  Ha, Wa = image_a.shape[1:]
+  Hb, Wb = image_b.shape[1:]
+  bhs = (Hb - Ha) // 2 if Hb > Ha else 0
+  bws = (Wb - Wa) // 2 if Wb > Wa else 0
+  image_b = image_b[:, bhs:bhs + Ha, bws:bws + Wa]
+
+  # Random (x,y) placement if A larger than B.
+  Hb, Wb = image_b.shape[1:]
+  bhs, bws = random.randint(0, Ha - Hb), random.randint(0, Wa - Wb)
+  image_a[:, bhs:bhs + Hb, bws:bws + Wb] = image_b
+
+  # targets.
+  alpha = 1 - ((Hb * Wb) / (Ha * Wa))
+  label_a = label_a * alpha + label_b * (1. - alpha)
+
+  # masks.
+  if mask_a is not None:
+    mask_b = mask_b[bh1:bh2, bw1:bw2]
+    mask_a[bhs:bhs + Hb, bws:bws + Wb] = mask_b
+
+  return id_a, image_a, label_a, mask_a
+
+
 class CutMix(AugmentedDataset):
 
   def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0):
@@ -473,38 +506,6 @@ class CutMix(AugmentedDataset):
 
     # This is done here so cut-mixed batches aren't cropped as well.
     self.random_crop = RandomCrop(crop, channels_last=False)
-
-  def do_cutmix(self, batch_a, batch_b, alpha):
-    ia, xa, ya, ma = batch_a
-    _, xb, yb, mb = batch_b
-
-    # Cut random bbox.
-    bH, bW = xb.shape[1:]
-    bh1, bw1, bh2, bw2 = rand_bbox(bH, bW, alpha)
-    xb = xb[:, bh1:bh2, bw1:bw2]
-
-    # Central crop if B larger than A.
-    aH, aW = xa.shape[1:]
-    bH, bW = xb.shape[1:]
-    bhs = (bH - aH) // 2 if bH > aH else 0
-    bws = (bW - aW) // 2 if bW > aW else 0
-    xb = xb[:, bhs:bhs + aH, bws:bws + aW]
-
-    # Random (x,y) placement if A larger than B.
-    bH, bW = xb.shape[1:]
-    bhs, bws = random.randint(0, aH - bH), random.randint(0, aW - bW)
-    xa[:, bhs:bhs + bH, bws:bws + bW] = xb
-
-    # targets.
-    alpha = 1 - ((bH * bW) / (aH * aW))
-    ya = ya * alpha + yb * (1. - alpha)
-
-    # masks.
-    if ma is not None:
-      mb = mb[bh1:bh2, bw1:bw2]
-      ma[bhs:bhs + bH, bws:bws + bW] = mb
-
-    return ia, xa, ya, ma
 
   def __getitem__(self, index):
     (i, x, y, m), is_segm = self._to_segm_batch(self.dataset[index])
@@ -520,7 +521,7 @@ class CutMix(AugmentedDataset):
       r = random.choice(range(len(self)))
       batch_b, _ = self._to_segm_batch(self.dataset[r])
 
-      batch_a = self.do_cutmix(batch_a, batch_b, l)
+      batch_a = cutmix(batch_a, batch_b, l)
 
     return batch_a if is_segm else batch_a[:3]
 
@@ -542,7 +543,7 @@ class CutOrMixUp(CutMix):
       batch_b, _ = self._to_segm_batch(self.dataset[r])
 
       if np.random.rand(1) > 0.5:
-        batch_a = self.do_cutmix(batch_a, batch_b, alpha)
+        batch_a = cutmix(batch_a, batch_b, alpha)
         i, x, y, m = batch_a
       else:
         x, y = batch_a
