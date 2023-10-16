@@ -136,8 +136,8 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   log_model("CCAM", model, args)
 
-  ccam_param_groups = model.get_parameter_groups()
-  log_opt_params("CCAM", ccam_param_groups)
+  param_groups, param_names = model.get_parameter_groups(with_names=True)
+  log_opt_params("CCAM", param_names)
 
   model = model.to(DEVICE)
   model.train()
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     SimMaxLoss(metric='cos', alpha=args.alpha).to(DEVICE)
   ]
 
-  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), ccam_param_groups)
+  optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups)
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
   # Train

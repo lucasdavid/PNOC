@@ -315,8 +315,8 @@ if __name__ == '__main__':
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=True)
 
-  cg_param_groups = cgnet.get_parameter_groups()
-  oc_param_groups = ocnet.get_parameter_groups()
+  cg_param_groups, cg_param_names = cgnet.get_parameter_groups(with_names=True)
+  oc_param_groups, oc_param_names = ocnet.get_parameter_groups(with_names=True)
   cgnet = cgnet.to(DEVICE)
   ocnet = ocnet.to(DEVICE)
   cgnet.train()
@@ -337,8 +337,8 @@ if __name__ == '__main__':
 
   cgopt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
   ocopt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), oc_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
-  log_opt_params('CGNet', cg_param_groups)
-  log_opt_params('OCNet', oc_param_groups)
+  log_opt_params('CGNet', cg_param_names)
+  log_opt_params('OCNet', oc_param_names)
 
   cg_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
   oc_scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)

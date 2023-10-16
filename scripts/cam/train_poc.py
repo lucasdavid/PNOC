@@ -157,7 +157,7 @@ if __name__ == '__main__':
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
-  cg_param_groups = cgnet.get_parameter_groups()
+  cg_param_groups, cg_param_names = cgnet.get_parameter_groups(with_names=True)
 
   cgnet = cgnet.to(DEVICE)
   ocnet = ocnet.to(DEVICE)
@@ -184,7 +184,7 @@ if __name__ == '__main__':
   optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups)
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 
-  log_opt_params("CGNet", cg_param_groups)
+  log_opt_params("CGNet", cg_param_names)
 
   # Train
   train_metrics = MetricsContainer(['loss', 'c_loss', 'p_loss', 're_loss', 'o_loss', 'alpha', 'oc_alpha', 'k'])

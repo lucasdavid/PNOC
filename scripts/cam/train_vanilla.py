@@ -136,7 +136,7 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   log_model("Vanilla", model, args)
 
-  param_groups = model.get_parameter_groups()
+  param_groups, param_names = model.get_parameter_groups(with_names=True)
   model = model.to(DEVICE)
   model.train()
 
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
   optimizer = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
-  log_opt_params("Vanilla", param_groups)
+  log_opt_params("Vanilla", param_names)
 
   # Train
   train_meter = MetricsContainer(['loss', 'class_loss'])

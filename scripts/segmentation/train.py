@@ -123,7 +123,7 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=args.restore_strict)
   log_model('DeepLabV3+', model, args)
 
-  param_groups = model.get_parameter_groups()
+  param_groups, param_names = model.get_parameter_groups(with_names=True)
 
   model = model.to(DEVICE)
   model.train()
@@ -138,7 +138,7 @@ if __name__ == '__main__':
   class_loss_fn = nn.CrossEntropyLoss(ignore_index=255, label_smoothing=args.label_smoothing).to(DEVICE)
 
   opt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups)
-  log_opt_params('DeepLabV3+', param_groups)
+  log_opt_params('DeepLabV3+', param_names)
 
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 

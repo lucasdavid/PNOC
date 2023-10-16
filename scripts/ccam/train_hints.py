@@ -139,8 +139,8 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(args.restore), strict=True)
   log_model("CCAM", model, args)
 
-  param_groups = model.get_parameter_groups()
-  log_opt_params("CCAM", param_groups)
+  param_groups, param_names = model.get_parameter_groups(with_names=True)
+  log_opt_params("CCAM", param_names)
 
   model = model.to(DEVICE)
   model.train()
