@@ -130,9 +130,9 @@ class Backbone(nn.Module):
       name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights
     )
 
-    self.model = backbone
     self.out_features = out_features
     self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
+    stages = [self.stage1, self.stage2, self.stage3, self.stage4, self.stage5]
 
     if not self.trainable_backbone:
       for s in stages:
@@ -144,8 +144,9 @@ class Backbone(nn.Module):
         self.not_training.extend([self.stage1])
 
       if self.mode == "fix":
-        set_trainable_layers(backbone, torch.nn.BatchNorm2d, trainable=False)
-        self.not_training.extend([m for m in backbone.modules() if isinstance(m, torch.nn.BatchNorm2d)])
+        for s in stages:
+          set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
+          self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
   def initialize(self, modules):
     for m in modules:

@@ -404,8 +404,8 @@ EID=r1  # Experiment ID
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-$EID
 train_vanilla
 
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
+# BATCH_SIZE=16
+# ACCUMULATE_STEPS=2
 LABELSMOOTHING=0.1
 AUGMENT=colorjitter  # none for DeepGlobe
 
