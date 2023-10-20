@@ -463,9 +463,9 @@ def rand_bbox(h, w, lam):
   return h1, w1, h2, w2
 
 
-def cutmix(batch_a, batch_b, alpha):
-  id_a, image_a, label_a, mask_a = batch_a
-  id_b, image_b, label_b, mask_b = batch_b
+def _cutmix(sample_a, sample_b, alpha):
+  id_a, image_a, label_a, mask_a = sample_a
+  id_b, image_b, label_b, mask_b = sample_b
 
   # Cut random bbox.
   Hb, Wb = image_b.shape[1:]
@@ -496,6 +496,18 @@ def cutmix(batch_a, batch_b, alpha):
   return id_a, image_a, label_a, mask_a
 
 
+def cutmix_batch(images, labels, masks, beta=1.):
+  ids = np.arange(len(images), dtype="int")
+  batch_a = list(zip(ids, images, labels, masks))
+
+  _, images_cm, labels_cm, masks_cm = zip(*(
+    _cutmix(batch_a, batch_a[r], np.random.beta(beta, beta))
+    for r in np.random.choice(len(images), len(images))
+  ))
+
+  return images_cm, labels_cm, masks_cm
+
+
 class CutMix(AugmentedDataset):
 
   def __init__(self, dataset, crop, num_mix=1, beta=1., prob=1.0):
@@ -521,7 +533,7 @@ class CutMix(AugmentedDataset):
       r = random.choice(range(len(self)))
       batch_b, _ = self._to_segm_batch(self.dataset[r])
 
-      batch_a = cutmix(batch_a, batch_b, l)
+      batch_a = _cutmix(batch_a, batch_b, l)
 
     return batch_a if is_segm else batch_a[:3]
 
@@ -543,7 +555,7 @@ class CutOrMixUp(CutMix):
       batch_b, _ = self._to_segm_batch(self.dataset[r])
 
       if np.random.rand(1) > 0.5:
-        batch_a = cutmix(batch_a, batch_b, alpha)
+        batch_a = _cutmix(batch_a, batch_b, alpha)
         i, x, y, m = batch_a
       else:
         x, y = batch_a
