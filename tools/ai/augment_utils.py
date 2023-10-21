@@ -486,7 +486,8 @@ def _cutmix(sample_a, sample_b, alpha):
 
   # targets.
   alpha = 1 - ((Hb * Wb) / (Ha * Wa))
-  label_a = label_a * alpha + label_b * (1. - alpha)
+  label_a *= alpha
+  label_a += label_b * (1. - alpha)
 
   # masks.
   if mask_a is not None:
@@ -494,18 +495,6 @@ def _cutmix(sample_a, sample_b, alpha):
     mask_a[bhs:bhs + Hb, bws:bws + Wb] = mask_b
 
   return id_a, image_a, label_a, mask_a
-
-
-def cutmix_batch(images, labels, masks, beta=1.):
-  ids = np.arange(len(images), dtype="int")
-  batch_a = list(zip(ids, images, labels, masks))
-
-  _, images_cm, labels_cm, masks_cm = zip(*(
-    _cutmix(batch_a, batch_a[r], np.random.beta(beta, beta))
-    for r in np.random.choice(len(images), len(images))
-  ))
-
-  return images_cm, labels_cm, masks_cm
 
 
 class CutMix(AugmentedDataset):
@@ -517,11 +506,13 @@ class CutMix(AugmentedDataset):
     self.prob = prob
 
     # This is done here so cut-mixed batches aren't cropped as well.
-    self.random_crop = RandomCrop(crop, channels_last=False)
+    self.random_crop = RandomCrop_For_Segmentation(crop, channels_last=False)
 
   def __getitem__(self, index):
     (i, x, y, m), is_segm = self._to_segm_batch(self.dataset[index])
-    batch_a = (i, self.random_crop(x), y, m)
+    entry = self.random_crop({"image": x, "mask": m})
+    x, m = entry["image"], entry["mask"]
+    batch_a = (i, x, y, m)
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -542,7 +533,9 @@ class CutOrMixUp(CutMix):
 
   def __getitem__(self, index):
     (i, x, y, m), is_segm = self._to_segm_batch(self.dataset[index])
-    batch_a = (i, self.random_crop(x), y, m)
+    entry = self.random_crop({"image": x, "mask": m})
+    x, m = entry["image"], entry["mask"]
+    batch_a = (i, x, y, m)
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
