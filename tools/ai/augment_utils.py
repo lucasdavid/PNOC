@@ -296,15 +296,26 @@ class RandomCrop_For_Segmentation(RandomCrop):
     labels_last=True,
     bg_value=0,
     ignore_value=255,
+    idtype=np.float32,
+    mdtype=np.int64,
   ):
     super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
 
     self.labels_last = labels_last
     self.ignore_value = ignore_value
     self.mask_crop_shape = (self.crop_size, self.crop_size)
+    self.idtype = idtype
+    self.mdtype = mdtype
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']
+
+    if isinstance(image, Image.Image):
+      x = np.array(image, dtype=self.idtype)
+      y = np.array(mask, dtype=self.mdtype)
+      image.close()
+      mask.close()
+      image, mask = x, y
 
     ci, (b, a) = super().__call__(image)
 
