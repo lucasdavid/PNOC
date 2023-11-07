@@ -376,6 +376,17 @@ inference_priors() {
     --device $DEVICE
 }
 
+inference_lpcam() {
+  echo "=================================================================="
+  echo "[LPCam:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
+  CUDA_VISIBLE_DEVICES=$DEVICES \
+    $PY scripts/lpcam/inference.py \
+    --tag $TAG --dataset $DATASET --domain $DOMAIN --data_dir $DATA_DIR \
+    --architecture $ARCHITECTURE --dilated $DILATED --mode $MODE --device $DEVICE
+}
+
 evaluate_priors() {
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
   CUDA_VISIBLE_DEVICES="" \
@@ -392,20 +403,20 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-ARCHITECTURE=resnet101
-ARCH=rn101
+ARCHITECTURE=resnest269
+ARCH=rs269
 OC_ARCHITECTURE=$ARCHITECTURE
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 
-EID=r1  # Experiment ID
+EID=r4  # Experiment ID
 
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-$EID
-train_vanilla
+# train_vanilla
 
-# BATCH_SIZE=16
-# ACCUMULATE_STEPS=2
+BATCH_SIZE=16
+ACCUMULATE_STEPS=2
 LABELSMOOTHING=0.1
 AUGMENT=colorjitter  # none for DeepGlobe
 
@@ -419,13 +430,14 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
-# DOMAIN=$DOMAIN_TRAIN     inference_priors
+DOMAIN=$DOMAIN_TRAIN     inference_priors
 DOMAIN=$DOMAIN_VALID     inference_priors
 DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
 CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train-original evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
