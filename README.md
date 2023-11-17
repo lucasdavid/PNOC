@@ -2,8 +2,9 @@
 
 ## Introduction
 
-This respository contains the official implementation for the paper
-"P-NOC: Adversarial CAM Generation for Weakly Supervised Semantic Segmentation".
+This respository contains the official implementation for the paper "P-NOC: Adversarial Training of CAM Generating Networks for Robust Weakly Supervised Semantic Segmentation Priors".
+
+![Diagram for the proposed training method P-NOC.](assets/diagram-noc-cse.png)
 
 In summary, P-NOC is trained by alternatively optimizing two objectives:
 ```math
@@ -13,8 +14,6 @@ In summary, P-NOC is trained by alternatively optimizing two objectives:
 \end{align}
 ```
 where $`\mathcal{L}_\text{P}`$ is the Puzzle-CAM regularization and $`p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))`$.
-
-![Diagram for the proposed training method P-NOC.](assets/diagram-noc-cse.png)
 
 ## Results
 ### Pascal VOC 2012 (test)
