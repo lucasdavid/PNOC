@@ -12,9 +12,13 @@ In summary, P-NOC is trained by alternatively optimizing two objectives:
     \mathcal{L}_\text{noc} &= \mathbb{E}_{(x,y)\sim\mathcal{D},r\sim y}[\lambda_\text{noc}\ell_\text{cls}(p^\text{noc}, y)]
 \end{align}
 ```
-where $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
+where $\mathcal{L}_\text{P}$ is the Puzzle-CAM regularization and $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
 
-![Diagram for the proposed training method P-NOC.](assets/diagram-p-noc.png)
+![Diagram for the proposed training method P-NOC.](assets/diagram-noc-cse.png)
+
+## Setup
+
+Check the [SETUP.md](SETUP.md) file for information on how to setup the dataset and this project.
 
 ## Results
 ### Pascal VOC 2012 (test)
