@@ -12,13 +12,9 @@ In summary, P-NOC is trained by alternatively optimizing two objectives:
     \mathcal{L}_\text{noc} &= \mathbb{E}_{(x,y)\sim\mathcal{D},r\sim y}[\lambda_\text{noc}\ell_\text{cls}(p^\text{noc}, y)]
 \end{align}
 ```
-where $\mathcal{L}_\text{P}$ is the Puzzle-CAM regularization and $p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))$.
+where $`\mathcal{L}_\text{P}`$ is the Puzzle-CAM regularization and $`p^\text{noc} = oc(x \circ (1 - \psi(A^r) > \delta_\text{noc}))`$.
 
 ![Diagram for the proposed training method P-NOC.](assets/diagram-noc-cse.png)
-
-## Setup
-
-Check the [SETUP.md](SETUP.md) file for information on how to setup the dataset and this project.
 
 ## Results
 ### Pascal VOC 2012 (test)
@@ -49,6 +45,36 @@ Generally, they will run the following scripts, in this order:
 ./runners/3-rw.sh
 ./runners/4-segmentation.sh
 ```
+
+## Artifacts and Intermediate Results
+
+### Pascal VOC 2012
+
+| #   | Method | Description | Train set |  dCRF | mIoU (train) | Link |
+| --- |    --- |         --- |       --- |   --- |  --- | ---  |
+| —   | **CAMs** |
+| 1   | P-OC (OC+ra)       | segm. priors | trainaug    |  - | 61.5% | [weights](https://drive.google.com/file/d/1IO0vqWSWYoL2j29es3vgzg8Ea2PdLuhm/view?usp=sharing) [CAMs](https://drive.google.com/file/d/1Gl9nu3Y-2TmSXio7UJQLgF-wiFxz-Y5h/view?usp=sharing)
+| 2   | P-OC+ls (OC+ra)    | segm. priors | trainaug |  - | 61.9% | [weights](https://drive.google.com/file/d/1uEx5KDs8Wcaha5aEshYILEc0ICE-DTNo/view?usp=sharing) [CAMs](https://drive.google.com/file/d/1vmMfRElbUIvx_M6Say1-2G3-wObC5p9l/view?usp=drive_link)
+| 3   | P-NOC (OC+rals)    | segm. priors | trainaug |  - | 62.9% | [weights](https://drive.google.com/file/d/1rCC8eWBdI2ChODsI5z8lm1-Ce2pa0zv1/view?usp=drive_link) CAMs |
+| 4   | P-NOC+ls (OC+rals) | segm. priors | trainaug |  - | 63.3% | [weights](https://drive.google.com/file/d/1X4fsGdDGpDBbWq2n_FGkqOtgOETS0x_P/view?usp=drive_link) [CAMs](https://drive.google.com/file/d/1KyenobT13vFnk_wrYlcrYOSnXmH2jLte/view?usp=drive_link) |
+| —   | **Saliency** |
+| 5   | C²AM-H (P-NOC+ls #4)         | saliency priors | trainaug |  ✓ | 67.9% | [weights](https://drive.google.com/file/d/1l37cudoH-pTpOpxakUSoPwp4wiIN2_8n/view?usp=sharing) [sals](https://drive.google.com/file/d/1foXVj0UoP3rHgsEWGwBtycMQS1UqHzKf/view?usp=drive_link) |
+| 6   | PoolNet (C²AM-H P-NOC+ls #5) | saliency masks  | trainaug |  - | 70.8% | [weights](https://drive.google.com/file/d/1mIlu1WhtLz6tKRNibD4L9FU8X7zzD5Xz/view?usp=drive_link) [sals](https://drive.google.com/file/d/1xUj2PDUvvqRuH0mG10drveULS3wb2y7b/view?usp=drive_link) |
+| —   | **Random Walk** |
+| 7   | AffinityNet (#4, #6) | affinity labels | trainaug | ✓ | -     | [masks](https://drive.google.com/file/d/1Y3H9AgyvzqSVDM_2UJFCh116T4daRLeG/view?usp=sharing)
+| 7   | AffinityNet (#4, #6) | pseudo masks    | trainaug | ✓ | 75.5% | [weights](https://drive.google.com/file/d/1yff6VLnsPyRAkvnMBLDpC0yVtAKSdS6F/view?usp=drive_link) [masks](https://drive.google.com/file/d/18ZVPRfnhFreY1I2WWklysqUsBU7IOzKt/view?usp=sharing) |
+| —   | **Segmentation** |
+| 8   | DeepLabV3+ (#7)      | segm. proposals | trainaug | ✓ | 75.8% | [weights](https://drive.google.com/file/d/1nse8KYEanQuF2t_xPO8ed67uLfNkGwIs/view?usp=drive_link) masks
+
+
+### MS COCO 2014
+
+| #   | Method | Description | Train set |  dCRF | mIoU (train) | Link |
+| --- |    --- |         --- |       --- |   --- |  --- | ---  |
+| —   | **CAMs** |
+| 2   | P-NOC (OC: RS269+ra)    | segm. priors | train | - | 40.4% | [weights](https://drive.google.com/file/d/1s0sum2ni0XLPNnaNM3BOm7UQdzJbypWJ/view?usp=drive_link) CAMs |
+| 3   | P-NOC+ls (OC: RS269+ra) | segm. priors | train | - | 40.1% | [weights](https://drive.google.com/file/d/1KCU3U_6_dLD9jbt7ArTmlMYwHurHD-p0/view?usp=sharing) CAMs |
+
 
 ## Acknowledgements
 
