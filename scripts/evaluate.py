@@ -41,7 +41,6 @@ parser.add_argument("--step_th", default=0.05, type=float)
 def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
   compared = 0
   corrupted = []
-  missing = []
 
   steps = range(start, len(dataset), step)
 
@@ -73,28 +72,28 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
       elif args.mode in ("npy", "rw"):
         cam, keys = load_cam_file(npy_file)
 
-        if sal_file:
+        if not sal_file:
+          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
+        else:
           sal = load_saliency_file(sal_file, args.sal_mode)
           bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
-
           cam = np.concatenate((bg, cam), axis=0)
-        else:
-          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
 
         cam = np.argmax(cam, axis=0)
 
       elif args.mode == "deeplab-pytorch":
-        if not os.path.exists(npy_file):
-          missing.append(image_id)
-          continue
+        cam, keys, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
 
-        keys, cam, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
+      elif args.mode == "deeplab-pytorch-threshold":
+        cam, keys, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
+        prob[0, ...] = args.threshold
+        cam = prob.argmax(0)
 
       if args.crf_t:
         try:
           with dataset.data_source.get_image(image_id) as img:
             img = np.asarray(img)
-            if args.mode != "deeplab-pytorch":
+            if "deeplab-pytorch" != args.mode:
               cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
             else:
               # DeepLab-pytorch's CRF
@@ -131,12 +130,10 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if args.verbose > 0 and missing:
-    print(f"Missing files ({len(missing)}): {' '.join(missing[:30])}")
   if args.verbose > 0 and corrupted:
     print(f"Corrupted files ({len(corrupted)}): {' '.join(corrupted[:30])}")
-  if args.verbose > 0 and start == 0 and (missing or corrupted):
-    read = compared + len(missing) + len(corrupted)
+  if args.verbose > 0 and start == 0 and corrupted:
+    read = compared + len(corrupted)
     print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
 
 
@@ -184,7 +181,7 @@ def do_python_eval(dataset, classes, num_workers=8):
   loglist["p_tp"] = p_tp
   loglist["fp_all"] = fp_all
   loglist["fn_all"] = fn_all
-  loglist["miou_foreground"] = miou_foreground
+  loglist["miou_foreground"] = miou_foreground * 100
   return loglist
 
 
@@ -195,7 +192,7 @@ def run(args, dataset: datasets.PathsDataset):
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 
-  miou_ = None
+  index_ = miou_ = None
   threshold_ = fp_ = 0.
   iou_ = {}
   miou_history = []
@@ -207,7 +204,7 @@ def run(args, dataset: datasets.PathsDataset):
     thresholds = [args.threshold]
 
   try:
-    for t in thresholds:
+    for i, t in enumerate(thresholds):
       args.threshold = t
       r = do_python_eval(dataset, classes, num_workers=args.num_workers)
 
@@ -229,6 +226,7 @@ def run(args, dataset: datasets.PathsDataset):
       }
 
       if miou_ is None or r["mIoU"] > miou_:
+        index_ = i
         threshold_ = t
         miou_ = r["mIoU"]
         fp_ = r["fp_all"]
@@ -250,6 +248,7 @@ def run(args, dataset: datasets.PathsDataset):
   wandb.run.summary[f"evaluation/best_t"] = threshold_
   wandb.run.summary[f"evaluation/best_miou"] = miou_
   wandb.run.summary[f"evaluation/best_fp"] = fp_
+  wandb.run.summary[f"evaluation/best_iou"] = wandb.Table(columns=columns, data=[report_iou[index_]])
 
   if args.mode == "rw":
     a_over = 1.60
