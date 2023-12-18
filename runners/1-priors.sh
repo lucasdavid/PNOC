@@ -410,10 +410,10 @@ OC_ARCHITECTURE=$ARCHITECTURE
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
 
-EID=r4  # Experiment ID
+EID=r1  # Experiment ID
 
 TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-$EID
-# train_vanilla
+train_vanilla
 
 BATCH_SIZE=16
 ACCUMULATE_STEPS=2
@@ -430,14 +430,13 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+train_pnoc
 
 DOMAIN=$DOMAIN_TRAIN     inference_priors
 DOMAIN=$DOMAIN_VALID     inference_priors
 DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
 CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-lsra-r4@train-original evaluate_priors
-# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-# CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
-# CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
