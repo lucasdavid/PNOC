@@ -130,9 +130,9 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
   except KeyboardInterrupt:
     ...
 
-  if args.verbose > 0 and corrupted:
+  if start == 0 and args.verbose > 0 and corrupted:
     print(f"Corrupted files ({len(corrupted)}): {' '.join(corrupted[:30])}")
-  if args.verbose > 0 and start == 0 and corrupted:
+  if start == 0 and args.verbose > 0 and corrupted:
     read = compared + len(corrupted)
     print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
 
