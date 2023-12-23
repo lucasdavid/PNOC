@@ -60,12 +60,14 @@ if [[ $DATASET == cityscapes ]]; then
   DOMAIN_TEST="test"
   DATA_DIR=$DATASETS_DIR/cityscapes
 
-  IMAGE_SIZE=512
-  MIN_IMAGE_SIZE=$IMAGE_SIZE
-  MAX_IMAGE_SIZE=$IMAGE_SIZE
+  IMAGE_SIZE=768
+  MIN_IMAGE_SIZE=960   # Images in this set have sizes (1024, 2048). Ratios are calculated over 2028,
+  MAX_IMAGE_SIZE=1920  # hence min/max are larger than `IMAGE_SIZE`. True (min, max) = (480, 960).
 
   VALIDATE_MAX_STEPS=0
-  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
+  # A single threshold is used because the bg class is not added based on
+  # thresholding. We assume bg=road (the most frequent class).
+  VALIDATE_THRESHOLDS=0.5
 
   LR=0.1
   WD=0.0001

@@ -6,7 +6,7 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import RandAugmentMC
 
 from .base import *
-from . import base, voc12, coco14, deepglobe
+from . import base, voc12, coco14, deepglobe, cityscapes
 
 
 class Iterator:
@@ -91,7 +91,11 @@ def get_classification_transforms(
     tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.
   tt += [Transpose()]
 
-  tv += [Normalize_For_Segmentation(mean, std), Top_Left_Crop_For_Segmentation(crop_size), Transpose_For_Segmentation()]
+  tv += [
+    Normalize_For_Segmentation(mean, std),
+    Top_Left_Crop_For_Segmentation(crop_size),
+    Transpose_For_Segmentation()
+  ]
 
   return tuple(map(transforms.Compose, (tt, tv)))
 
@@ -100,12 +104,13 @@ def get_affinity_transforms(
   min_image_size,
   max_image_size,
   crop_size,
+  overcrop: bool = True,
 ):
   mean, std = imagenet_stats()
 
   tt = transforms.Compose(
     [
-      RandomResize_For_Segmentation(min_image_size, max_image_size),
+      RandomResize_For_Segmentation(min_image_size, max_image_size, overcrop=overcrop),
       RandomHorizontalFlip_For_Segmentation(),
       Normalize_For_Segmentation(mean, std),
       RandomCrop_For_Segmentation(crop_size),

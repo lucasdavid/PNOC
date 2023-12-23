@@ -36,6 +36,7 @@ fi
 DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
+# DATASET=cityscapes # Cityscapes Urban Semantic Segmentation
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -50,7 +51,6 @@ ARCHITECTURE=resnest269
 TRAINABLE_STEM=true
 DILATED=false
 MODE=normal
-REGULAR=none
 
 # Training
 # LR=0.1  # defined in dataset.sh
@@ -82,9 +82,8 @@ LABELSMOOTHING=0
 
 ## OC-CSE
 OC_ARCHITECTURE=$ARCHITECTURE
-OC_REGULAR=none
 OC_MASK_GN=true # originally done in OC-CSE
-OC_TRAINABLE_STEM=true
+OC_TRAINABLE_STEM=$TRAINABLE_STEM
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.9
 OC_F_GAMMA=2.0
@@ -135,7 +134,6 @@ train_vanilla() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
@@ -179,10 +177,8 @@ train_occse() {
     --dilated $DILATED \
     --mode "$MODE" \
     --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
     --oc-architecture $OC_ARCHITECTURE \
     --oc-pretrained $OC_PRETRAINED \
-    --oc-regularization $OC_REGULAR \
     --oc-mask-globalnorm $OC_MASK_GN \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
@@ -227,7 +223,6 @@ train_puzzle() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
     --re_loss_option masking \
     --re_loss L1_Loss \
     --alpha_schedule 0.50 \
@@ -267,10 +262,8 @@ train_poc() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
     --oc-architecture $OC_ARCHITECTURE \
     --oc-pretrained $OC_PRETRAINED \
-    --oc-regularization $OC_REGULAR \
     --oc-mask-globalnorm $OC_MASK_GN \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
@@ -321,10 +314,8 @@ train_pnoc() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
-    --regularization $REGULAR \
     --oc-architecture $OC_ARCHITECTURE \
     --oc-pretrained $OC_PRETRAINED \
-    --oc-regularization $OC_REGULAR \
     --oc-trainable-stem $OC_TRAINABLE_STEM \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
@@ -365,7 +356,6 @@ inference_priors() {
   CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/inference.py \
     --architecture $ARCHITECTURE \
-    --regularization $REGULAR \
     --dilated $DILATED \
     --trainable-stem $TRAINABLE_STEM \
     --mode $MODE \
@@ -402,10 +392,6 @@ evaluate_priors() {
     --mode npy \
     --num_workers $WORKERS_INFER;
 }
-
-ARCHITECTURE=resnest269
-ARCH=rs269
-OC_ARCHITECTURE=$ARCHITECTURE
 
 AUGMENT=randaugment
 LABELSMOOTHING=0.1
