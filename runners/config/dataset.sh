@@ -53,3 +53,20 @@ if [[ $DATASET == deepglobe ]]; then
   LR=0.1
   WD=0.0001
 fi
+if [[ $DATASET == cityscapes ]]; then
+  DOMAIN_TRAIN=train
+  DOMAIN_VALID=train
+  DOMAIN_VALID_SEG="val"
+  DOMAIN_TEST="test"
+  DATA_DIR=$DATASETS_DIR/cityscapes
+
+  IMAGE_SIZE=512
+  MIN_IMAGE_SIZE=$IMAGE_SIZE
+  MAX_IMAGE_SIZE=$IMAGE_SIZE
+
+  VALIDATE_MAX_STEPS=0
+  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
+
+  LR=0.1
+  WD=0.0001
+fi
