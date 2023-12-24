@@ -103,6 +103,7 @@ class CityscapesDataSource(base.CustomDataSource):
 
   def get_label(self, sample_id) -> np.ndarray:
     label = self.sample_labels[sample_id]
+    label = label[1:]  # Ignore road label (background).
     return label
 
   def get_image_path(self, sample_id) -> str:
@@ -119,11 +120,11 @@ class CityscapesDataSource(base.CustomDataSource):
       void_class = 255
       bg_class = 0
     else:
-      num_classes = 19
-      classes = CLASSES
-      colors = COLORS
+      num_classes = 18
+      classes = CLASSES[1:]
+      colors = COLORS[1:]
       void_class = None
-      bg_class = 0
+      bg_class = None
 
     return base.DatasetInfo(
       num_classes=num_classes,

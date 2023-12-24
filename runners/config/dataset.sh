@@ -65,9 +65,7 @@ if [[ $DATASET == cityscapes ]]; then
   MAX_IMAGE_SIZE=1920  # hence min/max are larger than `IMAGE_SIZE`. True (min, max) = (480, 960).
 
   VALIDATE_MAX_STEPS=0
-  # A single threshold is used because the bg class is not added based on
-  # thresholding. We assume bg=road (the most frequent class).
-  VALIDATE_THRESHOLDS=0.5
+  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
 
   LR=0.1
   WD=0.0001
