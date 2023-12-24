@@ -7,7 +7,8 @@ import numpy as np
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "cityscapes")
-CLASSES = [
+
+TRAIN_CLASSES = (
   "road",
   "sidewalk",
   "building",
@@ -27,8 +28,8 @@ CLASSES = [
   "train",
   "motorcycle",
   "bicycle",
-]
-COLORS = [
+)
+TRAIN_COLORS = (
   [128, 64, 128],
   [244, 35, 232],
   [70, 70, 70],
@@ -49,14 +50,40 @@ COLORS = [
   [0, 0, 230],
   [119, 11, 32],
   [127, 127, 127],
-]
+)
+
+BG_CLASSES = (
+  "road",
+  "sidewalk",
+  "building",
+  "pole",
+  "vegetation",
+  "sky",
+)
+FG_INDICES = tuple((i for i, c in enumerate(TRAIN_CLASSES) if c not in BG_CLASSES))
+BG_INDICES = tuple((i for i, c in enumerate(TRAIN_CLASSES) if c in BG_CLASSES))
+
+CLSF_MAP = dict(map(reversed, enumerate(FG_INDICES)))   # w/o bg indices ({3: 0, 4: 1, 6: 2, 7: 3, ...})
+SEGM_MAP = -1 * np.ones(256, dtype="int32")  # Map bg indices to 0 and shift remaining ones.
+SEGM_MAP[255] = 255
+for i in BG_INDICES: SEGM_MAP[i] = 0
+for k, v in CLSF_MAP.items(): SEGM_MAP[k] = v + 1       # +1 accounts for the BG class.
+
+CLASSES = ["background"] + [c for i, c in enumerate(TRAIN_CLASSES) if i in FG_INDICES]
+COLORS  = [[0, 0, 0]]    + [c for i, c in enumerate(TRAIN_COLORS)  if i in FG_INDICES]
 
 
-def onehot_encode(indices, n=19):
+def _onehot(indices, n=19):
   target = np.zeros(n, dtype=np.float32)
   target[indices] = 1
 
   return target
+
+def _decode_classification(indices):
+  return [CLSF_MAP[i] for i in indices if i in FG_INDICES]
+
+def _decode_segmentation(indices):
+  return SEGM_MAP[indices]
 
 
 class CityscapesDataSource(base.CustomDataSource):
@@ -90,37 +117,44 @@ class CityscapesDataSource(base.CustomDataSource):
     kind = "gtCoarse" if "extra" in self.domain else "gtFine"
     self._image_ext = '_leftImg8bit.png'
     self._mask_ext = f'_{kind}_labelTrainIds.png'
-  
+
   def get_sample_ids(self, domain) -> List[str]:
     with open(self.get_sample_ids_path(domain)) as f:
       return [sid.strip().split(",")[0] for sid in f.readlines()]
 
   def get_sample_labels(self, domain):
     with open(self.get_sample_ids_path(domain)) as f:
-      ids_and_labels = [sid.strip().split(",") for sid in f.readlines()]
-    
-    return {k: onehot_encode(list(map(int, v.split("|")))) for k, v in ids_and_labels}
+      ids_and_labels = (line.strip().split(",") for line in f.readlines())
+      ids_and_labels = ((_id, list(map(int, indices.split("|")))) for _id, indices in ids_and_labels)
+
+    n = len(CLSF_MAP)
+
+    return {_id: _onehot(_decode_classification(indices), n) for _id, indices in ids_and_labels}
 
   def get_label(self, sample_id) -> np.ndarray:
-    label = self.sample_labels[sample_id]
-    label = label[1:]  # Ignore road label (background).
-    return label
+    return self.sample_labels[sample_id]
+
+  def get_mask(self, sample_id) -> np.ndarray:
+    with Image.open(self.get_mask_path(sample_id)).convert("L") as mask:
+      mask = np.array(mask)
+      mask = _decode_segmentation(mask)
+    return Image.fromarray(mask)
 
   def get_image_path(self, sample_id) -> str:
     return os.path.join(self.images_dir, self.domain, sample_id + self._image_ext)
-  
+
   def get_mask_path(self, sample_id) -> str:
     return os.path.join(self.masks_dir, self.domain, sample_id + self._mask_ext)
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
-      num_classes = 19
+      num_classes = len(CLASSES)
       classes = CLASSES
       colors = COLORS
       void_class = 255
       bg_class = 0
     else:
-      num_classes = 18
+      num_classes = len(CLASSES) - 1
       classes = CLASSES[1:]
       colors = COLORS[1:]
       void_class = None
