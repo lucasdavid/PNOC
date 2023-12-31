@@ -6,8 +6,10 @@ import numpy as np
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "deepglobe")
-CLASSES = ["urban_land", "agriculture_land", "rangeland", "forest_land", "water", "barren_land", "unknown"]
-COLORS = [[0, 255, 255], [255, 255, 0], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [127, 127, 127]]
+CLASSES = ["agriculture_land", "urban_land", "rangeland", "forest_land", "water", "barren_land", "unknown"]
+COLORS = [[255, 255, 0], [0, 255, 255], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [127, 127, 127]]
+
+BG_CLASS = "agriculture_land"
 
 
 class DeepGlobeLandCoverDataSource(base.CustomDataSource):
@@ -45,21 +47,21 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
 
   def get_label(self, sample_id) -> np.ndarray:
     label = self.sample_labels[sample_id]
-    return label
+    return label[1:]
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
-      num_classes = 7
+      num_classes = len(CLASSES)
       classes = CLASSES
       colors = COLORS
       void_class = 7
-      bg_class = 1
+      bg_class = 0
     else:
-      num_classes = 7
-      classes = CLASSES[:]
-      colors = COLORS[:]
+      num_classes = len(CLASSES) - 1
+      classes = CLASSES[1:]
+      colors = COLORS[1:]
       void_class = None
-      bg_class = 1
+      bg_class = None
 
     return base.DatasetInfo(
       num_classes=num_classes,

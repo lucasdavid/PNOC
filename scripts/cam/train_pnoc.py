@@ -45,12 +45,14 @@ parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--regularization', default=None, type=str)  # orthogonal
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-trainable-stem', default=True, type=str2bool)
+parser.add_argument('--oc-trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
@@ -76,6 +78,7 @@ parser.add_argument('--max_grad_norm_oc', default=None, type=float)
 parser.add_argument('--optimizer', default="sgd", choices=["sgd", "lion"])
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
+parser.add_argument('--lr_alpha_oc', default=1., type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -298,6 +301,7 @@ if __name__ == '__main__':
     dilated=args.dilated,
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
+    trainable_backbone=args.trainable_backbone,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -312,8 +316,9 @@ if __name__ == '__main__':
     mode="fix",
     regularization=args.oc_regularization,
     trainable_stem=args.oc_trainable_stem,
+    trainable_backbone=args.oc_trainable_backbone,
   )
-  ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=True)
+  ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=False)
 
   cg_param_groups, cg_param_names = cgnet.get_parameter_groups(with_names=True)
   oc_param_groups, oc_param_names = ocnet.get_parameter_groups(with_names=True)
@@ -336,7 +341,7 @@ if __name__ == '__main__':
     r_loss_fn = L2_Loss
 
   cgopt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
-  ocopt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), oc_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
+  ocopt = get_optimizer(args.lr * args.lr_alpha_oc, args.wd, int(step_max // args.accumulate_steps), oc_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
   log_opt_params('CGNet', cg_param_names)
   log_opt_params('OCNet', oc_param_names)
 

@@ -76,16 +76,18 @@ def get_classification_transforms(
   tv = []
   if min_size == max_size:
     tt += [transforms.Resize((min_size, min_size))]
+    tv += [Resize_For_Segmentation((min_size, min_size))]  # image=(1024,2048) min_size=768 --> (768,768)
   else:
     tt += [RandomResize(min_size, max_size)]
+    tv += [Resize_For_Segmentation(crop_size)]  # image=(500,480) crop_size=512 --> (534,512)
   tt += [RandomHorizontalFlip()]
+  if "clahe" in augment:
+    tt += [CLAHE()]
+    tv += [CLAHE()]
   if 'colorjitter' in augment:
     tt += [transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)]
   if 'randaugment' in augment:
     tt += [RandAugmentMC(n=2, m=10)]
-  if "clahe" in augment:
-    tt += [CLAHE()]
-    tv += [CLAHE()]
   tt += [Normalize(mean, std)]
   if 'cutmix' not in augment:
     tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.
@@ -93,7 +95,7 @@ def get_classification_transforms(
 
   tv += [
     Normalize_For_Segmentation(mean, std),
-    Top_Left_Crop_For_Segmentation(crop_size),
+    Top_Left_Crop_For_Segmentation(crop_size),  # image=(534,512) crop_size=512 --> (512,512)
     Transpose_For_Segmentation()
   ]
 

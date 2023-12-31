@@ -151,14 +151,14 @@ class CityscapesDataSource(base.CustomDataSource):
       num_classes = len(CLASSES)
       classes = CLASSES
       colors = COLORS
-      void_class = 255
       bg_class = 0
+      void_class = 15
     else:
       num_classes = len(CLASSES) - 1
       classes = CLASSES[1:]
       colors = COLORS[1:]
-      void_class = None
       bg_class = None
+      void_class = None
 
     return base.DatasetInfo(
       num_classes=num_classes,

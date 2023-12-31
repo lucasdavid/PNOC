@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 import datasets
 import wandb
+from core.training import priors_validation_step
 from core.networks import *
 from core.puzzle_utils import *
 from tools.ai.augment_utils import *
@@ -24,6 +25,7 @@ from tools.general import wandb_utils
 from tools.general.io_utils import *
 from tools.general.json_utils import *
 from tools.general.time_utils import *
+
 
 parser = argparse.ArgumentParser()
 
@@ -45,6 +47,7 @@ parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
@@ -160,6 +163,7 @@ if __name__ == '__main__':
     dilated=args.dilated,
     regularization=args.regularization,
     trainable_stem=args.trainable_stem,
+    trainable_backbone=args.trainable_backbone,
   )
   param_groups = model.get_parameter_groups()
 
@@ -214,69 +218,8 @@ if __name__ == '__main__':
 
   train_meter = MetricsContainer(['loss', 'class_loss', 'p_class_loss', 're_loss', 'conf_loss', 'alpha'])
 
-  best_train_mIoU = -1
-  thresholds = list(map(float, args.validate_thresholds.split(","))) if args.validate_thresholds else list(np.arange(0.10, 0.50, 0.05))
-
-  def evaluate(loader):
-    include_bg = train_dataset.info.bg_class is None
-
-    model.eval()
-    eval_timer.tik()
-
-    meter_dic = {
-      th: MIoUCalculator(train_dataset.info.classes, train_dataset.info.bg_class, include_bg)
-      for th in thresholds
-    }
-
-    with torch.no_grad():
-      for step, (_, images, labels, gt_masks) in enumerate(loader):
-        images = images.to(DEVICE)
-        labels = labels.to(DEVICE)
-
-        with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-          _, features = model(images, with_cam=True)
-
-        # features = resize_for_tensors(features, images.size()[-2:])
-        # gt_masks = resize_for_tensors(gt_masks, features.size()[-2:], mode='nearest')
-
-        mask = labels.unsqueeze(2).unsqueeze(3)
-        cams = (make_cam(features.float()) * mask)
-
-        for b in range(images.size()[0]):
-          # c, h, w -> h, w, c
-          cam = to_numpy(cams[b]).transpose((1, 2, 0))
-          gt_mask = to_numpy(gt_masks[b])
-
-          h, w, c = cam.shape
-          gt_mask = cv2.resize(gt_mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-          for th in thresholds:
-            pred_mask = cam
-            if include_bg:
-              bg = np.ones_like(cam[:, :, 0]) * th
-              pred_mask = np.concatenate([bg[..., np.newaxis], pred_mask], axis=-1)
-
-            pred_mask = np.argmax(pred_mask, axis=-1)
-
-            meter_dic[th].add(pred_mask, gt_mask)
-
-        if args.validate_max_steps and step >= args.validate_max_steps:
-          break
-
-    model.train()
-
-    best_th = 0.0
-    best_mIoU = 0.0
-    best_iou = {}
-
-    for th in thresholds:
-      mIoU, mIoU_foreground, iou, *_ = meter_dic[th].get(clear=True, detail=True)
-      if best_mIoU < mIoU:
-        best_th = th
-        best_mIoU = mIoU
-        best_iou = iou
-
-    return best_th, best_mIoU, best_iou
+  miou_best = -1
+  THRESHOLDS = list(map(float, args.validate_thresholds.split(","))) if args.validate_thresholds else list(np.arange(0.10, 0.50, 0.05))
 
   train_iterator = datasets.Iterator(train_loader)
 
@@ -395,7 +338,7 @@ if __name__ == '__main__':
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
-      wandb.log(wb_logs, commit=not do_validation)
+      wandb.log(wb_logs, step=iteration, commit=not do_validation)
 
       log(
         '[i] \
@@ -414,34 +357,21 @@ if __name__ == '__main__':
     # Evaluation
     #################################################################################################
     if do_validation:
-      threshold, mIoU, iou = evaluate(valid_loader)
+      model.eval()
+      with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
+        metric_results = priors_validation_step(
+          model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+        )
+      metric_results["iteration"] = iteration + 1
+      model.train()
 
-      if best_train_mIoU == -1 or best_train_mIoU < mIoU:
-        best_train_mIoU = mIoU
-        wandb.run.summary["train/best_t"] = threshold
-        wandb.run.summary["train/best_miou"] = mIoU
-        wandb.run.summary["train/best_iou"] = iou
+      wandb.log({f"val/{k}": v for k, v in metric_results.items()})
+      print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-      data = {
-        'iteration': iteration + 1,
-        'threshold': threshold,
-        'miou': mIoU,
-        'iou': iou,
-        'best_miou': best_train_mIoU,
-        'time': eval_timer.tok(clear=True),
-      }
-      data_dic['validation'].append(data)
-      write_json(data_path, data_dic)
-      wandb.log({f"val/{k}": v for k, v in data.items()})
-
-      log(
-        'iteration = {iteration:,} '
-        'threshold = {threshold:.2f}'
-        'best_miou = {best_miou:.2f}%'
-        'miou      = {miou:.2f}%'
-        'iou       = {iou}'
-        'time      = {time:.0f}sec'.format(**data)
-      )
+      if metric_results["miou"] > miou_best:
+        miou_best = metric_results["miou"]
+        for k in ("threshold", "miou", "iou"):
+          wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
       save_model_fn()
 

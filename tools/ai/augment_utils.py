@@ -386,14 +386,20 @@ class CLAHE:
       x = data
 
     if isinstance(x, Image.Image):
+      from_pil = True
       i = np.array(x)
       x.close()
       x = i
+    else:
+      from_pil = False
 
     x = cv2.cvtColor(x, cv2.COLOR_RGB2Lab)
     # 0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
     x[:, :, 0] = self.clahe.apply(x[:, :, 0])
     x = cv2.cvtColor(x, cv2.COLOR_Lab2RGB)
+
+    if from_pil:
+      x = Image.fromarray(x)
 
     if isinstance(data, dict):
       data["image"] = x
