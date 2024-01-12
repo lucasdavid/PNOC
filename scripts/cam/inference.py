@@ -5,7 +5,7 @@ import argparse
 import copy
 import os
 import sys
-from typing import List
+from typing import Callable, List, Optional
 
 import numpy as np
 import torch
@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch import multiprocessing
 from torch.utils.data import Subset
 from tqdm import tqdm
+from torchvision import transforms
 
 import datasets
 from core.networks import *
@@ -34,20 +35,18 @@ parser = argparse.ArgumentParser()
 ###############################################################################
 parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--device', default='cuda', type=str)
-# parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', required=True, type=str)
 parser.add_argument('--pred_dir', default=None, type=str)
 parser.add_argument('--sample_ids', default=None, type=str)
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
-parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--tag', default='', type=str)
 parser.add_argument('--weights', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
+parser.add_argument('--resize', default=None, type=int)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
 parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
@@ -72,8 +71,6 @@ def run(args):
     info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
-    regularization=args.regularization,
-    trainable_stem=args.trainable_stem,
   )
   load_model(model, WEIGHTS_PATH, map_location=torch.device(DEVICE))
   model.eval()
@@ -81,16 +78,20 @@ def run(args):
   dataset = [Subset(dataset, np.arange(i, len(dataset), GPUS_COUNT)) for i in range(GPUS_COUNT)]
   scales = [float(scale) for scale in args.scales.split(',')]
 
+  if args.resize:
+    resize = transforms.Resize((args.resize, args.resize))
+
   if GPUS_COUNT > 1:
-    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, scales, PREDS_DIR, DEVICE), join=True)
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, resize, scales, PREDS_DIR, DEVICE), join=True)
   else:
-    _work(0, model, dataset, scales, PREDS_DIR, DEVICE)
+    _work(0, model, dataset, resize, scales, PREDS_DIR, DEVICE)
 
 
 def _work(
     process_id: int,
     model: Classifier,
     dataset: List[datasets.PathsDataset],
+    resize: Optional[transforms.Resize],
     scales: List[float],
     preds_dir: str,
     device: str,
@@ -112,10 +113,22 @@ def _work(
       image = data_source.get_image(image_id)
       label = data_source.get_label(image_id)
 
-      W, H = image.size
+      original_size = image.size    # 2048
 
-      strided_size = get_strided_size((H, W), 4)
-      strided_up_size = get_strided_up_size((H, W), 16)
+      if resize:
+        # Some datasets (e.g., cityscapes) have large
+        # images and must be resized before inference.
+        image = resize(image)
+
+        W, H = original_size
+
+        strided_size = get_strided_size((H, W), 4)
+        strided_up_size = get_strided_up_size((H, W), 16)
+      else:
+        W, H = image.size
+
+        strided_size = get_strided_size((H, W), 4)
+        strided_up_size = get_strided_up_size((H, W), 16)
 
       cams = [forward_tta(model, image, scale, device) for scale in scales]
 

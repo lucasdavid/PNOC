@@ -202,6 +202,12 @@ def get_custom_loader(config, mode='train', pin=False):
       if mode == 'train'
       else COCOImageDataTest(config.test_root, config.train_list)
     )
+  elif config.dataset == "cityscapes":
+    dataset = (
+      CityscapesImageDataTrain(config.train_root, config.train_list, config.pseudo_root)
+      if mode == 'train'
+      else CityscapesImageDataTest(config.test_root, config.train_list)
+    )
   else:
     raise ValueError(f'Unknown dataset {config.dataset}. Should either be "voc12" or "coco14".')
 

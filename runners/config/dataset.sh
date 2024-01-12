@@ -1,5 +1,9 @@
 # Dataset
 
+VALIDATE_MAX_STEPS=0
+VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
+
+
 if [[ $DATASET == voc12 ]]; then
   DOMAIN_TRAIN=train_aug
   DOMAIN_VALID=train
@@ -10,9 +14,7 @@ if [[ $DATASET == voc12 ]]; then
   IMAGE_SIZE=512
   MIN_IMAGE_SIZE=320
   MAX_IMAGE_SIZE=640
-
-  VALIDATE_MAX_STEPS=0
-  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
+  INF_IMAGE_SIZE=0  # no squared resize during inference.
 
   LR=0.1
   WD=0.0001
@@ -27,9 +29,9 @@ if [[ $DATASET == coco14 ]]; then
   IMAGE_SIZE=640
   MIN_IMAGE_SIZE=400
   MAX_IMAGE_SIZE=800
+  INF_IMAGE_SIZE=0  # no squared resize during inference.
 
   VALIDATE_MAX_STEPS=620  # too many valid samples
-  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
 
   LR=0.05
   WD=0.0001
@@ -44,11 +46,7 @@ if [[ $DATASET == deepglobe ]]; then
   IMAGE_SIZE=320
   MIN_IMAGE_SIZE=$IMAGE_SIZE
   MAX_IMAGE_SIZE=$IMAGE_SIZE
-
-  VALIDATE_MAX_STEPS=0
-  # A single threshold is used because the bg class is not added based on
-  # thresholding. We assume bg=agriculture_land (the most frequent class).
-  VALIDATE_THRESHOLDS=0.5
+  INF_IMAGE_SIZE=$IMAGE_SIZE  # Resize 2048 image to 320 before inference, then resize predictions back to 2048.
 
   LR=0.1
   WD=0.0001
@@ -63,10 +61,8 @@ if [[ $DATASET == cityscapes ]]; then
   IMAGE_SIZE=768
   MIN_IMAGE_SIZE=768  # 960   # Images in this set have sizes (1024, 2048). Ratios are calculated over 2028,
   MAX_IMAGE_SIZE=768  # 1920  # hence min/max are larger than `IMAGE_SIZE`. True (min, max) = (480, 960).
+  INF_IMAGE_SIZE=$IMAGE_SIZE
 
-  VALIDATE_MAX_STEPS=0
-  VALIDATE_THRESHOLDS=0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45
-
-  LR=0.1
+  LR=0.05
   WD=0.0001
 fi

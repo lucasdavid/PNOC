@@ -43,16 +43,13 @@ parser.add_argument('--domain_valid', default=None, type=str)
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-parser.add_argument('--regularization', default=None, type=str)  # orthogonal
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--trainable-stage4', default=True, type=str2bool)
 parser.add_argument('--trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
-parser.add_argument('--oc-regularization', default=None, type=str)
-parser.add_argument('--oc-trainable-stem', default=True, type=str2bool)
-parser.add_argument('--oc-trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-focal-momentum', default=0.9, type=float)
@@ -299,13 +296,13 @@ if __name__ == '__main__':
     train_dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
-    regularization=args.regularization,
     trainable_stem=args.trainable_stem,
+    trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
-    cgnet.load_state_dict(torch.load(args.restore, map_location=torch.device('cpu')), strict=True)
+    cgnet.load_state_dict(torch.load(args.restore, map_location=torch.device('cpu')))
   log_model('CGNet', cgnet, args)
 
   # Ordinary Classifier.
@@ -314,11 +311,11 @@ if __name__ == '__main__':
     args.oc_architecture,
     train_dataset.info.num_classes,
     mode="fix",
-    regularization=args.oc_regularization,
-    trainable_stem=args.oc_trainable_stem,
-    trainable_backbone=args.oc_trainable_backbone,
+    trainable_stem=args.trainable_stem,
+    trainable_stage4=args.trainable_stage4,
+    trainable_backbone=args.trainable_backbone,
   )
-  ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')), strict=False)
+  ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')))
 
   cg_param_groups, cg_param_names = cgnet.get_parameter_groups(with_names=True)
   oc_param_groups, oc_param_names = ocnet.get_parameter_groups(with_names=True)

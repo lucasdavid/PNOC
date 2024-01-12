@@ -109,12 +109,14 @@ class Backbone(nn.Module):
     dilated=False,
     strides=None,
     trainable_stem=True,
+    trainable_stage4=True,
     trainable_backbone=True,
   ):
     super().__init__()
 
     self.mode = mode
     self.trainable_stem = trainable_stem
+    self.trainable_stage4 = trainable_stage4
     self.trainable_backbone = trainable_backbone
     self.not_training = []
     self.from_scratch_layers = []
@@ -139,7 +141,12 @@ class Backbone(nn.Module):
         set_trainable_layers(s, trainable=False)
       self.not_training.extend(stages)
     else:
-      if not self.trainable_stem:
+      if not self.trainable_stage4:
+        self.not_training.extend(stages[:-1])
+        for s in stages[:-1]:
+          set_trainable_layers(s, trainable=False)
+
+      elif not self.trainable_stem:
         set_trainable_layers(self.stage1, trainable=False)
         self.not_training.extend([self.stage1])
 
@@ -221,6 +228,7 @@ class Classifier(Backbone):
     strides=None,
     regularization=None,
     trainable_stem=True,
+    trainable_stage4=True,
     trainable_backbone=True,
   ):
     super().__init__(
@@ -229,6 +237,7 @@ class Classifier(Backbone):
       dilated=dilated,
       strides=strides,
       trainable_stem=trainable_stem,
+      trainable_stage4=trainable_stage4,
       trainable_backbone=trainable_backbone,
     )
 

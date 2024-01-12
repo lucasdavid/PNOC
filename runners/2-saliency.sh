@@ -33,9 +33,11 @@ else
 fi
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
+# DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
+DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
+
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -223,20 +225,28 @@ evaluate_saliency_detection() {
 ## ================================================
 ## Pascal VoC 2012
 ##
+FG_T=0.4
 CAMS_DIR=experiments/predictions/pnoc/voc12-rs269-pnoc-b16-lr0.1-ls@rs269-rals-r1@train@scale=0.5,1.0,1.5,2.0
 PRIORS_TAG=rs269pnoc@rs269-rals-r1
-FG_T=0.4
 ## ================================================
 ## MS COCO 2014
 ##
-# FG_T=0.3
 # LR=0.0005
+# FG_T=0.3
 # CAMS_DIR=experiments/predictions/pnoc/coco-rs269-pnoc-b16-lr0.05-ls@rs269-lsra-r1@train@scale=0.5,1.0,1.5,2.0
 # PRIORS_TAG=rs269pnoc@rs269-rals-r1
 ## ================================================
+## Cityscapes
+##
+IMAGE_SIZE=768
+ARCH=rs101
+ARCHITECTURE=resnest101
+FG_T=0.2
+CAMS_DIR=experiments/predictions/pnoc/cityscapes-rs101-pnoc-b32-lr0.05-ls@rs101-r1@train@scale=0.5,1.0,1.5,2.0
+PRIORS_TAG=rs101pnoc@rs101
 
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
-PN_TAG=$DATASET-pn@ccamh-rs269-fg$FG_T@$PRIORS_TAG
+PN_TAG=$DATASET-pn@ccamh-$ARCH-fg$FG_T@$PRIORS_TAG
 
 ccamh_training
 ccamh_inference

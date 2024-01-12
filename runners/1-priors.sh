@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=24:00:00
+#SBATCH --time=04:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -32,11 +32,11 @@ else
   WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc
 fi
 
-# Dataset
-DATASET=voc12  # Pascal VOC 2012
-# DATASET=coco14  # MS COCO 2014
-# DATASET=deepglobe # DeepGlobe Land Cover Classification
-# DATASET=cityscapes # Cityscapes Urban Semantic Segmentation
+## Dataset
+# DATASET=voc12       # Pascal VOC 2012
+# DATASET=coco14      # MS COCO 2014
+# DATASET=deepglobe   # DeepGlobe Land Cover Classification
+DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -46,14 +46,15 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ### Priors
-ARCH=rs269
-ARCHITECTURE=resnest269
+ARCH=rs101
+ARCHITECTURE=resnest101
 TRAINABLE_STEM=true
+TRAINABLE_BONE=true
+TRAINABLE_STAGE4=true
 DILATED=false
 MODE=normal
 
 # Training
-# LR=0.1  # defined in dataset.sh
 OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
 BATCH_SIZE=32
@@ -61,6 +62,7 @@ ACCUMULATE_STEPS=1
 
 LR_ALPHA_SCRATCH=10.0
 LR_ALPHA_BIAS=2.0
+LR_ALPHA_OC=1.0
 
 # =========================
 # $PIP install lion-pytorch
@@ -75,7 +77,8 @@ MIXED_PRECISION=true
 PERFORM_VALIDATION=true
 
 ## Augmentation
-AUGMENT=randaugment  # collorjitter_mixup_cutmix_cutormixup
+AUGMENT=randaugment  # clahe_collorjitter_mixup_cutmix_cutormixup
+AUG=ra
 CUTMIX=0.5
 MIXUP=1.0
 LABELSMOOTHING=0
@@ -83,7 +86,6 @@ LABELSMOOTHING=0
 ## OC-CSE
 OC_ARCHITECTURE=$ARCHITECTURE
 OC_MASK_GN=true # originally done in OC-CSE
-OC_TRAINABLE_STEM=$TRAINABLE_STEM
 OC_STRATEGY=random
 OC_F_MOMENTUM=0.9
 OC_F_GAMMA=2.0
@@ -117,7 +119,7 @@ train_vanilla() {
   echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:ra" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:$AUG" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
@@ -134,6 +136,7 @@ train_vanilla() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
+    --trainable-backbone $TRAINABLE_BONE \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
@@ -223,6 +226,7 @@ train_puzzle() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
+    --trainable-backbone $TRAINABLE_BONE \
     --re_loss_option masking \
     --re_loss L1_Loss \
     --alpha_schedule 0.50 \
@@ -262,6 +266,7 @@ train_poc() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
+    --trainable-backbone $TRAINABLE_BONE \
     --oc-architecture $OC_ARCHITECTURE \
     --oc-pretrained $OC_PRETRAINED \
     --oc-mask-globalnorm $OC_MASK_GN \
@@ -306,6 +311,7 @@ train_pnoc() {
     --wd $WD \
     --lr_alpha_scratch $LR_ALPHA_SCRATCH \
     --lr_alpha_bias $LR_ALPHA_BIAS \
+    --lr_alpha_oc   $LR_ALPHA_OC \
     --optimizer $OPTIMIZER \
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
@@ -314,9 +320,10 @@ train_pnoc() {
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
+    --trainable-backbone $TRAINABLE_BONE \
+    --trainable-stage4 $TRAINABLE_STAGE4 \
     --oc-architecture $OC_ARCHITECTURE \
     --oc-pretrained $OC_PRETRAINED \
-    --oc-trainable-stem $OC_TRAINABLE_STEM \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
     --max_image_size $MAX_IMAGE_SIZE \
@@ -345,7 +352,7 @@ train_pnoc() {
     --dataset $DATASET \
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
-    --data_dir $DATA_DIR
+    --data_dir $DATA_DIR;
 }
 
 inference_priors() {
@@ -357,11 +364,11 @@ inference_priors() {
     $PY scripts/cam/inference.py \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
-    --trainable-stem $TRAINABLE_STEM \
     --mode $MODE \
     --tag $TAG \
     --dataset $DATASET \
     --domain $DOMAIN \
+    --resize $INF_IMAGE_SIZE \
     --data_dir $DATA_DIR \
     --device $DEVICE
 }
@@ -393,36 +400,43 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-AUGMENT=randaugment
-LABELSMOOTHING=0.1
+LABELSMOOTHING=0
+AUGMENT=clahe  # default:randaug, cityscapes:clahe
+AUG="clahe"
 
 EID=r1  # Experiment ID
 
-TAG_VANILLA=vanilla/$DATASET-$ARCH-lr$LR-rals-$EID
-train_vanilla
+TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
+TAG_VANILLA=$TAG
+# train_vanilla
 
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
-LABELSMOOTHING=0.1
-AUGMENT=colorjitter  # none for DeepGlobe
+# LR=0.01
+# MODE=fix
+# TRAINABLE_STAGE4=false
+# BATCH_SIZE=16
+# ACCUMULATE_STEPS=2
+# LABELSMOOTHING=0.1
 
-OC_NAME="$ARCH"-rals
+AUGMENT=clahe  # default:colorjitter, cityscapes:clahe, deepglobe:none
+AUG=clahe
+
+OC_NAME="$ARCH"
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
-# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-ls-$EID"
+# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-$EID"
 # train_puzzle
 
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
-DOMAIN=$DOMAIN_TRAIN     inference_priors
+# DOMAIN=$DOMAIN_TRAIN     inference_priors
 DOMAIN=$DOMAIN_VALID     inference_priors
-DOMAIN=$DOMAIN_VALID_SEG inference_priors
+# DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors

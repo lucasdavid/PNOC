@@ -104,11 +104,13 @@ class CityscapesDataSource(base.CustomDataSource):
     masks_dir: str = None,
     sample_ids: List[str] = None,
   ):
+    domain = domain or split and self.DOMAINS.get(split, self.DOMAINS[self.DEFAULT_SPLIT])
+
     super().__init__(
       domain=domain,
       split=split,
-      images_dir=images_dir or os.path.join(root_dir, "leftImg8bit"),
-      masks_dir=masks_dir or os.path.join(root_dir, "gtFine"),
+      images_dir=images_dir or os.path.join(root_dir, "leftImg8bit", domain),
+      masks_dir=masks_dir or os.path.join(root_dir, "gtFine", domain),
       sample_ids=sample_ids,
     )
     self.root_dir = root_dir
@@ -117,6 +119,10 @@ class CityscapesDataSource(base.CustomDataSource):
     kind = "gtCoarse" if "extra" in self.domain else "gtFine"
     self._image_ext = '_leftImg8bit.png'
     self._mask_ext = f'_{kind}_labelTrainIds.png'
+
+    # Images and original segmentation maps are organized in city-labeled sub-folders.
+    # If using the original dir (`masks_dir is None`), include city name in path.
+    self._include_city_in_paths = masks_dir is None
 
   def get_sample_ids(self, domain) -> List[str]:
     with open(self.get_sample_ids_path(domain)) as f:
@@ -141,10 +147,15 @@ class CityscapesDataSource(base.CustomDataSource):
     return Image.fromarray(mask)
 
   def get_image_path(self, sample_id) -> str:
-    return os.path.join(self.images_dir, self.domain, sample_id + self._image_ext)
+    city = sample_id.split("_")[0]
+    return os.path.join(self.images_dir, city, sample_id + self._image_ext)
 
   def get_mask_path(self, sample_id) -> str:
-    return os.path.join(self.masks_dir, self.domain, sample_id + self._mask_ext)
+    if self._include_city_in_paths:
+      city = sample_id.split("_")[0]
+      return os.path.join(self.masks_dir, city, sample_id + self._mask_ext)
+    else:
+      return os.path.join(self.masks_dir, sample_id + self._mask_ext)
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":
