@@ -215,16 +215,6 @@ def run(args, dataset: datasets.PathsDataset):
 
       report_iou.append([t] + [r[c] for c in classes] + [r["mIoU"], r["miou_foreground"]])
 
-      logs = {
-        "evaluation/t": t,
-        "evaluation/miou": r["mIoU"],
-        "evaluation/miou_fg": r["miou_foreground"],
-        "evaluation/miou_bg": r[bg_class],
-        "evaluation/fp": r["fp_all"],
-        "evaluation/fn": r["fn_all"],
-        "evaluation/iou": wandb.Table(columns=columns, data=report_iou)
-      }
-
       if miou_ is None or r["mIoU"] > miou_:
         index_ = i
         threshold_ = t
@@ -232,7 +222,15 @@ def run(args, dataset: datasets.PathsDataset):
         fp_ = r["fp_all"]
         iou_ = r
 
-      wandb.log(logs)
+      wandb.log({
+        "evaluation/t": t,
+        "evaluation/miou": r["mIoU"],
+        "evaluation/miou_fg": r["miou_foreground"],
+        "evaluation/miou_bg": r[bg_class],
+        "evaluation/fp": r["fp_all"],
+        "evaluation/fn": r["fn_all"],
+        "evaluation/iou": [r[c] for c in classes],
+      })
 
   except KeyboardInterrupt:
     print("\ninterrupted")
@@ -244,6 +242,8 @@ def run(args, dataset: datasets.PathsDataset):
     "-" * 80,
     sep="\n"
   )
+
+  wandb.run.summary[f"evaluation/iou"] = wandb.Table(columns=columns, data=report_iou)
 
   wandb.run.summary[f"evaluation/best_t"] = threshold_
   wandb.run.summary[f"evaluation/best_miou"] = miou_

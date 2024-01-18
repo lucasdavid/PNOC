@@ -2,7 +2,6 @@
   "editor.tabSize": 2,
   "editor.formatOnSave": false,
   "editor.wordWrapColumn": 120,
-  "python.formatting.provider": "yapf",
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -34,8 +33,6 @@
     "data/postgresql": true,
     "logs/": true
   },
-  "extensions.autoCheckUpdates": false,
-  "extensions.autoUpdate": false,
   "search.followSymlinks": false,
   "files.trimFinalNewlines": true,
   "python.analysis.typeCheckingMode": "off"
