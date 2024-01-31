@@ -4,6 +4,7 @@ import os
 import sys
 
 import numpy as np
+import pandas as pd
 from PIL import Image, UnidentifiedImageError
 
 import datasets
@@ -38,6 +39,8 @@ parser.add_argument("--max_th", default=0.81, type=float)
 parser.add_argument("--step_th", default=0.05, type=float)
 parser.add_argument("--ignore_bg_cam", default=False, type=str2bool)
 
+parser.add_argument('--ignore_uncertain_pred', default=False, type=str2bool, help="Used when evaluating affinity maps.")
+
 
 def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
   compared = 0
@@ -53,7 +56,6 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
       image_id, image_path, mask_path = dataset[idx]
 
       y_true = np.asarray(dataset.data_source.get_mask(image_id))
-      valid_mask = y_true < 255
 
       npy_file = os.path.join(PRED_DIR, image_id + ".npy")
       png_file = os.path.join(PRED_DIR, image_id + ".png")
@@ -110,6 +112,10 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
 
       y_pred = keys[cam]
 
+      valid_mask = y_true < 255
+      if args.ignore_uncertain_pred:
+        valid_mask &= y_pred < 255
+
       for i in range(len(classes)):
         P[i].acquire()
         P[i].value += np.sum((y_pred == i) * valid_mask)
@@ -133,7 +139,7 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
     print(f"{compared} ({compared/read:.3%}) predictions evaluated.")
 
 
-def do_python_eval(dataset, classes, num_workers=8):
+def do_python_eval(dataset, classes, bg_index: int = 0, num_workers: int = 8):
   TP = []
   P = []
   T = []
@@ -162,34 +168,52 @@ def do_python_eval(dataset, classes, num_workers=8):
     FP_ALL.append((P[i].value - TP[i].value) / (T[i].value + P[i].value - TP[i].value + 1e-10))
     FN_ALL.append((T[i].value - TP[i].value) / (T[i].value + P[i].value - TP[i].value + 1e-10))
 
-  loglist = {}
-  for i in range(len(classes)):
-    loglist[classes[i]] = IoU[i] * 100
+  IoU = np.asarray(IoU)
+  FP_ALL = np.asarray(FP_ALL)
+  FN_ALL = np.asarray(FN_ALL)
 
-  miou = np.mean(np.array(IoU))
-  t_tp = np.mean(np.array(T_TP)[1:])
-  p_tp = np.mean(np.array(P_TP)[1:])
-  fp_all = np.mean(np.array(FP_ALL)[1:])
-  fn_all = np.mean(np.array(FN_ALL)[1:])
-  miou_foreground = np.mean(np.array(IoU)[1:])
-  loglist["mIoU"] = miou * 100
-  loglist["t_tp"] = t_tp
-  loglist["p_tp"] = p_tp
-  loglist["fp_all"] = fp_all
-  loglist["fn_all"] = fn_all
-  loglist["miou_foreground"] = miou_foreground * 100
+  fg_mask = np.arange(len(classes)) != bg_index
+
+  miou = IoU.mean()
+  iou_bg = IoU[bg_index]
+  iou_fg = IoU[fg_mask].mean()
+
+  t_tp = np.array(T_TP)[fg_mask].mean()
+  p_tp = np.array(P_TP)[fg_mask].mean()
+
+  mfp = FP_ALL[fg_mask].mean()
+  mfn = FN_ALL[fg_mask].mean()
+
+  loglist = {
+    "mIoU": miou * 100,
+    "iou_fg": iou_fg * 100,
+    "iou_bg": iou_bg * 100,
+    "iou":  (IoU * 100).tolist(),
+    "t_tp": t_tp,
+    "p_tp": p_tp,
+    "fp": FP_ALL * 100,
+    "fn": FN_ALL * 100,
+    "mfp": mfp,
+    "mfn": mfn,
+  }
+
   return loglist
 
 
 def run(args, dataset: datasets.PathsDataset):
   classes = dataset.info.classes.tolist()
-  bg_class = classes[dataset.info.bg_class]
+  bg_index = dataset.info.bg_class  # assumes the first class represents the background.
+
+  if bg_index != 0:
+    raise NotImplementedError(
+      "Evaluation not implemented for problems in "
+      "which the background is not the first class.")
 
   columns = ["threshold", *classes, "overall", "foreground"]
   report_iou = []
 
   index_ = miou_ = None
-  threshold_ = fp_ = 0.
+  threshold_ = mfp_ = mfn_ = fp_ = fn_ = 0.
   iou_ = {}
   miou_history = []
   fp_history = []
@@ -202,56 +226,63 @@ def run(args, dataset: datasets.PathsDataset):
   try:
     for i, t in enumerate(thresholds):
       args.threshold = t
-      r = do_python_eval(dataset, classes, num_workers=args.num_workers)
+      r = do_python_eval(dataset, classes, bg_index=bg_index, num_workers=args.num_workers)
 
-      if args.verbose: print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['fp_all']:.3%}")
+      if args.verbose: print(f"Th={t or 0.:.3f} mIoU={r['mIoU']:.3f}% FP={r['mfp']:.3%} FN={r['mfn']:.3%}")
 
-      fp_history.append(r["fp_all"])
+      fp_history.append(r["mfp"])
       miou_history.append(r["mIoU"])
 
-      report_iou.append([t] + [r[c] for c in classes] + [r["mIoU"], r["miou_foreground"]])
+      report_iou.append([t] + r["iou"] + [r["mIoU"], r["iou_fg"]])
 
       if miou_ is None or r["mIoU"] > miou_:
         index_ = i
         threshold_ = t
         miou_ = r["mIoU"]
-        fp_ = r["fp_all"]
-        iou_ = r
+        mfp_ = r["mfp"]
+        mfn_ = r["mfn"]
+        fp_ = r["fp"]
+        fn_ = r["fn"]
+        iou_ = r["iou"]
 
       wandb.log({
         "evaluation/t": t,
         "evaluation/miou": r["mIoU"],
-        "evaluation/miou_fg": r["miou_foreground"],
-        "evaluation/miou_bg": r[bg_class],
-        "evaluation/fp": r["fp_all"],
-        "evaluation/fn": r["fn_all"],
-        "evaluation/iou": [r[c] for c in classes],
+        "evaluation/miou_fg": r["iou_fg"],
+        "evaluation/miou_bg": r["iou_bg"],
+        "evaluation/fp": r["mfp"],
+        "evaluation/fn": r["mfn"],
+        "evaluation/iou": r["iou"],
       })
 
   except KeyboardInterrupt:
     print("\ninterrupted")
 
-  if args.verbose: print(
-    f"Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={fp_:.3%}",
-    "-" * 80,
-    *(f"{k:<12}\t{v:.5f}" for k, v in iou_.items()),
-    "-" * 80,
-    sep="\n"
-  )
+  if args.verbose:
+    print(
+      "-" * 80,
+      f"Best Th={threshold_ or 0.:.3f} mIoU={miou_:.5f}% FP={mfp_:.3%} FN={mfn_:.3%}",
+      "-" * 80,
+      # *(f"{k:<12}\t{v:.5f}" for k, v in iou_.items()),
+      # "-" * 80,
+      sep="\n"
+    )
+    print(pd.DataFrame({"iou": iou_, "fp": fp_, "fn": fn_}, index=classes))
+    print("-" * 80)
 
   wandb.run.summary[f"evaluation/iou"] = wandb.Table(columns=columns, data=report_iou)
 
   wandb.run.summary[f"evaluation/best_t"] = threshold_
   wandb.run.summary[f"evaluation/best_miou"] = miou_
-  wandb.run.summary[f"evaluation/best_fp"] = fp_
+  wandb.run.summary[f"evaluation/best_fp"] = mfp_
   wandb.run.summary[f"evaluation/best_iou"] = wandb.Table(columns=columns, data=[report_iou[index_]])
 
   if args.mode == "rw":
     a_over = 1.60
     a_under = 0.60
 
-    fp_over = fp_ * a_over
-    fp_under = fp_ * a_under
+    fp_over = mfp_ * a_over
+    fp_under = mfp_ * a_under
 
     if args.verbose: print("Over FP : {:.4f}, Under FP : {:.4f}".format(fp_over, fp_under))
 
@@ -268,7 +299,7 @@ def run(args, dataset: datasets.PathsDataset):
     miou_under = miou_history[under_index]
     fp_under = fp_history[under_index]
 
-    if args.verbose: print("Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(threshold_ or 0., miou_, fp_))
+    if args.verbose: print("Best Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(threshold_ or 0., miou_, mfp_))
     if args.verbose: print("Over Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_over or 0., miou_over, fp_over))
     if args.verbose: print("Under Th={:.2f}, mIoU={:.3f}%, FP={:.4f}".format(t_under or 0., miou_under, fp_under))
 
