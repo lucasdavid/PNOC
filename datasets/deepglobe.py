@@ -10,6 +10,7 @@ CLASSES = ["agriculture_land", "urban_land", "rangeland", "forest_land", "water"
 COLORS = [[255, 255, 0], [0, 255, 255], [255, 0, 255], [0, 255, 0], [0, 0, 255], [255, 255, 255], [0, 0, 0], [127, 127, 127]]
 
 BG_CLASS = "agriculture_land"
+FG_NPY_INDICES = [0, 2, 3, 4, 5, 6]  # Agriculture (our bg) is the 2nd class in the stored .npy vectors.
 
 
 class DeepGlobeLandCoverDataSource(base.CustomDataSource):
@@ -47,7 +48,7 @@ class DeepGlobeLandCoverDataSource(base.CustomDataSource):
 
   def get_label(self, sample_id) -> np.ndarray:
     label = self.sample_labels[sample_id]
-    return label[1:]
+    return label[FG_NPY_INDICES]
 
   def get_info(self, task: str) -> base.DatasetInfo:
     if task == "segmentation":

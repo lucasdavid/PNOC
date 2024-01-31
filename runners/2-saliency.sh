@@ -33,10 +33,10 @@ else
 fi
 
 # Dataset
-# DATASET=voc12  # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
-DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
+# DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
 
 
 . $WORK_DIR/runners/config/env.sh

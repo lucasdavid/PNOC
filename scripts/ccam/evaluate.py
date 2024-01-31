@@ -208,6 +208,7 @@ def run(args, dataset: datasets.PathsDataset):
     print(f"Predicted saliency maps folder `{PRED_DIR}` does not exist.", file=sys.stderr)
     exit(1)
 
+  index_ = miou_ = None
   miou_ = threshold_ = fp_ = fn_ = 0.
   iou_ = {}
   miou_history = []
@@ -219,7 +220,7 @@ def run(args, dataset: datasets.PathsDataset):
   )
 
   try:
-    for t in thresholds:
+    for i, t in enumerate(thresholds):
       args.threshold = t
       r = do_python_eval(args, dataset, classes, num_workers=args.num_workers)
 
@@ -248,6 +249,7 @@ def run(args, dataset: datasets.PathsDataset):
       }
 
       if r["mIoU"] > miou_:
+        index_ = i
         threshold_ = t
         miou_ = r["mIoU"]
         fp_ = r["fp_all"]
@@ -270,6 +272,7 @@ def run(args, dataset: datasets.PathsDataset):
   wandb.run.summary[f"evaluation/best_t"] = threshold_
   wandb.run.summary[f"evaluation/best_miou"] = miou_
   wandb.run.summary[f"evaluation/best_fp"] = fp_
+  wandb.run.summary[f"evaluation/best_iou"] = wandb.Table(columns=columns, data=[report_iou[index_]])
 
 
 if __name__ == "__main__":
