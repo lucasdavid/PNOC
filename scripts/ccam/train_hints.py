@@ -44,7 +44,6 @@ parser.add_argument('--domain_valid', default=None, type=str)
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-parser.add_argument("--regularization", default=None, type=str)  # orthogonal
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--stage4_out_features', default=1024, type=int)

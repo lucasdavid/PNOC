@@ -32,7 +32,7 @@ def log_dataset(name, dataset, tt, tv):
 
 
 def log_model(name, model, args):
-  properties = "architecture mode dilated regularization trainable_backbone trainable_stem use_gn".split()
+  properties = "architecture mode dilated trainable_backbone trainable_stem use_gn".split()
   config = [(p, getattr(args, p)) for p in properties if hasattr(args, p)]
 
   print(

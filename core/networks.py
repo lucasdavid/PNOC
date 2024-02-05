@@ -27,9 +27,9 @@ def group_norm(features):
 #######################################################################
 
 
-def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
+def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs):
   if 'resnet38d' == name:
-    from .arch_resnet import resnet38d
+    from .backbones.arch_resnet import resnet38d
     out_features = 4096
 
     model = resnet38d.ResNet38d()
@@ -45,7 +45,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
     out_features = 2048
 
     if 'resnet' in name:
-      from .arch_resnet import resnet
+      from .backbones.arch_resnet import resnet
       if dilated:
         strides = strides or (1, 2, 1, 1)
         dilations = (1, 1, 2, 4)
@@ -62,7 +62,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
 
         model.load_state_dict(state_dict)
     elif 'resnest' in name:
-      from .arch_resnest import resnest
+      from .backbones.arch_resnest import resnest
       dilation = 4 if dilated else 2
 
       pretrained = weights == "imagenet"
@@ -74,7 +74,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
       del model.avgpool
       del model.fc
     elif 'res2net' in name:
-      from .res2net import res2net_v1b
+      from .backbones.res2net import res2net_v1b
 
       pretrained = weights == "imagenet"
       model_fn = getattr(res2net_v1b, name)
@@ -84,7 +84,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet'):
 
       del model.avgpool
       del model.fc
-
+    
     if weights and weights != 'imagenet':
       print(f'loading weights from {weights}')
       checkpoint = torch.load(weights, map_location="cpu")
@@ -111,6 +111,7 @@ class Backbone(nn.Module):
     trainable_stem=True,
     trainable_stage4=True,
     trainable_backbone=True,
+    backbone_kwargs={},
   ):
     super().__init__()
 
@@ -129,7 +130,7 @@ class Backbone(nn.Module):
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
     out_features, backbone, stages = build_backbone(
-      name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights
+      name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights, **backbone_kwargs,
     )
 
     self.out_features = out_features
@@ -158,10 +159,7 @@ class Backbone(nn.Module):
   def initialize(self, modules):
     for m in modules:
       if isinstance(m, nn.Conv2d):
-        # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        # m.weight.data.normal_(0, math.sqrt(2. / n))
         torch.nn.init.kaiming_normal_(m.weight)
-
       elif isinstance(m, nn.BatchNorm2d):
         m.weight.data.fill_(1)
         m.bias.data.zero_()
@@ -223,37 +221,31 @@ class Classifier(Backbone):
     self,
     model_name,
     num_classes=20,
+    backbone_weights="imagenet",
     mode='fix',
     dilated=False,
     strides=None,
-    regularization=None,
     trainable_stem=True,
     trainable_stage4=True,
     trainable_backbone=True,
+    **backbone_kwargs,
   ):
     super().__init__(
       model_name,
+      weights=backbone_weights,
       mode=mode,
       dilated=dilated,
       strides=strides,
       trainable_stem=trainable_stem,
       trainable_stage4=trainable_stage4,
       trainable_backbone=trainable_backbone,
+      backbone_kwargs=backbone_kwargs,
     )
 
     self.num_classes = num_classes
-    self.regularization = regularization
 
     cin = self.out_features
-
-    if not regularization or regularization.lower() == 'none':
-      self.classifier = nn.Conv2d(cin, num_classes, 1, bias=False)
-    elif regularization.lower() in ('kernel_usage', 'ku'):
-      self.classifier = regularizers.Conv2dKU(cin, num_classes, 1, bias=False)
-    elif regularization.lower() in ('minmax', 'minmaxcam'):
-      self.classifier = regularizers.MinMaxConv2d(cin, num_classes, 1, bias=False)
-    else:
-      raise ValueError(f'Unknown regularization strategy {regularization}.')
+    self.classifier = nn.Conv2d(cin, num_classes, 1, bias=False)
 
     self.from_scratch_layers.extend([self.classifier])
     self.initialize([self.classifier])

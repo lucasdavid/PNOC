@@ -27,7 +27,6 @@ parser.add_argument('--batch_size', default=32, type=int)
 
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 
@@ -79,7 +78,6 @@ def main(args):
     num_classes=dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
-    regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
   print(f'Restoring weights from {model_path}')

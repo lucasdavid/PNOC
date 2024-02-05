@@ -57,7 +57,7 @@ MODE=normal
 # Training
 OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
-BATCH_SIZE=32
+BATCH=32
 ACCUMULATE_STEPS=1
 
 LR_ALPHA_SCRATCH=10.0
@@ -119,7 +119,7 @@ train_vanilla() {
   echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,aug:$AUG" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,aug:$AUG" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
@@ -129,7 +129,7 @@ train_vanilla() {
     --optimizer $OPTIMIZER \
     --lr_alpha_scratch $LR_ALPHA_SCRATCH \
     --lr_alpha_bias $LR_ALPHA_BIAS \
-    --batch_size $BATCH_SIZE \
+    --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
@@ -166,14 +166,14 @@ train_occse() {
   TRAINABLE_STEM=false
   DILATED=true
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,oc-cse" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,oc-cse" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-occse" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_occse.py \
     --tag $TAG \
     --lr $LR \
     --num_workers $WORKERS_TRAIN \
-    --batch_size $BATCH_SIZE \
+    --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
@@ -212,14 +212,14 @@ train_puzzle() {
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,puzzle" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,puzzle" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-p \
     $PY scripts/cam/train_puzzle.py \
     --tag $TAG \
     --lr $LR \
     --num_workers $WORKERS_TRAIN \
     --max_epoch $EPOCHS \
-    --batch_size $BATCH_SIZE \
+    --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
@@ -252,14 +252,14 @@ train_poc() {
   echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,poc" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,poc" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-poc" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_poc.py \
     --tag $TAG \
     --lr $LR \
     --num_workers $WORKERS_TRAIN \
-    --batch_size $BATCH_SIZE \
+    --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
@@ -302,7 +302,7 @@ train_pnoc() {
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,pnoc" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T \
     $PY scripts/cam/train_pnoc.py \
     --tag $TAG \
@@ -313,7 +313,7 @@ train_pnoc() {
     --lr_alpha_bias $LR_ALPHA_BIAS \
     --lr_alpha_oc   $LR_ALPHA_OC \
     --optimizer $OPTIMIZER \
-    --batch_size $BATCH_SIZE \
+    --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
@@ -385,7 +385,7 @@ inference_lpcam() {
 }
 
 evaluate_priors() {
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH_SIZE,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
   CUDA_VISIBLE_DEVICES="" \
   $PY scripts/evaluate.py \
     --experiment_name $TAG \
@@ -401,8 +401,8 @@ evaluate_priors() {
 }
 
 LABELSMOOTHING=0
-AUGMENT=clahe  # default:randaug, cityscapes:clahe
-AUG="clahe"
+AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
+AUG="ra"
 
 EID=r1  # Experiment ID
 
@@ -410,9 +410,10 @@ TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
 train_vanilla
 
+## Low-tier hardware:
 # MODE=fix
 # TRAINABLE_STAGE4=false
-# BATCH_SIZE=16
+# BATCH=16
 # ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0.1
 
@@ -423,13 +424,13 @@ AUG=cj
 OC_NAME="$ARCH"
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
-# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH_SIZE-lr$LR-$EID"
+# TAG="puzzle/$DATASET-$ARCH-p-b$BATCH-lr$LR-$EID"
 # train_puzzle
 
-# TAG="poc/$DATASET-$ARCH-poc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+# TAG="poc/$DATASET-$ARCH-poc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH_SIZE-lr$LR-ls@$OC_NAME-$EID"
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
 DOMAIN=$DOMAIN_TRAIN     inference_priors

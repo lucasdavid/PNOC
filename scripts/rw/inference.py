@@ -44,7 +44,6 @@ parser.add_argument('--mixed_precision', default=False, type=str2bool)
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='fix', type=str)  # normal
-parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=False, type=str2bool)  # only false allowed.
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)

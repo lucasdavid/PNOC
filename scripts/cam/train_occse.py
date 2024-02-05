@@ -35,13 +35,11 @@ parser.add_argument('--domain_valid', default=None, type=str)
 # Network
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
-parser.add_argument('--regularization', default=None, type=str)  # kernel_usage
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
-parser.add_argument('--oc-regularization', default=None, type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
 parser.add_argument('--oc-strategy', default='random', type=str, choices=list(occse.STRATEGIES))
 parser.add_argument('--oc-mask-globalnorm', default=True, type=str2bool)
@@ -129,7 +127,6 @@ if __name__ == '__main__':
     train_dataset.info.num_classes,
     mode=args.mode,
     dilated=args.dilated,
-    regularization=args.regularization,
     trainable_stem=args.trainable_stem,
   )
   if args.restore:
@@ -143,7 +140,6 @@ if __name__ == '__main__':
     model_name=args.oc_architecture,
     num_classes=train_dataset.info.num_classes,
     mode=args.mode,
-    regularization=args.oc_regularization,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained), strict=True)
 
