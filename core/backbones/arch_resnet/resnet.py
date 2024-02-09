@@ -140,6 +140,8 @@ class ResNet(nn.Module):
     self.inplanes = planes * block.expansion
     for i in range(1, blocks):
       layers.append(block(self.inplanes, planes, dilation=dilation, batch_norm_fn=self.batch_norm_fn))
+    
+    self.outplanes = self.inplanes
 
     return nn.Sequential(*layers)
 
@@ -154,8 +156,8 @@ class ResNet(nn.Module):
     x = self.layer3(x)
     x = self.layer4(x)
 
-    x = self.avgpool(x)
-    x = x.view(x.size(0), -1)
-    x = self.fc(x)
+    # x = self.avgpool(x)
+    # x = x.view(x.size(0), -1)
+    # x = self.fc(x)
 
     return x

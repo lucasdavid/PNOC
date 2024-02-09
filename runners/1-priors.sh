@@ -53,6 +53,7 @@ TRAINABLE_BONE=true
 TRAINABLE_STAGE4=true
 DILATED=false
 MODE=normal
+PRETRAINED_WEIGHTS=imagenet
 
 # Training
 OPTIMIZER=sgd  # sgd,lion
@@ -135,6 +136,7 @@ train_vanilla() {
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
+    --backbone_weights $PRETRAINED_WEIGHTS \
     --trainable-stem $TRAINABLE_STEM \
     --trainable-backbone $TRAINABLE_BONE \
     --image_size $IMAGE_SIZE \
@@ -400,6 +402,11 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+LR=0.0001
+ARCHITECTURE=swin_t
+ARCH=swin_t_22k
+PRETRAINED_WEIGHTS=./experiments/models/swin_tiny_patch4_window7_224_22k.pth
+
 LABELSMOOTHING=0
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
 AUG="ra"
@@ -410,7 +417,6 @@ TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
 train_vanilla
 
-## Low-tier hardware:
 # MODE=fix
 # TRAINABLE_STAGE4=false
 # BATCH=16
@@ -431,13 +437,13 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
-DOMAIN=$DOMAIN_TRAIN     inference_priors
-DOMAIN=$DOMAIN_VALID     inference_priors
-DOMAIN=$DOMAIN_VALID_SEG inference_priors
+# DOMAIN=$DOMAIN_TRAIN     inference_priors
+# DOMAIN=$DOMAIN_VALID     inference_priors
+# DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors

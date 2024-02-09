@@ -72,7 +72,7 @@ parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
 parser.add_argument('--max_grad_norm', default=None, type=float)
 parser.add_argument('--max_grad_norm_oc', default=None, type=float)
-parser.add_argument('--optimizer', default="sgd", choices=["sgd", "lion"])
+parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "lion"])
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--lr_alpha_oc', default=1., type=float)
@@ -299,6 +299,7 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
+    image_size=args.image_size,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -314,6 +315,7 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
+    image_size=args.image_size,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')))
 

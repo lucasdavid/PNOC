@@ -60,6 +60,9 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
 
   if algorithm == "sgd":
     return PolyOptimizer(params, lr=lr, max_step=max_step, **kwargs)
+  
+  if algorithm == "momentum":
+    return PolyOptimizer(params, lr=lr, max_step=max_step, momentum=0.9, nesterov=True, **kwargs)
 
   elif algorithm == "adamw":
     return PolyAdamW(params, lr=lr, max_step=max_step, **kwargs)

@@ -165,6 +165,8 @@ class ResNet38d(nn.Module):
   def __init__(self):
     super(ResNet38d, self).__init__()
 
+    self.outplanes = 4096
+
     self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 
     self.b2 = ResBlock(64, 128, 128, stride=2)
@@ -189,7 +191,7 @@ class ResNet38d(nn.Module):
     self.b6 = ResBlock_bot(1024, 2048, stride=1, dilation=4, dropout=0.3)
     self.b7 = ResBlock_bot(2048, 4096, dilation=4, dropout=0.5)
     self.bn7 = nn.BatchNorm2d(4096)
-
+  
   def forward(self, x):
     x = self.conv1a(x)
 

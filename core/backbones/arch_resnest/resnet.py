@@ -217,7 +217,7 @@ class ResNet(nn.Module):
     self.cardinality = groups
     self.bottleneck_width = bottleneck_width
     # ResNet-D params
-    self.inplanes = stem_width * 2 if deep_stem else 64
+    self.outplanes = self.inplanes = stem_width * 2 if deep_stem else 64
     self.avg_down = avg_down
     self.last_gamma = last_gamma
     # ResNeSt params
@@ -273,9 +273,9 @@ class ResNet(nn.Module):
         block, 512, layers[3], stride=2, norm_layer=norm_layer, dropblock_prob=dropblock_prob
       )
 
-    self.avgpool = GlobalAvgPool2d()
-    self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
-    self.fc = nn.Linear(512 * block.expansion, num_classes)
+    # self.avgpool = GlobalAvgPool2d()
+    # self.drop = nn.Dropout(final_drop) if final_drop > 0.0 else None
+    # self.fc = nn.Linear(512 * block.expansion, num_classes)
 
     for m in self.modules():
       if isinstance(m, nn.Conv2d):
@@ -348,7 +348,7 @@ class ResNet(nn.Module):
     else:
       raise RuntimeError("=> unknown dilation size: {}".format(dilation))
 
-    self.inplanes = planes * block.expansion
+    self.outplanes = self.inplanes = planes * block.expansion
     for i in range(1, blocks):
       layers.append(
         block(
@@ -383,11 +383,11 @@ class ResNet(nn.Module):
 
     # print(x.size())
 
-    x = self.avgpool(x)
+    # x = self.avgpool(x)
     #x = x.view(x.size(0), -1)
-    x = torch.flatten(x, 1)
-    if self.drop:
-      x = self.drop(x)
-    x = self.fc(x)
+    # x = torch.flatten(x, 1)
+    # if self.drop:
+    #   x = self.drop(x)
+    # x = self.fc(x)
 
     return x

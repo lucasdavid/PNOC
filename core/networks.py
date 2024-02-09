@@ -30,7 +30,6 @@ def group_norm(features):
 def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs):
   if 'resnet38d' == name:
     from .backbones.arch_resnet import resnet38d
-    out_features = 4096
 
     model = resnet38d.ResNet38d()
     state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
@@ -41,9 +40,40 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
     stage3 = nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5)
     stage4 = nn.Sequential(model.b5, model.b5_1, model.b5_2)
     stage5 = nn.Sequential(model.b6, model.b7, model.bn7, nn.ReLU())
-  else:
-    out_features = 2048
+  elif "swin" in name:
+    if "swinv2" in name:
+      from .backbones import swin_transformer_v2 as swin_mod
 
+      model_fn = getattr(swin_mod, name)
+      model = model_fn(**kwargs)
+
+      stage1, stage2, stage3, stage4, stage5 = (
+        nn.Sequential(model.patch_embed, model.pos_drop),
+        *model.layers[:3],
+        nn.Sequential(model.layers[3], model.norm, swin_mod.TransposeLayer((1, 2))),
+      )
+    else:
+      from .backbones import swin_transformer as swin_mod
+
+      model_fn = getattr(swin_mod, name)
+      model = model_fn(out_indices=(3,), **kwargs)
+
+      stage1, stage2, stage3, stage4, stage5 = (
+        nn.Sequential(model.patch_embed, model.pos_drop),
+        *model.layers,
+      )
+
+    if weights and weights != 'imagenet':
+      print(f'loading weights from {weights}')
+      checkpoint = torch.load(weights, map_location="cpu")
+      checkpoint = checkpoint["model"]
+
+      del checkpoint["head.weight"]
+      del checkpoint["head.bias"]
+
+      model.load_state_dict(checkpoint, strict=False)
+
+  else:
     if 'resnet' in name:
       from .backbones.arch_resnet import resnet
       if dilated:
@@ -96,7 +126,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
     stage4 = nn.Sequential(model.layer3)
     stage5 = nn.Sequential(model.layer4)
 
-  return out_features, model, (stage1, stage2, stage3, stage4, stage5)
+  return model, (stage1, stage2, stage3, stage4, stage5)
 
 
 class Backbone(nn.Module):
@@ -129,13 +159,11 @@ class Backbone(nn.Module):
     else:
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
-    out_features, backbone, stages = build_backbone(
+    backbone, stages = build_backbone(
       name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights, **backbone_kwargs,
     )
 
-    self.out_features = out_features
-    self.stage1, self.stage2, self.stage3, self.stage4, self.stage5 = stages
-    stages = [self.stage1, self.stage2, self.stage3, self.stage4, self.stage5]
+    self.backbone = backbone
 
     if not self.trainable_backbone:
       for s in stages:
@@ -160,9 +188,16 @@ class Backbone(nn.Module):
     for m in modules:
       if isinstance(m, nn.Conv2d):
         torch.nn.init.kaiming_normal_(m.weight)
+      elif isinstance(m, nn.Linear):
+        trunc_normal_(m.weight, std=.02)
+        if isinstance(m, nn.Linear) and m.bias is not None:
+            nn.init.constant_(m.bias, 0)
       elif isinstance(m, nn.BatchNorm2d):
         m.weight.data.fill_(1)
         m.bias.data.zero_()
+      elif isinstance(m, nn.LayerNorm):
+        nn.init.constant_(m.bias, 0)
+        nn.init.constant_(m.weight, 1.0)
 
   def get_parameter_groups(self, exclude_partial_names=(), with_names=False):
     names = ([], [], [], [])
@@ -244,18 +279,14 @@ class Classifier(Backbone):
 
     self.num_classes = num_classes
 
-    cin = self.out_features
+    cin = self.backbone.outplanes
     self.classifier = nn.Conv2d(cin, num_classes, 1, bias=False)
 
     self.from_scratch_layers.extend([self.classifier])
     self.initialize([self.classifier])
 
   def forward(self, x, with_cam=False):
-    x = self.stage1(x)
-    x = self.stage2(x)
-    x = self.stage3(x)
-    x = self.stage4(x)
-    x = self.stage5(x)
+    x = self.backbone(x)
 
     if with_cam:
       features = self.classifier(x)
@@ -283,7 +314,7 @@ class CCAM(Backbone):
       model_name, weights=weights, mode=mode, dilated=dilated, strides=strides, trainable_stem=trainable_stem
     )
 
-    self.ac_head = ccam.Disentangler(stage4_out_features + self.out_features)
+    self.ac_head = ccam.Disentangler(stage4_out_features + self.backbone.outplanes)
     self.from_scratch_layers += [self.ac_head]
 
   def forward(self, x):
@@ -303,7 +334,7 @@ class AffinityNet(Backbone):
   def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None):
     super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
 
-    in_features = self.out_features
+    in_features = self.backbone.outplanes
 
     if '50' in model_name:
       fc_edge1_features = 64
@@ -430,7 +461,7 @@ class DeepLabV3Plus(Backbone):
       trainable_backbone=trainable_backbone,
     )
 
-    in_features = self.out_features
+    in_features = self.backbone.outplanes
     norm_fn = group_norm if use_group_norm else nn.BatchNorm2d
 
     self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn)
