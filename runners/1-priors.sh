@@ -405,7 +405,10 @@ evaluate_priors() {
 LR=0.0001
 ARCHITECTURE=swin_t
 ARCH=swin_t_22k
-PRETRAINED_WEIGHTS=./experiments/models/swin_tiny_patch4_window7_224_22k.pth
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_tiny_patch4_window7_224_22k.pth
+# ARCHITECTURE=mit_b0
+# ARCH=mit_b0
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
 
 LABELSMOOTHING=0
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
@@ -419,7 +422,7 @@ train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
-# BATCH=16
+# BATCH=4
 # ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0.1
 

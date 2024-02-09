@@ -35,11 +35,14 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
     state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
     model.load_state_dict(state_dict, strict=True)
 
-    stage1 = nn.Sequential(model.conv1a, model.b2, model.b2_1, model.b2_2)
-    stage2 = nn.Sequential(model.b3, model.b3_1, model.b3_2)
-    stage3 = nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5)
-    stage4 = nn.Sequential(model.b5, model.b5_1, model.b5_2)
-    stage5 = nn.Sequential(model.b6, model.b7, model.bn7, nn.ReLU())
+    stages = (
+      nn.Sequential(model.conv1a, model.b2, model.b2_1, model.b2_2),
+      nn.Sequential(model.b3, model.b3_1, model.b3_2),
+      nn.Sequential(model.b4, model.b4_1, model.b4_2, model.b4_3, model.b4_4, model.b4_5),
+      nn.Sequential(model.b5, model.b5_1, model.b5_2),
+      nn.Sequential(model.b6, model.b7, model.bn7, nn.ReLU()),
+    )
+
   elif "swin" in name:
     if "swinv2" in name:
       from .backbones import swin_transformer_v2 as swin_mod
@@ -47,7 +50,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
       model_fn = getattr(swin_mod, name)
       model = model_fn(**kwargs)
 
-      stage1, stage2, stage3, stage4, stage5 = (
+      stages = (
         nn.Sequential(model.patch_embed, model.pos_drop),
         *model.layers[:3],
         nn.Sequential(model.layers[3], model.norm, swin_mod.TransposeLayer((1, 2))),
@@ -58,20 +61,38 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
       model_fn = getattr(swin_mod, name)
       model = model_fn(out_indices=(3,), **kwargs)
 
-      stage1, stage2, stage3, stage4, stage5 = (
-        nn.Sequential(model.patch_embed, model.pos_drop),
-        *model.layers,
-      )
+      stages = (nn.Sequential(model.patch_embed, model.pos_drop), *model.layers)
 
     if weights and weights != 'imagenet':
       print(f'loading weights from {weights}')
       checkpoint = torch.load(weights, map_location="cpu")
       checkpoint = checkpoint["model"]
-
       del checkpoint["head.weight"]
       del checkpoint["head.bias"]
 
       model.load_state_dict(checkpoint, strict=False)
+
+  elif "mit" in name:
+    from .backbones import mix_transformer
+
+    model_fn = getattr(mix_transformer, name)
+    model = model_fn(**kwargs)
+
+    stages = (
+      None,
+      nn.Sequential(model.patch_embed1, model.block1, model.norm1),
+      nn.Sequential(model.patch_embed2, model.block2, model.norm2),
+      nn.Sequential(model.patch_embed3, model.block3, model.norm3),
+      nn.Sequential(model.patch_embed4, model.block4, model.norm4),
+    )
+
+    if weights and weights != "imagenet":
+      print(f'loading weights from {weights}')
+      checkpoint = torch.load(weights, map_location="cpu")
+      del checkpoint["head.weight"]
+      del checkpoint["head.bias"]
+
+      model.load_state_dict(checkpoint)
 
   else:
     if 'resnet' in name:
@@ -114,19 +135,21 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
 
       del model.avgpool
       del model.fc
-    
+
     if weights and weights != 'imagenet':
       print(f'loading weights from {weights}')
       checkpoint = torch.load(weights, map_location="cpu")
       model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-    stage1 = nn.Sequential(model.conv1, model.bn1, model.relu, model.maxpool)
-    stage2 = nn.Sequential(model.layer1)
-    stage3 = nn.Sequential(model.layer2)
-    stage4 = nn.Sequential(model.layer3)
-    stage5 = nn.Sequential(model.layer4)
+    stages = (
+      nn.Sequential(model.conv1, model.bn1, model.relu, model.maxpool),
+      model.layer1,
+      model.layer2,
+      model.layer3,
+      model.layer4,
+    )
 
-  return model, (stage1, stage2, stage3, stage4, stage5)
+  return model, stages
 
 
 class Backbone(nn.Module):
@@ -164,6 +187,7 @@ class Backbone(nn.Module):
     )
 
     self.backbone = backbone
+    self.stages = stages
 
     if not self.trainable_backbone:
       for s in stages:
@@ -176,20 +200,22 @@ class Backbone(nn.Module):
           set_trainable_layers(s, trainable=False)
 
       elif not self.trainable_stem:
-        set_trainable_layers(self.stage1, trainable=False)
-        self.not_training.extend([self.stage1])
+        if stages[0] is not None:
+          set_trainable_layers(stages[0], trainable=False)
+          self.not_training.append(stages[0])
 
       if self.mode == "fix":
         for s in stages:
-          set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
-          self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
+          if s is not None:
+            set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
+            self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
   def initialize(self, modules):
     for m in modules:
       if isinstance(m, nn.Conv2d):
         torch.nn.init.kaiming_normal_(m.weight)
       elif isinstance(m, nn.Linear):
-        trunc_normal_(m.weight, std=.02)
+        nn.init.trunc_normal_(m.weight, std=.02)
         if isinstance(m, nn.Linear) and m.bias is not None:
             nn.init.constant_(m.bias, 0)
       elif isinstance(m, nn.BatchNorm2d):
@@ -286,7 +312,8 @@ class Classifier(Backbone):
     self.initialize([self.classifier])
 
   def forward(self, x, with_cam=False):
-    x = self.backbone(x)
+    outs = self.backbone(x)
+    x = outs[-1] if isinstance(outs, tuple) else outs
 
     if with_cam:
       features = self.classifier(x)

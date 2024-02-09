@@ -88,6 +88,8 @@ if __name__ == '__main__':
   TAG = args.tag
   SEED = args.seed
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
+  if DEVICE == "cpu":
+    args.mixed_precision = False
   if args.validate_thresholds:
     THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
 
