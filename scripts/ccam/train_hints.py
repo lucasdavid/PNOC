@@ -264,6 +264,9 @@ if __name__ == '__main__':
         for k in ("threshold", "miou", "iou"):
           wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
+        model_best_path = model_dir + f'{TAG}_best.pth'
+        save_model(model, model_best_path, parallel=GPUS_COUNT > 1)
+
       save_model(model, model_path, parallel=GPUS_COUNT > 1)
       # endregion
 

@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=48
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
-#SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
+#SBATCH -o /scratch/lerdl/lucas.david/experiments/logs/pnoc/%j-priors.out
 #SBATCH --time=04:00:00
 
 # Copyright 2023 Lucas Oliveira David

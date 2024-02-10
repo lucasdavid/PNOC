@@ -144,7 +144,7 @@ ccamh_inference() {
   echo "=================================================================="
 
   WEIGHTS=imagenet
-  PRETRAINED=./experiments/models/$CCAMH_TAG.pth
+  PRETRAINED=./experiments/models/${CCAMH_TAG}_best.pth
 
   CUDA_VISIBLE_DEVICES=$DEVICES $PY scripts/ccam/inference.py \
     --tag $CCAMH_TAG \
@@ -233,8 +233,8 @@ PRIORS_TAG=rs101u2pl@rs101p
 # CAMS_DIR=experiments/predictions/u2pl/voc12-rs269-lr0.1-m0-b16-classmix-ls-sdefault-bg0.05-fg0.40-u1-c1-r1@train/cams
 # PRIORS_TAG=rs269u2pl@rs269pnoc
 
-FG_T=0.4
-INF_FG_T=0.5
+FG_T=0.5
+INF_FG_T=0.3
 
 ## ================================================
 ## MS COCO 2014
@@ -248,8 +248,8 @@ INF_FG_T=0.5
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
 PN_TAG=$DATASET-pn@ccamh-$ARCH-fg$FG_T@$PRIORS_TAG
 
-ccamh_training
-ccamh_inference
+# ccamh_training
+# ccamh_inference
 ccamh_pseudo_masks_crf
 
 ## PoolNet Training and Inference
