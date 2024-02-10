@@ -244,7 +244,16 @@ class CAMsDataset(ClassificationDataset):
 
     cams_path = os.path.join(self.data_source.masks_dir, f'{sample_id}.npy')
     cams = np.load(cams_path, allow_pickle=True).item()
-    cams = cams['hr_cam']
+
+    if "hr_cam" in cams:
+      cams = cams
+    elif "masks" in cams:
+      keys = cams["keys"]
+      cams = cams["masks"]
+
+      if len(keys) == cams:
+        # remove bg mask.
+        cams = cams[1:]
 
     if self.info.bg_class is None:
       # If the bg is not in the classification task,
