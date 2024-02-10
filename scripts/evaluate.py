@@ -13,7 +13,7 @@ from tqdm import tqdm
 from tools.ai.demo_utils import crf_inference_dlv2_softmax, crf_inference_label
 from tools.ai.log_utils import log_config
 from tools.general import wandb_utils
-from tools.general.io_utils import load_cam_file, load_saliency_file, load_dlv2_seg_file
+from tools.general.io_utils import load_cam_file, load_saliency_file, load_dlv2_seg_file, str2bool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str, required=True)
@@ -36,6 +36,7 @@ parser.add_argument("--threshold", default=None, type=float)
 parser.add_argument("--min_th", default=0.05, type=float)
 parser.add_argument("--max_th", default=0.81, type=float)
 parser.add_argument("--step_th", default=0.05, type=float)
+parser.add_argument("--ignore_bg_cam", default=False, type=str2bool)
 
 
 def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
@@ -68,17 +69,24 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
 
         keys, cam = np.unique(y_pred, return_inverse=True)
         cam = cam.reshape(y_pred.shape)
+        prob = None
 
       elif args.mode in ("npy", "rw"):
         cam, keys = load_cam_file(npy_file)
 
-        if not sal_file:
-          cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
-        else:
-          sal = load_saliency_file(sal_file, args.sal_mode)
-          bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
-          cam = np.concatenate((bg, cam), axis=0)
+        if len(cam) == len(keys) and args.ignore_bg_cam:
+          # Background map is here, but we want to ignore it in favor of thresholding.
+          cam = cam[1:]
 
+        if len(cam) < len(keys):  # background map is missing. Perform thresholding.
+          if not sal_file:
+            cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
+          else:
+            sal = load_saliency_file(sal_file, args.sal_mode)
+            bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
+            cam = np.concatenate((bg, cam), axis=0)
+
+        prob = cam
         cam = np.argmax(cam, axis=0)
 
       elif args.mode == "deeplab-pytorch":
@@ -90,27 +98,15 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
         cam = prob.argmax(0)
 
       if args.crf_t:
-        try:
-          with dataset.data_source.get_image(image_id) as img:
-            img = np.asarray(img)
-            if "deeplab-pytorch" != args.mode:
-              cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
-            else:
-              # DeepLab-pytorch's CRF
-              prob = crf_inference_dlv2_softmax(img.astype(np.uint8), prob, t=args.crf_t)
-              y_pred = np.argmax(prob, axis=0)
-              keys, cam = np.unique(y_pred, return_inverse=True)
-              cam = cam.reshape(y_pred.shape)
+        with dataset.data_source.get_image(image_id) as img:
+          img = np.asarray(img).astype(np.uint8)
 
-        except ValueError as error:
-          if args.verbose > 2:
-            print(
-              f"dCRF inference error for id={image_id} img.size={img.shape} "
-              f"cam={cam.shape} labels={keys}:",
-              error,
-              file=sys.stderr
-            )
-          corrupted.append(image_id)
+          if prob is not None and args.crf_gt_prob == 1.0:
+            # DeepLab-pytorch's CRF
+            prob = crf_inference_dlv2_softmax(img, prob, t=args.crf_t)
+            cam = prob.argmax(0)
+          else:
+            cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
 
       y_pred = keys[cam]
 
