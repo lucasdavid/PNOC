@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=04:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -26,10 +26,10 @@
 
 if [[ "`hostname`" == "sdumont"* ]]; then
   ENV=sdumont
-  WORK_DIR=$SCRATCH/pnoc
+  WORK_DIR=$SCRATCH/pnoc-transformers
 else
   ENV=local
-  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc
+  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc-transformers
 fi
 
 ## Dataset
@@ -402,13 +402,21 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-LR=0.0001
-ARCHITECTURE=swin_t
-ARCH=swin_t_22k
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_tiny_patch4_window7_224_22k.pth
+wandb offline
+
+LR=0.001
+WD=0.01
+
+# ARCHITECTURE=swin_b
+# ARCH=swin_t_22k
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
+
 # ARCHITECTURE=mit_b0
 # ARCH=mit_b0
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
+ARCHITECTURE=mit_b4
+ARCH=mit_b4
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
 
 LABELSMOOTHING=0
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
