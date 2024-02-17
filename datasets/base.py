@@ -260,7 +260,7 @@ class CAMsDataset(ClassificationDataset):
       # only positive hints are drawn from CAMs.
       cams = cams.max(0, keepdims=True)
     else:
-      labels = cams["keys"][1:] - 1  # invert op done in cam/inference.
+      labels = keys[1:] - 1  # invert op done in cam/inference.
       fg_cam = cams[labels != self.info.bg_class]
       bg_cam = cams[labels == self.info.bg_class]
       cams = fg_cam.max(0, keepdims=True)

@@ -272,4 +272,3 @@ mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
 
 CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 DOMAIN=$DOMAIN_VALID evaluate_saliency_detection
 CRF_T=0  TAG=saliency/$PN_TAG DOMAIN=$DOMAIN_VALID evaluate_saliency_detection
-
