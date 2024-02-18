@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=24:00:00
+#SBATCH --time=16:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -402,18 +402,21 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-wandb offline
-
-LR=0.001
+LR=0.01
 WD=0.01
 
 # ARCHITECTURE=swin_b
-# ARCH=swin_t_22k
+# ARCH=swin_b_22k
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
+
+# ARCHITECTURE=swin_l
+# ARCH=swin_l_22k
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
 
 # ARCHITECTURE=mit_b0
 # ARCH=mit_b0
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
+
 ARCHITECTURE=mit_b4
 ARCH=mit_b4
 PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
@@ -426,7 +429,7 @@ EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-train_vanilla
+# train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -448,13 +451,13 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
-# DOMAIN=$DOMAIN_VALID     inference_priors
+DOMAIN=$DOMAIN_VALID     inference_priors
 # DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-# CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
 # CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
 # CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors

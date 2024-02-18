@@ -299,7 +299,6 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
-    image_size=args.image_size,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -315,7 +314,6 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
-    image_size=args.image_size,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')))
 
