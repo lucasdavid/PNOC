@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J sal-ccamh
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-sal-ccamh.out
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -233,8 +233,8 @@ PRIORS_TAG=rs101u2pl-masks@rs101p
 # CAMS_DIR=experiments/predictions/u2pl/voc12-rs269-lr0.1-m0-b16-classmix-ls-sdefault-bg0.05-fg0.40-u1-c1-r1@train/cams
 # PRIORS_TAG=rs269u2pl@rs269pnoc
 
-BG_T=0.1
-FG_T=0.4
+# BG_T=0.1
+FG_T=0.5
 INF_FG_T=0.3
 
 ## ================================================

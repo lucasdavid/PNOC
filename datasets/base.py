@@ -246,14 +246,14 @@ class CAMsDataset(ClassificationDataset):
     cams = np.load(cams_path, allow_pickle=True).item()
 
     if "hr_cam" in cams:
-      cams = cams
-    elif "masks" in cams:
       keys = cams["keys"]
-      cams = cams["masks"]
-
-      if len(keys) == cams:
-        # remove bg mask.
-        cams = cams[1:]
+      cams = cams["hr_cam"]
+    else:
+      raise ValueError(f"Unknown cams format (keys={cams.keys()})")
+    
+    if len(keys) == len(cams):
+      # remove bg mask.
+      cams = cams[1:]
 
     if self.info.bg_class is None:
       # If the bg is not in the classification task,
