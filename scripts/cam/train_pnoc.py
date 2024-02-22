@@ -48,6 +48,7 @@ parser.add_argument('--trainable-stage4', default=True, type=str2bool)
 parser.add_argument('--trainable-backbone', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
+parser.add_argument('--backbone_weights', default="imagenet", type=str)
 
 parser.add_argument('--oc-architecture', default='resnet50', type=str)
 parser.add_argument('--oc-pretrained', required=True, type=str)
@@ -299,6 +300,7 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
+    backbone_weights=args.backbone_weights,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -314,6 +316,7 @@ if __name__ == '__main__':
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
+    backbone_weights=args.backbone_weights,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')))
 

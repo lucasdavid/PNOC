@@ -35,6 +35,8 @@ parser.add_argument('--domain_valid', default=None, type=str)
 # Network
 parser.add_argument('--architecture', default='resnest269', type=str)
 parser.add_argument('--mode', default='normal', type=str)
+parser.add_argument('--backbone_weights', default="imagenet", type=str)
+
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
@@ -117,6 +119,7 @@ if __name__ == '__main__':
     mode=args.mode,
     dilated=args.dilated,
     use_group_norm=args.use_gn,
+    backbone_weights=args.backbone_weights,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')

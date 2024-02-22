@@ -321,6 +321,7 @@ train_pnoc() {
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
+    --backbone_weights $PRETRAINED_WEIGHTS \
     --trainable-stem $TRAINABLE_STEM \
     --trainable-backbone $TRAINABLE_BONE \
     --trainable-stage4 $TRAINABLE_STAGE4 \
@@ -421,6 +422,8 @@ ARCHITECTURE=mit_b4
 ARCH=mit_b4
 PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
 
+OC_ARCHITECTURE=$ARCHITECTURE
+
 LABELSMOOTHING=0
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
 AUG="ra"
@@ -433,8 +436,8 @@ TAG_VANILLA=$TAG
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
-# BATCH=4
-# ACCUMULATE_STEPS=2
+BATCH=16
+ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0.1
 
 

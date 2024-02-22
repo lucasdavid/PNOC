@@ -44,8 +44,12 @@ cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
 # Architecture
-ARCH=rs269
-ARCHITECTURE=resnest269
+# ARCH=rs269
+# ARCHITECTURE=resnest269
+# PRETRAINED_WEIGHTS=imagenet
+ARCH=mit_b4
+ARCHITECTURE=mit_b4
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
 GROUP_NORM=true
 DILATED=false
 MODE=normal # fix
@@ -93,6 +97,7 @@ segm_training() {
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
     --mode $MODE \
+    --backbone_weights $PRETRAINED_WEIGHTS \
     --use_gn $GROUP_NORM \
     --image_size $IMAGE_SIZE \
     --min_image_size $MIN_IMAGE_SIZE \
@@ -161,8 +166,8 @@ PRIORS_TAG=sup
 MASKS_DIR=""
 
 ## For custom masks (pseudo masks from WSSS):
-PRIORS_TAG=pnoc-rals-r4-ccamh-rw
-MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
+# PRIORS_TAG=pnoc-rals-r4-ccamh-rw
+# MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
 TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$MODE-$PRIORS_TAG
 segm_training
@@ -176,7 +181,7 @@ CRF_GT=1
 SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
 DOMAIN=$DOMAIN_VALID     segm_inference
 DOMAIN=$DOMAIN_VALID_SEG segm_inference
-DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
+# DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
 # 4.3. Evaluation
 #

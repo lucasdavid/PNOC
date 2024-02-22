@@ -345,11 +345,9 @@ class CCAM(Backbone):
     self.from_scratch_layers += [self.ac_head]
 
   def forward(self, x):
-    x = self.stage1(x)
-    x = self.stage2(x)
-    x = self.stage3(x)
-    x1 = self.stage4(x)
-    x2 = self.stage5(x1)
+    outs = self.backbone(x)
+    x1 = outs[-2]
+    x2 = outs[-1]
 
     feats = torch.cat([x2, x1], dim=1)
 
@@ -414,11 +412,8 @@ class AffinityNet(Backbone):
     self.backbone.eval()
 
   def forward(self, x, with_affinity=False):
-    x1 = self.stage1(x).detach()
-    x2 = self.stage2(x1).detach()
-    x3 = self.stage3(x2).detach()
-    x4 = self.stage4(x3).detach()
-    x5 = self.stage5(x4).detach()
+    outs = self.backbone(x)
+    x1, x2, x3, x4, x5 = (o.detach() for o in outs)
 
     edge1 = self.fc_edge1(x1)
     edge2 = self.fc_edge2(x2)
@@ -473,6 +468,7 @@ class DeepLabV3Plus(Backbone):
       model_name,
       num_classes=21,
       mode='fix',
+      backbone_weights="imagenet",
       dilated=False,
       strides=None,
       use_group_norm=False,
@@ -486,6 +482,7 @@ class DeepLabV3Plus(Backbone):
       strides=strides,
       trainable_stem=trainable_stem,
       trainable_backbone=trainable_backbone,
+      weights=backbone_weights,
     )
 
     in_features = self.backbone.outplanes
@@ -499,13 +496,9 @@ class DeepLabV3Plus(Backbone):
   def forward(self, x, with_cam=False):
     inputs = x
 
-    x = self.stage1(x)
-    x = self.stage2(x)
-    x_low_level = x
-
-    x = self.stage3(x)
-    x = self.stage4(x)
-    x = self.stage5(x)
+    outs = self.backbone(x)
+    x_low_level = outs[1]
+    x = outs[-1]
 
     x = self.aspp(x)
     x = self.decoder(x, x_low_level)
