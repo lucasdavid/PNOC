@@ -26,10 +26,10 @@
 
 if [[ "$(hostname)" == "sdumont"* ]]; then
   ENV=sdumont
-  WORK_DIR=$SCRATCH/pnoc
+  WORK_DIR=$SCRATCH/pnoc-transformers
 else
   ENV=local
-  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc
+  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc-transformers
 fi
 
 # Dataset
@@ -47,9 +47,15 @@ export PYTHONPATH=$(pwd)
 # ARCH=rs269
 # ARCHITECTURE=resnest269
 # PRETRAINED_WEIGHTS=imagenet
-ARCH=mit_b4
-ARCHITECTURE=mit_b4
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
+# ARCH=mit_b4
+# ARCHITECTURE=mit_b4
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
+
+ARCHITECTURE=swin_l
+ARCH=swin_l_22k
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
+
+
 GROUP_NORM=true
 DILATED=false
 MODE=normal # fix
