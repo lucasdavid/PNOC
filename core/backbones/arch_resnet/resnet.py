@@ -113,6 +113,7 @@ class ResNet(nn.Module):
   def __init__(self, block, layers, strides=(1, 2, 2, 1), dilations=(1, 1, 1, 1), batch_norm_fn=nn.BatchNorm2d):
     self.batch_norm_fn = batch_norm_fn
     self.inplanes = 64
+    self.stage_features = []
     super(ResNet, self).__init__()
 
     self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -141,6 +142,7 @@ class ResNet(nn.Module):
     for i in range(1, blocks):
       layers.append(block(self.inplanes, planes, dilation=dilation, batch_norm_fn=self.batch_norm_fn))
     
+    self.stage_features.append(self.inplanes)
     self.outplanes = self.inplanes
 
     return nn.Sequential(*layers)
@@ -151,13 +153,9 @@ class ResNet(nn.Module):
     x = self.relu(x)
     x = self.maxpool(x)
 
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
+    x1 = self.layer1(x)
+    x2 = self.layer2(x1)
+    x3 = self.layer3(x2)
+    x4 = self.layer4(x3)
 
-    # x = self.avgpool(x)
-    # x = x.view(x.size(0), -1)
-    # x = self.fc(x)
-
-    return x
+    return [x1, x2, x3, x4]

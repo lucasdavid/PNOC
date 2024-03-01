@@ -59,7 +59,6 @@ ARCH=rs269
 DILATED=false
 TRAINABLE_STEM=true
 MODE=normal
-S4_OUT_FEATURES=1024
 
 ALPHA=0.25
 HINT_W=1.0
@@ -99,7 +98,6 @@ ccam_training() {
     --mixed_precision $MIXED_PRECISION \
     --num_workers $WORKERS_TRAIN \
     --architecture $ARCHITECTURE \
-    --stage4_out_features $S4_OUT_FEATURES \
     --dilated $DILATED \
     --mode $MODE \
     --weights $WEIGHTS \
@@ -128,7 +126,6 @@ ccamh_training() {
     --validate_max_steps $VALIDATE_MAX_STEPS \
     --num_workers $WORKERS_TRAIN \
     --architecture $ARCHITECTURE \
-    --stage4_out_features $S4_OUT_FEATURES \
     --dilated $DILATED \
     --mode $MODE \
     --trainable-stem $TRAINABLE_STEM \
@@ -154,7 +151,6 @@ ccamh_inference() {
     --domain $DOMAIN \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
-    --stage4_out_features $S4_OUT_FEATURES \
     --mode $MODE \
     --weights $WEIGHTS \
     --trainable-stem $TRAINABLE_STEM \

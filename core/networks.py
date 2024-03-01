@@ -335,14 +335,14 @@ class CCAM(Backbone):
     dilated=False,
     strides=None,
     trainable_stem=True,
-    stage4_out_features=1024
   ):
     super().__init__(
       model_name, weights=weights, mode=mode, dilated=dilated, strides=strides, trainable_stem=trainable_stem
     )
 
-    self.ac_head = ccam.Disentangler(stage4_out_features + self.backbone.outplanes)
-    self.from_scratch_layers += [self.ac_head]
+    self.ac_head = ccam.Disentangler(self.backbone.stage_features[-2] + self.backbone.outplanes)
+    self.from_scratch_layers += [*self.ac_head.modules()]
+    self.initialize(self.ac_head.modules())
 
   def forward(self, x):
     outs = self.backbone(x)
@@ -356,10 +356,18 @@ class CCAM(Backbone):
 
 class AffinityNet(Backbone):
 
-  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None):
-    super().__init__(model_name, mode=mode, dilated=dilated, strides=strides)
+  def __init__(self, model_name, path_index=None, mode='fix', dilated=False, strides=None, trainable_backbone=False):
+    super().__init__(
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_backbone=trainable_backbone,
+    )
 
     in_features = self.backbone.outplanes
+
+    self.not_training
 
     if '50' in model_name:
       fc_edge1_features = 64
@@ -396,7 +404,6 @@ class AffinityNet(Backbone):
     )
     self.fc_edge6 = nn.Conv2d(160, 1, 1, bias=True)
 
-    self.backbone = nn.ModuleList([self.stage1, self.stage2, self.stage3, self.stage4, self.stage5])
     self.edge_layers = nn.ModuleList(
       [self.fc_edge1, self.fc_edge2, self.fc_edge3, self.fc_edge4, self.fc_edge5, self.fc_edge6]
     )
@@ -486,10 +493,12 @@ class DeepLabV3Plus(Backbone):
     )
 
     in_features = self.backbone.outplanes
+    low_level_in_features = self.backbone.stage_features[0]
+
     norm_fn = group_norm if use_group_norm else nn.BatchNorm2d
 
     self.aspp = ASPP(in_features, output_stride=16, norm_fn=norm_fn)
-    self.decoder = Decoder(num_classes, 256, norm_fn)
+    self.decoder = Decoder(num_classes, low_level_in_features, norm_fn)
 
     self.from_scratch_layers += [*self.aspp.modules(), *self.decoder.modules()]
 
@@ -497,8 +506,7 @@ class DeepLabV3Plus(Backbone):
     inputs = x
 
     outs = self.backbone(x)
-    x_low_level = outs[1]
-    x = outs[-1]
+    x_low_level, x = outs[0], outs[-1]
 
     x = self.aspp(x)
     x = self.decoder(x, x_low_level)

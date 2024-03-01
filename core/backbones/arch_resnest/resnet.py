@@ -217,6 +217,7 @@ class ResNet(nn.Module):
     self.cardinality = groups
     self.bottleneck_width = bottleneck_width
     # ResNet-D params
+    self.stage_features = []
     self.outplanes = self.inplanes = stem_width * 2 if deep_stem else 64
     self.avg_down = avg_down
     self.last_gamma = last_gamma
@@ -349,6 +350,8 @@ class ResNet(nn.Module):
       raise RuntimeError("=> unknown dilation size: {}".format(dilation))
 
     self.outplanes = self.inplanes = planes * block.expansion
+    self.stage_features.append(self.outplanes)
+
     for i in range(1, blocks):
       layers.append(
         block(
@@ -376,10 +379,10 @@ class ResNet(nn.Module):
     x = self.relu(x)
     x = self.maxpool(x)
 
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x)
-    x = self.layer4(x)
+    x1 = self.layer1(x)
+    x2 = self.layer2(x1)
+    x3 = self.layer3(x2)
+    x4 = self.layer4(x3)
 
     # print(x.size())
 
@@ -390,4 +393,4 @@ class ResNet(nn.Module):
     #   x = self.drop(x)
     # x = self.fc(x)
 
-    return x
+    return (x1, x2, x3, x4)

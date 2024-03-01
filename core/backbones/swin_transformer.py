@@ -539,7 +539,7 @@ class SwinTransformer(nn.Module):
             self.layers.append(layer)
 
         num_features = [int(embed_dim * 2 ** i) for i in range(self.num_layers)]
-        self.num_features = num_features
+        self.stage_features = self.num_features = num_features
         self.outplanes = num_features[-1]
 
         # add a norm layer for each output

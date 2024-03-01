@@ -43,7 +43,6 @@ parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
-parser.add_argument('--stage4_out_features', default=1024, type=int)
 parser.add_argument('--restore', default=None, type=str)
 
 # Hyperparameter
@@ -128,7 +127,6 @@ if __name__ == '__main__':
     weights=args.weights,
     mode=args.mode,
     dilated=args.dilated,
-    stage4_out_features=args.stage4_out_features,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')

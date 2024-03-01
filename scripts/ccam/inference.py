@@ -44,7 +44,6 @@ parser.add_argument('--weights', default='imagenet', type=str)
 parser.add_argument('--trainable-stem', default=True, type=str2bool)
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--pretrained', type=str, required=True)
-parser.add_argument('--stage4_out_features', default=1024, type=int)
 
 # Inference parameters
 parser.add_argument('--tag', default='', type=str)
@@ -69,7 +68,6 @@ def run(args):
     weights=args.weights,
     mode=args.mode,
     dilated=args.dilated,
-    stage4_out_features=args.stage4_out_features
   )
   load_model(model, WEIGHTS_PATH)
   model.eval()

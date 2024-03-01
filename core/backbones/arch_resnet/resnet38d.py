@@ -166,6 +166,7 @@ class ResNet38d(nn.Module):
     super(ResNet38d, self).__init__()
 
     self.outplanes = 4096
+    self.stage_features = [256, 512, 1024, 4096]
 
     self.conv1a = nn.Conv2d(3, 64, 3, padding=1, bias=False)
 
@@ -201,23 +202,22 @@ class ResNet38d(nn.Module):
 
     x = self.b3(x)
     x = self.b3_1(x)
-    x = self.b3_2(x)
+    x1 = x = self.b3_2(x)
 
     x = self.b4(x)  # B x 512 x 56 x 56
     x = self.b4_1(x)
     x = self.b4_2(x)
     x = self.b4_3(x)
-
     x = self.b4_4(x)
-    x = self.b4_5(x)
+    x2 = x = self.b4_5(x)
 
     x = self.b5(x)  # B x 1024 x 56 x 56
     x = self.b5_1(x)
-    x = self.b5_2(x)
+    x3 = x = self.b5_2(x)
 
     x = self.b6(x)  # B x 2048 x 56 x 56
     x = self.b7(x)
     x = self.bn7(x)
-    x = F.relu(x)
+    x4 = x = F.relu(x)
 
-    return x
+    return (x1, x2, x3, x4)
