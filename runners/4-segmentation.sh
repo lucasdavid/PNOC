@@ -29,7 +29,7 @@ if [[ "$(hostname)" == "sdumont"* ]]; then
   WORK_DIR=$SCRATCH/pnoc-transformers
 else
   ENV=local
-  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc-transformers
+  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc
 fi
 
 # Dataset
@@ -47,13 +47,13 @@ export PYTHONPATH=$(pwd)
 # ARCH=rs269
 # ARCHITECTURE=resnest269
 # PRETRAINED_WEIGHTS=imagenet
-# ARCH=mit_b4
-# ARCHITECTURE=mit_b4
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
+ARCH=mit_b0
+ARCHITECTURE=mit_b0
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
 
-ARCHITECTURE=swin_l
-ARCH=swin_l_22k
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
+# ARCHITECTURE=swin_l
+# ARCH=swin_l_22k
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
 
 
 GROUP_NORM=true
@@ -66,8 +66,8 @@ LR=0.007 # voc12
 
 EPOCHS=50
 
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
+BATCH_SIZE=32
+ACCUMULATE_STEPS=1
 
 AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 CUTMIX=0.5
@@ -171,25 +171,28 @@ AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 PRIORS_TAG=sup
 MASKS_DIR=""
 
+BATCH_SIZE=4
+IMAGE_SIZE=224
+
 ## For custom masks (pseudo masks from WSSS):
 # PRIORS_TAG=pnoc-rals-r4-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
-TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-lr$LR-ls-$MODE-$PRIORS_TAG
+TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-$ARCH-lr$LR-ls-$MODE-$PRIORS_TAG
 segm_training
 
 # 4.2 DeepLabV3+ Inference
 #
 
-CRF_T=10
-CRF_GT=1
+# CRF_T=10
+# CRF_GT=1
 
-SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
-DOMAIN=$DOMAIN_VALID     segm_inference
-DOMAIN=$DOMAIN_VALID_SEG segm_inference
-# DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
+# SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
+# DOMAIN=$DOMAIN_VALID     segm_inference
+# DOMAIN=$DOMAIN_VALID_SEG segm_inference
+# # DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
-# 4.3. Evaluation
-#
-DOMAIN=$DOMAIN_VALID     evaluate_masks
-DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# # 4.3. Evaluation
+# #
+# DOMAIN=$DOMAIN_VALID     evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks

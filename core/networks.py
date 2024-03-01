@@ -79,7 +79,6 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
     model = model_fn(**kwargs)
 
     stages = (
-      None,
       nn.Sequential(model.patch_embed1, model.block1, model.norm1),
       nn.Sequential(model.patch_embed2, model.block2, model.norm2),
       nn.Sequential(model.patch_embed3, model.block3, model.norm3),
@@ -200,15 +199,13 @@ class Backbone(nn.Module):
           set_trainable_layers(s, trainable=False)
 
       elif not self.trainable_stem:
-        if stages[0] is not None:
-          set_trainable_layers(stages[0], trainable=False)
-          self.not_training.append(stages[0])
+        set_trainable_layers(stages[0], trainable=False)
+        self.not_training.append(stages[0])
 
       if self.mode == "fix":
         for s in stages:
-          if s is not None:
-            set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
-            self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
+          set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
+          self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
 
   def initialize(self, modules):
     for m in modules:
