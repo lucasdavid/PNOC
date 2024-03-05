@@ -47,9 +47,9 @@ export PYTHONPATH=$(pwd)
 # ARCH=rs269
 # ARCHITECTURE=resnest269
 # PRETRAINED_WEIGHTS=imagenet
-ARCH=mit_b0
-ARCHITECTURE=mit_b0
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
+ARCH=mit_b5
+ARCHITECTURE=mit_b5
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
 
 # ARCHITECTURE=swin_l
 # ARCH=swin_l_22k
@@ -171,9 +171,6 @@ AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 PRIORS_TAG=sup
 MASKS_DIR=""
 
-BATCH_SIZE=4
-IMAGE_SIZE=224
-
 ## For custom masks (pseudo masks from WSSS):
 # PRIORS_TAG=pnoc-rals-r4-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
@@ -184,15 +181,16 @@ segm_training
 # 4.2 DeepLabV3+ Inference
 #
 
-# CRF_T=10
-# CRF_GT=1
+CRF_T=10
+CRF_GT=1
 
-# SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
-# DOMAIN=$DOMAIN_VALID     segm_inference
-# DOMAIN=$DOMAIN_VALID_SEG segm_inference
-# # DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
+SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
+DOMAIN=$DOMAIN_VALID     segm_inference
+DOMAIN=$DOMAIN_VALID_SEG segm_inference
+# DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
-# # 4.3. Evaluation
-# #
-# DOMAIN=$DOMAIN_VALID     evaluate_masks
-# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# 4.3. Evaluation
+#
+DOMAIN=$DOMAIN_VALID     evaluate_masks
+DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+

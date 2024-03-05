@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=16:00:00
+#SBATCH --time=12:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -418,9 +418,9 @@ WD=0.01
 # ARCH=mit_b0
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
 
-ARCHITECTURE=mit_b4
-ARCH=mit_b4
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b4.pth
+ARCHITECTURE=mit_b5
+ARCH=mit_b5
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
 
 OC_ARCHITECTURE=$ARCHITECTURE
 
@@ -436,9 +436,9 @@ TAG_VANILLA=$TAG
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
-BATCH=16
-ACCUMULATE_STEPS=2
-# LABELSMOOTHING=0.1
+# BATCH=16
+# ACCUMULATE_STEPS=2
+LABELSMOOTHING=0.1
 
 
 AUGMENT=colorjitter  # default:colorjitter, cityscapes:clahe, deepglobe:none
@@ -457,10 +457,10 @@ TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
-DOMAIN=$DOMAIN_VALID     inference_priors
+# DOMAIN=$DOMAIN_VALID     inference_priors
 # DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
 # CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
 # CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
