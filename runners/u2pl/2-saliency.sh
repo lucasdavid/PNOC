@@ -234,7 +234,7 @@ PRIORS_TAG=rs101u2pl-masks@rs101p
 # PRIORS_TAG=rs269u2pl@rs269pnoc
 
 # BG_T=0.1
-FG_T=0.5
+FG_T=0.8
 INF_FG_T=0.3
 
 ## ================================================

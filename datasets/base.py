@@ -252,8 +252,7 @@ class CAMsDataset(ClassificationDataset):
       raise ValueError(f"Unknown cams format (keys={cams.keys()})")
     
     if len(keys) == len(cams):
-      # remove bg mask.
-      cams = cams[1:]
+      cams = cams[1:]  # remove bg mask.
 
     if self.info.bg_class is None:
       # If the bg is not in the classification task,

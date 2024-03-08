@@ -167,9 +167,9 @@ evaluate_rw_masks() {
 # SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs269-fg0.4@rw269pnoc@rs269-rals
 
 PRIORS_TAG=rs101u2pl@rs101p
-CAMS_TRAIN_DIR=./experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@train/cams
-CAMS_VALID_DIR=./experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@val/cams
-SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs101-fg0.5@rs101u2pl@rs101p
+CAMS_TRAIN_DIR=./experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@train/masks
+CAMS_VALID_DIR=./experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@val/masks
+SAL_DIR=./experiments/predictions/saliency/voc12-pn@ccamh-rs101-fg0.8@rs101u2pl-masks@rs101p
 
 FG=0.50
 BG=0.10

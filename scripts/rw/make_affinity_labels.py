@@ -99,6 +99,9 @@ def _work(process_id, dataset, args, work_dir):
         print(f"{image_id} skipped (bg)")
       continue
 
+    if len(keys) == len(cam):
+      cam = cam[1:]  # remove bg mask.
+
     if not args.sal_dir:
       # 1. find confident fg & bg
       fg_cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.fg_threshold)
