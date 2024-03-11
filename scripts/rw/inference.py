@@ -153,6 +153,9 @@ def _work(process_id, model, dataset, normalize_fn, cams_dir, preds_dir, device,
         cams = resize_tensor(cams.unsqueeze(0), get_strided_size(size, 4))[0]
         # print(f"{image_id} hr-cam resized {tuple(size)} -> {tuple(cams.shape)}")
 
+      if len(cams) == len(cam_dict["keys"]):
+        cams = cams[1:]
+
       # preprocessing
       x = normalize_fn(x)
       x = x.transpose((2, 0, 1))
