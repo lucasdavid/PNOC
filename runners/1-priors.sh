@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=12:00:00
+#SBATCH --time=16:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -403,28 +403,28 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-LR=0.01
+LR=0.001
 WD=0.01
 
 # ARCHITECTURE=swin_b
 # ARCH=swin_b_22k
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
 
-# ARCHITECTURE=swin_l
-# ARCH=swin_l_22k
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
+ARCHITECTURE=swin_l
+ARCH=swin_l_22k
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
 
 # ARCHITECTURE=mit_b0
 # ARCH=mit_b0
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
 
-ARCHITECTURE=mit_b5
-ARCH=mit_b5
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
+# ARCHITECTURE=mit_b5
+# ARCH=mit_b5
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
 
 OC_ARCHITECTURE=$ARCHITECTURE
 
-LABELSMOOTHING=0
+LABELSMOOTHING=0.1
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
 AUG="ra"
 
@@ -432,7 +432,7 @@ EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-# train_vanilla
+train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
