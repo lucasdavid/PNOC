@@ -43,15 +43,18 @@ DATASET=voc12 # Pascal VOC 2012
 cd $WORK_DIR
 export PYTHONPATH=$(pwd)
 
-# Architecture
-# ARCH=rs269
-# ARCHITECTURE=resnest269
-# PRETRAINED_WEIGHTS=imagenet
-ARCH=mit_b5
-ARCHITECTURE=mit_b5
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
 
-# ARCHITECTURE=swin_l
+# Architecture
+# ARCHITECTURE=deeplabv3p
+# ARCH=rs269
+# BACKBONE=resnest269
+# PRETRAINED_WEIGHTS=imagenet
+ARCHITECTURE=segformer
+BACKBONE=mit_b5
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
+ARCH=segformer_mit_b5
+
+# BACKBONE=swin_l
 # ARCH=swin_l_22k
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
 
@@ -100,7 +103,7 @@ segm_training() {
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
-    --architecture $ARCHITECTURE \
+    --backbone $BACKBONE \
     --dilated $DILATED \
     --mode $MODE \
     --backbone_weights $PRETRAINED_WEIGHTS \
@@ -129,7 +132,7 @@ segm_inference() {
     $PY scripts/segmentation/inference.py \
     --tag $TAG \
     --pred_dir $SEGM_PRED_DIR \
-    --backbone $ARCHITECTURE \
+    --backbone $BACKBONE \
     --mode $MODE \
     --dilated $DILATED \
     --use_gn $GROUP_NORM \
@@ -193,4 +196,3 @@ DOMAIN=$DOMAIN_VALID_SEG segm_inference
 #
 DOMAIN=$DOMAIN_VALID     evaluate_masks
 DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
-

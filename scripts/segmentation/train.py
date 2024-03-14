@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import datasets
 import wandb
-from core.networks import DeepLabV3Plus
+from core.networks import DeepLabV3Plus, SegFormer
 from core.training import segmentation_validation_step
 from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
@@ -33,9 +33,10 @@ parser.add_argument('--domain_train', default=None, type=str)
 parser.add_argument('--domain_valid', default=None, type=str)
 
 # Network
-parser.add_argument('--architecture', default='resnest269', type=str)
-parser.add_argument('--mode', default='normal', type=str)
+parser.add_argument('--architecture', default='deeplabv3p', type=str, choices=["deeplabv3p", "segformer"])
+parser.add_argument('--backbone', default='resnest269', type=str)
 parser.add_argument('--backbone_weights', default="imagenet", type=str)
+parser.add_argument('--mode', default='normal', type=str)
 
 parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
@@ -113,14 +114,17 @@ if __name__ == '__main__':
   print(f'Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}')
 
   # Network
-  model = DeepLabV3Plus(
-    model_name=args.architecture,
-    num_classes=train_dataset.info.num_classes,
-    mode=args.mode,
-    dilated=args.dilated,
-    use_group_norm=args.use_gn,
-    backbone_weights=args.backbone_weights,
-  )
+  if args.architecture == "deeplabv3p":
+    model = DeepLabV3Plus(
+      model_name=args.backbone,
+      num_classes=train_dataset.info.num_classes,
+      mode=args.mode,
+      dilated=args.dilated,
+      use_group_norm=args.use_gn,
+      backbone_weights=args.backbone_weights,
+    )
+  else:
+    model = SegFormer()
   if args.restore:
     print(f'Restoring weights from {args.restore}')
     model.load_state_dict(torch.load(args.restore), strict=args.restore_strict)

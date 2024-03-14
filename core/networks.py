@@ -510,3 +510,120 @@ class DeepLabV3Plus(Backbone):
     x = resize_tensor(x, inputs.size()[2:], align_corners=True)
 
     return x
+
+
+
+class Segformer(nn.Module):
+  """
+  Deeplabv3plus implememts
+  This module has five components:
+
+  self.backbone
+  self.aspp
+  self.projector: an 1x1 conv for lowlevel feature projection
+  self.preclassifier: an 3x3 conv for feature mixing, before final classification
+  self.classifier: last 1x1 conv for output classification results
+
+  Args:
+      backbone: Dict, configs for backbone
+      decoder: Dict, configs for decoder
+
+  NOTE: The bottleneck has only one 3x3 conv by default, some implements stack
+      two 3x3 convs
+  """
+  def __init__(
+    self,
+    model_name,
+    num_classes=21,
+    mode='fix',
+    backbone_weights="imagenet",
+    dilated=False,
+    strides=None,
+    use_group_norm=False,
+    trainable_stem=True,
+    trainable_backbone=True,
+    decoder_in_channels=[64, 128, 320, 512],
+    decoder_channels=256,
+    decoder_feature_strides=[4, 8, 16, 32],
+    decoder_in_index=[0, 1, 2, 3],
+    decoder_embed_dim=768,
+    decoder_dropout_ratio=0.1,
+    decoder_norm_layer="BatchNorm2d",
+    decoder_align_corners=False,
+  ):
+    super(Segformer, self).__init__()
+    
+    self.trainable_backbone = trainable_backbone
+    self.trainable_stem = trainable_stem
+    self.align_corners = decoder_align_corners
+    self.mode = mode
+    
+    norm_layer = group_norm if use_group_norm else getattr(nn, decoder_norm_layer)
+
+    self.backbone = get_mit(variety=model_name, pretrain=backbone_weights)
+    self.decoder = SegFormerHead(
+      decoder_in_channels,
+      channels=decoder_channels,
+      feature_strides=decoder_feature_strides,
+      embed_dim=decoder_embed_dim,
+      dropout_ratio=decoder_dropout_ratio,
+      norm_layer=norm_layer,
+      in_index=decoder_in_index,
+    )
+    #self.projector = nn.Sequential( 
+    #    nn.Conv2d(
+    #        decoder.settings.lowlevel_in_channels,
+    #        decoder.settings.lowlevel_channels,
+    #        kernel_size=1, bias=False),
+    #    norm_layer(decoder.settings.lowlevel_channels),
+    #    nn.ReLU(inplace=True),
+    #)
+    #self.pre_classifier = DepthwiseSeparableConv(
+    #    decoder.settings.norm_layer,
+    #    channels + decoder.settings.lowlevel_channels,
+    #    channels, 3, padding=1
+    #)
+
+    self.classifier = nn.Conv2d(decoder_channels, num_classes, 1, 1)
+
+    stages = (
+      nn.Sequential(self.backbone.patch_embed1, self.backbone.block1, self.backbone.norm1),
+      nn.Sequential(self.backbone.patch_embed2, self.backbone.block2, self.backbone.norm2),
+      nn.Sequential(self.backbone.patch_embed3, self.backbone.block3, self.backbone.norm3),
+      nn.Sequential(self.backbone.patch_embed4, self.backbone.block4, self.backbone.norm4),
+    )
+
+    if not self.trainable_backbone:
+      for s in stages:
+        set_trainable_layers(s, trainable=False)
+      self.not_training.extend(stages)
+    else:
+      if not self.trainable_stem:
+        set_trainable_layers(stages[0], trainable=False)
+        self.not_training.append(stages[0])
+
+      if self.mode == "fix":
+        for s in stages:
+          set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
+          self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
+
+    #init_weight(self.projector)
+    #init_weight(self.pre_classifier)
+    init_weight(self.classifier)
+
+  def forward(self, x: Tensor, with_embeddings: bool = False) -> Tensor:
+    size = (x.shape[2], x.shape[3])
+    output = self.backbone(x)
+    output = self.decoder(output)
+    #output = self.pre_classifier(output)
+    out = {}
+    out['embeddings'] = output
+    output = self.classifier(output)
+    out['pre_logits'] = output
+    output = F.interpolate(output, size=size, mode='bilinear', align_corners=self.align_corners)
+    out['logits'] = output
+
+    if with_embeddings:
+      return out
+    else:
+      return output

@@ -407,3 +407,17 @@ class mit_b5(MixVisionTransformer):
             patch_size=4, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[4, 4, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 6, 40, 3], sr_ratios=[8, 4, 2, 1],
             drop_rate=0.0, drop_path_rate=0.1)
+
+
+def get_mit(
+    pretrain: str,
+    variety: str,
+    **kwargs,
+) -> MixVisionTransformer:
+    mitnet = globals()[variety.lower()](**kwargs)
+    if pretrain:
+        state_dict = torch.load(pretrain, map_location='cpu')
+        del state_dict['head.weight'], state_dict['head.bias']
+        mitnet.load_state_dict(state_dict)
+        del state_dict
+    return mitnet
