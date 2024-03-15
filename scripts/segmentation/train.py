@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import datasets
 import wandb
-from core.networks import DeepLabV3Plus, SegFormer
+from core.networks import DeepLabV3Plus, Segformer
 from core.training import segmentation_validation_step
 from tools.ai.log_utils import *
 from tools.ai.optim_utils import *
@@ -124,11 +124,17 @@ if __name__ == '__main__':
       backbone_weights=args.backbone_weights,
     )
   else:
-    model = SegFormer()
+    model = Segformer(
+      model_name=args.backbone,
+      num_classes=train_dataset.info.num_classes,
+      mode=args.mode,
+      use_group_norm=args.use_gn,
+      backbone_weights=args.backbone_weights,
+  )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
     model.load_state_dict(torch.load(args.restore), strict=args.restore_strict)
-  log_model('DeepLabV3+', model, args)
+  log_model(args.architecture, model, args)
 
   param_groups, param_names = model.get_parameter_groups(with_names=True)
 

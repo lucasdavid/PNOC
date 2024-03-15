@@ -11,8 +11,6 @@ from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
 
-from core.backbone.mix_transformer import get_mit
-
 
 class DepthwiseSeparableConv(nn.Module):
     """ Depthwise Separable Convolution"""

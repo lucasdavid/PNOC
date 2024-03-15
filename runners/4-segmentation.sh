@@ -50,9 +50,12 @@ export PYTHONPATH=$(pwd)
 # BACKBONE=resnest269
 # PRETRAINED_WEIGHTS=imagenet
 ARCHITECTURE=segformer
-BACKBONE=mit_b5
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
-ARCH=segformer_mit_b5
+# BACKBONE=mit_b5
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
+# ARCH=segformer_mit_b5
+BACKBONE=mit_b2
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b2.pth
+ARCH=segformer_mit_b2
 
 # BACKBONE=swin_l
 # ARCH=swin_l_22k
@@ -103,6 +106,7 @@ segm_training() {
     --batch_size $BATCH_SIZE \
     --accumulate_steps $ACCUMULATE_STEPS \
     --mixed_precision $MIXED_PRECISION \
+    --architecture $ARCHITECTURE \
     --backbone $BACKBONE \
     --dilated $DILATED \
     --mode $MODE \
@@ -132,6 +136,7 @@ segm_inference() {
     $PY scripts/segmentation/inference.py \
     --tag $TAG \
     --pred_dir $SEGM_PRED_DIR \
+    --architecture $ARCHITECTURE \
     --backbone $BACKBONE \
     --mode $MODE \
     --dilated $DILATED \
@@ -184,15 +189,15 @@ segm_training
 # 4.2 DeepLabV3+ Inference
 #
 
-CRF_T=10
-CRF_GT=1
+# CRF_T=10
+# CRF_GT=1
 
-SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
-DOMAIN=$DOMAIN_VALID     segm_inference
-DOMAIN=$DOMAIN_VALID_SEG segm_inference
-# DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
+# SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
+# DOMAIN=$DOMAIN_VALID     segm_inference
+# DOMAIN=$DOMAIN_VALID_SEG segm_inference
+# # DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
-# 4.3. Evaluation
-#
-DOMAIN=$DOMAIN_VALID     evaluate_masks
-DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# # 4.3. Evaluation
+# #
+# DOMAIN=$DOMAIN_VALID     evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks

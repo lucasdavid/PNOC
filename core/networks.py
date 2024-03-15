@@ -9,7 +9,7 @@ import torch.utils.model_zoo as model_zoo
 from tools.ai.torch_utils import (gap2d, resize_tensor,
                                   set_trainable_layers)
 
-from . import ccam, regularizers
+from . import ccam, regularizers, segformer
 from .deeplab_utils import ASPP, Decoder
 from .mcar import mcar_resnet50, mcar_resnet101
 
@@ -560,9 +560,12 @@ class Segformer(nn.Module):
     
     norm_layer = group_norm if use_group_norm else getattr(nn, decoder_norm_layer)
 
+    from core.backbones.mix_transformer import get_mit
     self.backbone = get_mit(variety=model_name, pretrain=backbone_weights)
-    self.decoder = SegFormerHead(
-      decoder_in_channels,
+
+    print(f"Outplanes: {self.backbone.stage_features}, in_features: {decoder_in_channels}")
+    self.decoder = segformer.SegFormerHead(
+      self.backbone.stage_features,
       channels=decoder_channels,
       feature_strides=decoder_feature_strides,
       embed_dim=decoder_embed_dim,
@@ -609,9 +612,9 @@ class Segformer(nn.Module):
 
     #init_weight(self.projector)
     #init_weight(self.pre_classifier)
-    init_weight(self.classifier)
+    segformer.init_weight(self.classifier)
 
-  def forward(self, x: Tensor, with_embeddings: bool = False) -> Tensor:
+  def forward(self, x: torch.Tensor, with_embeddings: bool = False) -> torch.Tensor:
     size = (x.shape[2], x.shape[3])
     output = self.backbone(x)
     output = self.decoder(output)

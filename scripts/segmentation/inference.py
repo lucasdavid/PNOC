@@ -34,6 +34,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=4, type=int)
 
 # Network
+parser.add_argument('--architecture', default='deeplabv3p', type=str, choices=["deeplabv3p", "segformer"])
 parser.add_argument('--backbone', default='resnest269', type=str)
 parser.add_argument('--mode', default='fix', type=str)
 parser.add_argument('--dilated', default=False, type=str2bool)
