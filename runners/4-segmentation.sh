@@ -50,12 +50,12 @@ export PYTHONPATH=$(pwd)
 # BACKBONE=resnest269
 # PRETRAINED_WEIGHTS=imagenet
 ARCHITECTURE=segformer
-# BACKBONE=mit_b5
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
-# ARCH=segformer_mit_b5
-BACKBONE=mit_b2
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b2.pth
-ARCH=segformer_mit_b2
+BACKBONE=mit_b5
+PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
+ARCH=segformer_mit_b5
+# BACKBONE=mit_b2
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b2.pth
+# ARCH=segformer_mit_b2
 
 # BACKBONE=swin_l
 # ARCH=swin_l_22k
@@ -66,9 +66,11 @@ GROUP_NORM=true
 DILATED=false
 MODE=normal # fix
 
-LR=0.007 # voc12
+OPTIMIZER=momentum
+LR=0.001 # voc12
 # LR=0.004  # coco14
 # LR=0.01  # deepglobe
+WD=0.01
 
 EPOCHS=50
 
@@ -96,11 +98,12 @@ segm_training() {
   echo "Semantic Segmentation Training $TAG"
   echo "================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,ls:$LABELSMOOTHING,aug:$AUGMENT,mode:$MODE" \
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,opt:$OPTIMIZER,ls:$LABELSMOOTHING,aug:$AUGMENT,mode:$MODE" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/segmentation/train.py \
     --tag $TAG \
+    --optimizer $OPTIMIZER \
     --lr $LR \
     --max_epoch $EPOCHS \
     --batch_size $BATCH_SIZE \
@@ -153,8 +156,8 @@ evaluate_masks() {
   # dCRF is not re-applied during evaluation (crf_t=0)
 
   CUDA_VISIBLE_DEVICES="" \
-    WANDB_RUN_GROUP="$W_GROUP" \
-    WANDB_TAGS="$DATASET,domain:$DOMAIN_VALID,$ARCH,ccamh,rw,segmentation,crf:$CRF_T-$CRF_GT" \
+    WANDB_TAGS="$DATASET,domain:$DOMAIN_VALID,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,opt:$OPTIMIZER,ls:$LABELSMOOTHING,aug:$AUGMENT,mode:$MODE,crf:$CRF_T-$CRF_GT" \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
     $PY scripts/evaluate.py \
     --experiment_name $TAG \
     --pred_dir $SEGM_PRED_DIR \
@@ -173,7 +176,7 @@ evaluate_masks() {
 ##
 
 LABELSMOOTHING=0.1
-AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
+AUGMENT=colorjitter # colorjitter_randaug_cutmix_mixup_cutormixup
 
 ## For supervised segmentation:
 PRIORS_TAG=sup
@@ -183,21 +186,21 @@ MASKS_DIR=""
 # PRIORS_TAG=pnoc-rals-r4-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
-TAG=segmentation/$DATASET-$IMAGE_SIZE-d3p-$ARCH-lr$LR-ls-$MODE-$PRIORS_TAG
+TAG=segmentation/$DATASET-$IMAGE_SIZE-$ARCH-lr$LR-ls-$MODE-$PRIORS_TAG
 segm_training
 
 # 4.2 DeepLabV3+ Inference
 #
 
-# CRF_T=10
-# CRF_GT=1
+CRF_T=10
+CRF_GT=1
 
-# SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
-# DOMAIN=$DOMAIN_VALID     segm_inference
-# DOMAIN=$DOMAIN_VALID_SEG segm_inference
+SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
+DOMAIN=$DOMAIN_VALID     segm_inference
+DOMAIN=$DOMAIN_VALID_SEG segm_inference
 # # DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
-# # 4.3. Evaluation
-# #
-# DOMAIN=$DOMAIN_VALID     evaluate_masks
-# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# 4.3. Evaluation
+#
+DOMAIN=$DOMAIN_VALID     evaluate_masks
+DOMAIN=$DOMAIN_VALID_SEG evaluate_masks

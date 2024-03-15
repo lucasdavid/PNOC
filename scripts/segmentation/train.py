@@ -42,6 +42,8 @@ parser.add_argument('--dilated', default=False, type=str2bool)
 parser.add_argument('--use_gn', default=True, type=str2bool)
 parser.add_argument('--restore', default=None, type=str)
 parser.add_argument('--restore_strict', default=True, type=str2bool)
+parser.add_argument('--trainable-stem', default=True, type=str2bool)
+parser.add_argument('--trainable-backbone', default=True, type=str2bool)
 
 # Hyperparameter
 parser.add_argument('--batch_size', default=32, type=int)
@@ -50,6 +52,7 @@ parser.add_argument('--max_epoch', default=50, type=int)
 parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 
+parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "adamw"])
 parser.add_argument('--lr', default=0.007, type=float)
 parser.add_argument('--wd', default=4e-5, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
@@ -130,6 +133,8 @@ if __name__ == '__main__':
       mode=args.mode,
       use_group_norm=args.use_gn,
       backbone_weights=args.backbone_weights,
+      trainable_stem=args.trainable_stem,
+      trainable_backbone=args.trainable_backbone,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -150,7 +155,7 @@ if __name__ == '__main__':
   # Loss, Optimizer
   class_loss_fn = nn.CrossEntropyLoss(ignore_index=255, label_smoothing=args.label_smoothing).to(DEVICE)
 
-  opt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups)
+  opt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups, algorithm=args.optimizer)
   log_opt_params('DeepLabV3+', param_names)
 
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)

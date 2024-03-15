@@ -73,11 +73,23 @@ def run(args):
   normalize_fn = Normalize(*datasets.imagenet_stats())
 
   # Network
-  model = DeepLabV3Plus(
-    model_name=args.backbone,
-    num_classes=info.num_classes,
-    mode=args.mode,
-    use_group_norm=args.use_gn,
+  if args.architecture == "deeplabv3p":
+    model = DeepLabV3Plus(
+      model_name=args.backbone,
+      num_classes=info.num_classes,
+      mode=args.mode,
+      dilated=args.dilated,
+      use_group_norm=args.use_gn,
+      backbone_weights=args.backbone_weights,
+    )
+  else:
+    model = Segformer(
+      model_name=args.backbone,
+      num_classes=info.num_classes,
+      mode=args.mode,
+      dilated=args.dilated,
+      use_group_norm=args.use_gn,
+      backbone_weights=args.backbone_weights,
   )
   load_model(model, MODEL_PATH, parallel=False)
   model.eval()

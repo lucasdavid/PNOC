@@ -215,12 +215,9 @@ class Backbone(nn.Module):
         nn.init.trunc_normal_(m.weight, std=.02)
         if isinstance(m, nn.Linear) and m.bias is not None:
             nn.init.constant_(m.bias, 0)
-      elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-      elif isinstance(m, nn.LayerNorm):
-        nn.init.constant_(m.bias, 0)
+      elif isinstance(m, (nn.BatchNorm2d, nn.SyncBatchNorm, nn.GroupNorm, nn.LayerNorm)):
         nn.init.constant_(m.weight, 1.0)
+        nn.init.constant_(m.bias, 0)
 
   def get_parameter_groups(self, exclude_partial_names=(), with_names=False):
     names = ([], [], [], [])
@@ -478,6 +475,7 @@ class DeepLabV3Plus(Backbone):
       use_group_norm=False,
       trainable_stem=True,
       trainable_backbone=True,
+      align_corners: bool = True,
   ):
     super().__init__(
       model_name,
@@ -488,6 +486,8 @@ class DeepLabV3Plus(Backbone):
       trainable_backbone=trainable_backbone,
       weights=backbone_weights,
     )
+
+    self.align_corners = align_corners
 
     in_features = self.backbone.outplanes
     low_level_in_features = self.backbone.stage_features[0]
@@ -507,13 +507,13 @@ class DeepLabV3Plus(Backbone):
 
     x = self.aspp(x)
     x = self.decoder(x, x_low_level)
-    x = resize_tensor(x, inputs.size()[2:], align_corners=True)
+    x = resize_tensor(x, inputs.size()[2:], align_corners=self.align_corners)
 
     return x
 
 
 
-class Segformer(nn.Module):
+class Segformer(Backbone):
   """
   Deeplabv3plus implememts
   This module has five components:
@@ -542,28 +542,28 @@ class Segformer(nn.Module):
     use_group_norm=False,
     trainable_stem=True,
     trainable_backbone=True,
-    decoder_in_channels=[64, 128, 320, 512],
+    align_corners=False,
     decoder_channels=256,
     decoder_feature_strides=[4, 8, 16, 32],
     decoder_in_index=[0, 1, 2, 3],
     decoder_embed_dim=768,
     decoder_dropout_ratio=0.1,
     decoder_norm_layer="BatchNorm2d",
-    decoder_align_corners=False,
   ):
-    super(Segformer, self).__init__()
+    super().__init__(
+      model_name,
+      mode=mode,
+      dilated=dilated,
+      strides=strides,
+      trainable_stem=trainable_stem,
+      trainable_backbone=trainable_backbone,
+      weights=backbone_weights,
+    )
     
-    self.trainable_backbone = trainable_backbone
-    self.trainable_stem = trainable_stem
-    self.align_corners = decoder_align_corners
-    self.mode = mode
+    self.align_corners = align_corners
     
     norm_layer = group_norm if use_group_norm else getattr(nn, decoder_norm_layer)
 
-    from core.backbones.mix_transformer import get_mit
-    self.backbone = get_mit(variety=model_name, pretrain=backbone_weights)
-
-    print(f"Outplanes: {self.backbone.stage_features}, in_features: {decoder_in_channels}")
     self.decoder = segformer.SegFormerHead(
       self.backbone.stage_features,
       channels=decoder_channels,
@@ -589,44 +589,19 @@ class Segformer(nn.Module):
 
     self.classifier = nn.Conv2d(decoder_channels, num_classes, 1, 1)
 
-    stages = (
-      nn.Sequential(self.backbone.patch_embed1, self.backbone.block1, self.backbone.norm1),
-      nn.Sequential(self.backbone.patch_embed2, self.backbone.block2, self.backbone.norm2),
-      nn.Sequential(self.backbone.patch_embed3, self.backbone.block3, self.backbone.norm3),
-      nn.Sequential(self.backbone.patch_embed4, self.backbone.block4, self.backbone.norm4),
-    )
+    self.from_scratch_layers.extend([*self.decoder.modules(), self.classifier])
+    self.initialize([self.classifier])
 
-    if not self.trainable_backbone:
-      for s in stages:
-        set_trainable_layers(s, trainable=False)
-      self.not_training.extend(stages)
-    else:
-      if not self.trainable_stem:
-        set_trainable_layers(stages[0], trainable=False)
-        self.not_training.append(stages[0])
-
-      if self.mode == "fix":
-        for s in stages:
-          set_trainable_layers(s, torch.nn.BatchNorm2d, trainable=False)
-          self.not_training.extend([m for m in s.modules() if isinstance(m, torch.nn.BatchNorm2d)])
-
-    #init_weight(self.projector)
-    #init_weight(self.pre_classifier)
-    segformer.init_weight(self.classifier)
-
-  def forward(self, x: torch.Tensor, with_embeddings: bool = False) -> torch.Tensor:
+  def forward(self, x):
     size = (x.shape[2], x.shape[3])
-    output = self.backbone(x)
+    output = self.backbone.forward_features(x)
     output = self.decoder(output)
     #output = self.pre_classifier(output)
-    out = {}
-    out['embeddings'] = output
+    # out = {}
+    # out['embeddings'] = output
     output = self.classifier(output)
-    out['pre_logits'] = output
+    # out['pre_logits'] = output
     output = F.interpolate(output, size=size, mode='bilinear', align_corners=self.align_corners)
-    out['logits'] = output
+    # out['logits'] = output
 
-    if with_embeddings:
-      return out
-    else:
-      return output
+    return output
