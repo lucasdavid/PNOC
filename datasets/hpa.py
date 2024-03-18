@@ -33,7 +33,7 @@ from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "hpa-single-cell-classification")
 CLASSES = [
-  "background", "Nucleoplasm", "Nuclear", "Nucleoli", "Nucleoli", "Nuclear", "Nuclear", "Endoplasmic",
+  "background", "Nucleoplasm", "Nuclearmembrane", "Nucleoli", "Nucleolifibrillar", "Nuclearspeckles", "Nuclearbodies", "Endoplasmic",
   "Golgi", "Intermediate", "Actin", "Microtubules", "Mitotic", "Centrosome", "Plasma",
   "Mitochondria", "Aggresome", "Cytosol", "Vesicles", "Negative",
 ]
