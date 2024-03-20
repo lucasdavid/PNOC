@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J segm
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-segm.out
-#SBATCH --time=48:00:00
+#SBATCH --time=10:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -70,7 +70,8 @@ DILATED=false
 MODE=normal # fix
 
 OPTIMIZER=momentum
-LR=0.001 # voc12
+LR=0.01 # SegFormer
+# LR=0.007 # voc12
 # LR=0.004  # coco14
 # LR=0.01  # deepglobe
 WD=0.01
@@ -194,9 +195,6 @@ segm_training
 
 # 4.2 DeepLabV3+ Inference
 #
-
-CRF_T=10
-CRF_GT=1
 
 SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
 DOMAIN=$DOMAIN_VALID     segm_inference

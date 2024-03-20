@@ -80,7 +80,6 @@ def run(args):
       mode=args.mode,
       dilated=args.dilated,
       use_group_norm=args.use_gn,
-      backbone_weights=args.backbone_weights,
     )
   else:
     model = Segformer(
@@ -89,7 +88,6 @@ def run(args):
       mode=args.mode,
       dilated=args.dilated,
       use_group_norm=args.use_gn,
-      backbone_weights=args.backbone_weights,
   )
   load_model(model, MODEL_PATH, parallel=False)
   model.eval()
@@ -149,7 +147,7 @@ def _work(process_id, model, normalize_fn, dataset, scales, preds_dir, device, a
 
       if args.crf_t > 0:
         x = np.array(image)
-        p = crf_inference(x, p, t=args.crf_t, gt_prob=args.crf_gt_prob)
+        p = crf_inference_dlv2_softmax(x, p, t=args.crf_t)
         image.close()
 
       p = np.argmax(p, axis=0)
