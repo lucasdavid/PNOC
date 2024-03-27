@@ -179,18 +179,17 @@ class Normalize_For_Segmentation:
 
 class Top_Left_Crop:
 
-  def __init__(self, crop_size, channels=3):
+  def __init__(self, crop_size):
     self.bg_value = 0
     self.crop_size = crop_size
-    self.crop_shape = (self.crop_size, self.crop_size, channels)
 
   def __call__(self, image):
     h, w, c = image.shape
-
     ch = min(self.crop_size, h)
     cw = min(self.crop_size, w)
+    shape = (self.crop_size, self.crop_size, c)
 
-    cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
+    cropped_image = np.ones(shape, image.dtype) * self.bg_value
     cropped_image[:ch, :cw] = image[:ch, :cw]
 
     return cropped_image
@@ -198,24 +197,23 @@ class Top_Left_Crop:
 
 class Top_Left_Crop_For_Segmentation:
 
-  def __init__(self, crop_size, channels=3):
+  def __init__(self, crop_size):
     self.bg_value = 0
     self.crop_size = crop_size
-    self.crop_shape = (self.crop_size, self.crop_size, channels)
-    self.crop_shape_for_mask = (self.crop_size, self.crop_size)
-
+    
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
     h, w, c = image.shape
-
     ch = min(self.crop_size, h)
     cw = min(self.crop_size, w)
-
-    cropped_image = np.ones(self.crop_shape, image.dtype) * self.bg_value
+    crop_shape = (self.crop_size, self.crop_size, c)
+    mask_shape = (self.crop_size, self.crop_size)
+    
+    cropped_image = np.ones(crop_shape, image.dtype) * self.bg_value
     cropped_image[:ch, :cw] = image[:ch, :cw]
 
-    cropped_mask = np.ones(self.crop_shape_for_mask, mask.dtype) * 255
+    cropped_mask = np.ones(mask_shape, mask.dtype) * 255
     cropped_mask[:ch, :cw] = mask[:ch, :cw]
 
     data['image'] = cropped_image
@@ -258,20 +256,27 @@ def random_crop_box(crop_size, h, w):
 
 class RandomCrop:
 
-  def __init__(self, crop_size, channels=3, channels_last=True, with_bbox=False, bg_value=0):
+  def __init__(self, crop_size, channels_last=True, with_bbox=False, bg_value=0):
     self.bg_value = bg_value
     self.with_bbox = with_bbox
     self.crop_size = crop_size
     self.channels_last = channels_last
-    self.crop_shape = (
-      (self.crop_size, self.crop_size, channels) if channels_last else (channels, self.crop_size, self.crop_size)
+    
+  def __call__(self, x):
+    if self.channels_last:
+      h, w, c = x.shape
+    else:
+      c, h, w = x.shape
+
+    crop_shape = (
+      (self.crop_size, self.crop_size, c)
+      if self.channels_last
+      else (c, self.crop_size, self.crop_size)
     )
 
-  def __call__(self, x):
-    sizes = x.shape[:2] if self.channels_last else x.shape[1:]
-    b, a = random_crop_box(self.crop_size, *sizes)
+    b, a = random_crop_box(self.crop_size, h, w)
 
-    y = np.ones(self.crop_shape, x.dtype) * self.bg_value
+    y = np.ones(crop_shape, x.dtype) * self.bg_value
 
     if self.channels_last:
       crop = x[a['ymin']:a['ymax'], a['xmin']:a['xmax']]
@@ -291,7 +296,6 @@ class RandomCrop_For_Segmentation(RandomCrop):
   def __init__(
     self,
     crop_size,
-    channels=3,
     channels_last=True,
     labels_last=True,
     bg_value=0,
@@ -299,7 +303,7 @@ class RandomCrop_For_Segmentation(RandomCrop):
     idtype=np.float32,
     mdtype=np.int64,
   ):
-    super().__init__(crop_size, channels, channels_last, with_bbox=True, bg_value=bg_value)
+    super().__init__(crop_size, channels_last, with_bbox=True, bg_value=bg_value)
 
     self.labels_last = labels_last
     self.ignore_value = ignore_value

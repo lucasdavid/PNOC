@@ -6,7 +6,7 @@ from tools.ai.augment_utils import *
 from tools.ai.randaugment import RandAugmentMC
 
 from .base import *
-from . import base, voc12, coco14, deepglobe, cityscapes
+from . import base, voc12, coco14, deepglobe, cityscapes, hpa
 
 
 class Iterator:
@@ -29,7 +29,7 @@ class Iterator:
 
 
 def custom_data_source(
-  dataset: str, data_dir: str, domain: Optional[str] = None, split: Optional[str] = None, **kwargs
+  dataset: str, data_dir: str, domain: Optional[str] = None, split: Optional[str] = "train", **kwargs
 ) -> CustomDataSource:
   data_source_cls = base.DATASOURCES[dataset]
   return data_source_cls(

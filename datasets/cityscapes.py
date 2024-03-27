@@ -173,6 +173,7 @@ class CityscapesDataSource(base.CustomDataSource):
 
     return base.DatasetInfo(
       num_classes=num_classes,
+      channels=3,
       classes=classes,
       colors=colors,
       bg_class=bg_class,

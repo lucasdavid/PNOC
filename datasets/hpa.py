@@ -24,10 +24,14 @@ Label 	Name 	Description
 """
 
 import os
-from typing import List, Optional, Tuple
+import cv2
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+from PIL import Image
+from sklearn.model_selection import train_test_split
 
 from . import base
 
@@ -46,53 +50,70 @@ COLORS = [
 
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
   NAME = "hpa-single-cell-classification"
-  DOMAINS = {
-    "train": "train",
-    "valid": "val",
-    "test": "test",
-  }
+  VALIDATION_SPLIT = 0.1
+  SEED = 1838339744
 
   def __init__(
     self,
     root_dir,
     domain: str,
-    split: Optional[str] = None,
+    split: Optional[str] = "train",
     images_dir=None,
     masks_dir: str = None,
     sample_ids: List[str] = None,
   ):
+    images_dir = images_dir or os.path.join(root_dir, domain or "train")
+    masks_dir = masks_dir or os.path.join(root_dir, "SegmentationClass")
+    self.root_dir = root_dir
+
     super().__init__(
       domain=domain,
       split=split,
-      images_dir=images_dir or os.path.join(root_dir, "JPEGImages"),
-      masks_dir=masks_dir or os.path.join(root_dir, "SegmentationClass"),
+      images_dir=images_dir,
+      masks_dir=masks_dir,
       sample_ids=sample_ids,
     )
-    self.root_dir = root_dir
     self.sample_labels = self.load_sample_labels(self.domain)
 
-  _sample_info: pd.DataFrame = None
+  _sample_info: Dict[str, Tuple[np.ndarray, np.ndarray]] = None  # {train: (<ids shape=N dtype=str>, <labels shape=(N, 19) dtype=float>)}
 
-  def get_sample_info(self, domain):
+  def load_sample_info(self, domain: str):
     if self._sample_info is None:
-      self._sample_info = {}
-    if domain not in self._sample_info:
-      filepath = os.path.join(DATA_DIR, f"{domain}.csv")
-      self._sample_info = pd.read_csv(filepath)
-    return self._sample_info
+      train_info = pd.read_csv(os.path.join(self.root_dir, "train.csv"))
+      with open(os.path.join(self.root_dir, "sample_submission.csv")) as f:
+        test_ids = np.asarray([l.strip().split(",")[0] for l in f.readlines()])
+
+      train_targets = np.zeros((len(train_info), 19))
+      test_targets = np.zeros((len(test_ids), 19))
+      for i, l in enumerate(train_info["Label"]):
+        train_targets[i, list(map(int, l.split("|")))] = 1.
+
+      train_ids, valid_ids, train_targets, valid_targets = train_test_split(
+        train_info.ID.values, train_targets, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
+
+      self._sample_info = {
+        "train": (train_ids, train_targets),
+        "valid": (valid_ids, valid_targets),
+        "test": (test_ids, test_targets),
+      }
+
+    return self._sample_info[domain]
 
   def get_sample_ids(self, domain) -> List[str]:
-    info = self.get_sample_info(domain)
-    return info.ID.values
+    return self.load_sample_info(domain)[0]
 
   def load_sample_labels(self, domain) -> List[str]:
-    info = self.get_sample_info(domain)
-    target = np.zeros((len(info), 19))
-    for i, l in enumerate(info.Labels):
-      target[i, list(map(int, l.split("|")))] = 1.
-    return {_id: label for _id, label in zip(info.ID.values, target)}
+    ids, targets = self.load_sample_info(domain)
+    return dict(zip(ids, targets))
+  
+  def get_image(self, sample_id) -> Image.Image:
+    colors = ('red','green','blue','yellow')
+    image = [cv2.imread(os.path.join(self.root_dir, self.domain, f'{sample_id}_{c}.png'), cv2.IMREAD_GRAYSCALE) for c in colors]
+    image = np.stack(image, axis=-1)
+    image = Image.fromarray(image)
+    return image
 
-  def get_label(self, sample_id) -> np.ndarray:
+  def get_label(self, sample_id: str) -> np.ndarray:
     label = self.sample_labels[sample_id]
     return label
 
@@ -113,6 +134,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
     return base.DatasetInfo(
       num_classes=num_classes,
+      channels=4,
       classes=classes,
       colors=colors,
       bg_class=bg_class,

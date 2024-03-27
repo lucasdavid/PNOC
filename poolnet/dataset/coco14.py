@@ -49,8 +49,6 @@ class COCO14Dataset(Dataset):
     return os.path.join(self.root_dir, self.domain, f"COCO_{self.domain}_{image_id}.jpg")
 
   def load_sample_with_labels(self, idx):
-    import cv2
-    cv2.setNumThreads(0)
     label = self.label_list[idx]
 
     if self.IGNORE_BG_IMAGES and label.sum() == 0:

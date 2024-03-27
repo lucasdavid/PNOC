@@ -66,3 +66,18 @@ if [[ $DATASET == cityscapes ]]; then
   LR=0.05
   WD=0.0001
 fi
+if [[ $DATASET == hpa-single-cell-classification ]]; then
+  DOMAIN_TRAIN=train
+  DOMAIN_VALID=train
+  DOMAIN_VALID_SEG="valid"
+  DOMAIN_TEST="test"
+  DATA_DIR=$DATASETS_DIR/hpa-single-cell
+
+  IMAGE_SIZE=512
+  MIN_IMAGE_SIZE=512  # 960   # Images in this set have sizes (1024, 2048). Ratios are calculated over 2028,
+  MAX_IMAGE_SIZE=512  # 1920  # hence min/max are larger than `IMAGE_SIZE`. True (min, max) = (480, 960).
+  INF_IMAGE_SIZE=$IMAGE_SIZE
+
+  LR=0.1
+  WD=0.0001
+fi

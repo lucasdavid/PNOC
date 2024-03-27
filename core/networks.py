@@ -26,14 +26,53 @@ def group_norm(features):
 
 #######################################################################
 
+def patch_conv_in_channels(model, layer_name, new_in_channels):
+  layer = getattr(model, layer_name)  # layer = model.conv1
+  # new_layer = layer.clone().detach()
 
-def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs):
+  if isinstance(layer, nn.Sequential):
+    cv_layers = list(layer.children())
+    cv = cv_layers[0]
+  else:
+    cv = layer
+
+  if not isinstance(cv, nn.Conv2d):
+    raise ValueError(f"Cannot extract Conv2d from {cv}.")
+
+  new_cv = nn.Conv2d(
+    in_channels=new_in_channels,
+    out_channels=cv.out_channels,
+    kernel_size=cv.kernel_size,
+    stride=cv.stride,
+    padding=cv.padding,
+    bias=cv.bias).requires_grad_()
+
+  copy_weights = 0
+
+  with torch.no_grad():
+    new_cv.weight[:, :cv.in_channels, :, :] = cv.weight.data
+
+    for i in range(new_in_channels - cv.in_channels):
+        channel = cv.in_channels + i
+        new_cv.weight[:, channel:channel+1, :, :] = cv.weight[:, copy_weights:copy_weights+1, : :].data
+  new_cv.weight = nn.Parameter(new_cv.weight)
+
+  if isinstance(layer, nn.Sequential):
+    new_cv = nn.Sequential(new_cv, *cv_layers[1:])
+
+  setattr(model, layer_name, new_cv)  # model.conv1 = new_layer
+
+
+def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels=3, **kwargs):
   if 'resnet38d' == name:
     from .backbones.arch_resnet import resnet38d
 
     model = resnet38d.ResNet38d()
     state_dict = resnet38d.convert_mxnet_to_torch('./experiments/models/resnet_38d.params')
     model.load_state_dict(state_dict, strict=True)
+
+    if channels != 3:
+      patch_conv_in_channels(model, "conv1a", channels)
 
     stages = (
       nn.Sequential(model.conv1a, model.b2, model.b2_1, model.b2_2),
@@ -49,6 +88,10 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
 
       model_fn = getattr(swin_mod, name)
       model = model_fn(**kwargs)
+
+      if channels != 3:
+        model.patch_embed = channels
+        patch_conv_in_channels(model.patch_embed, "proj", channels)
 
       stages = (
         nn.Sequential(model.patch_embed, model.pos_drop),
@@ -78,6 +121,9 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
     model_fn = getattr(mix_transformer, name)
     model = model_fn(**kwargs)
 
+    if channels != 3:
+      patch_conv_in_channels(model.patch_embed1, "proj", channels)
+
     stages = (
       nn.Sequential(model.patch_embed1, model.block1, model.norm1),
       nn.Sequential(model.patch_embed2, model.block2, model.norm2),
@@ -104,6 +150,9 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
         dilations = (1, 1, 1, 2)
       model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, dilations=dilations, batch_norm_fn=norm_fn)
 
+      if channels != 3:
+        patch_conv_in_channels(model, "conv1", channels)
+
       if weights == 'imagenet':
         print(f'loading weights from {resnet.urls_dic[name]}')
         state_dict = model_zoo.load_url(resnet.urls_dic[name])
@@ -118,6 +167,8 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
       pretrained = weights == "imagenet"
       model_fn = getattr(resnest, name)
       model = model_fn(pretrained=pretrained, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
+      if channels != 3:
+        patch_conv_in_channels(model, "conv1", channels)
       if pretrained:
         print(f'loading weights from {resnest.resnest_model_urls[name]}')
 
@@ -129,6 +180,8 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', **kwargs
       pretrained = weights == "imagenet"
       model_fn = getattr(res2net_v1b, name)
       model = model_fn(pretrained=pretrained, strides=strides or (1, 2, 2, 2), norm_layer=norm_fn)
+      if channels != 3:
+        patch_conv_in_channels(model, "conv1", channels)  # FIX: conv1 is Sequential
       if pretrained:
         print(f'loading pretrained weights')
 
@@ -157,6 +210,7 @@ class Backbone(nn.Module):
     self,
     model_name,
     weights='imagenet',
+    channels=3,
     mode='fix',
     dilated=False,
     strides=None,
@@ -182,7 +236,7 @@ class Backbone(nn.Module):
       raise ValueError(f'Unknown mode {mode}. Must be `normal` or `fix`.')
 
     backbone, stages = build_backbone(
-      name=model_name, dilated=dilated, strides=strides, norm_fn=self.norm_fn, weights=weights, **backbone_kwargs,
+      model_name, dilated, strides, self.norm_fn, weights, channels, **backbone_kwargs,
     )
 
     self.backbone = backbone
@@ -277,6 +331,7 @@ class Classifier(Backbone):
     model_name,
     num_classes=20,
     backbone_weights="imagenet",
+    channels=3,
     mode='fix',
     dilated=False,
     strides=None,
@@ -287,6 +342,7 @@ class Classifier(Backbone):
   ):
     super().__init__(
       model_name,
+      channels=channels,
       weights=backbone_weights,
       mode=mode,
       dilated=dilated,
@@ -559,9 +615,9 @@ class Segformer(Backbone):
       trainable_backbone=trainable_backbone,
       weights=backbone_weights,
     )
-    
+
     self.align_corners = align_corners
-    
+
     norm_layer = group_norm if use_group_norm else getattr(nn, decoder_norm_layer)
 
     self.decoder = segformer.SegFormerHead(
@@ -573,7 +629,7 @@ class Segformer(Backbone):
       norm_layer=norm_layer,
       in_index=decoder_in_index,
     )
-    #self.projector = nn.Sequential( 
+    #self.projector = nn.Sequential(
     #    nn.Conv2d(
     #        decoder.settings.lowlevel_in_channels,
     #        decoder.settings.lowlevel_channels,

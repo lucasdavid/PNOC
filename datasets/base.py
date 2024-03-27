@@ -19,12 +19,14 @@ class DatasetInfo:
   def __init__(
       self,
       num_classes: int,
+      channels: int,
       classes: List[str],
       colors: List[Tuple[int, int, int]],
       bg_class: Optional[int],
       void_class: Optional[int],
   ):
     self.num_classes = num_classes
+    self.channels = channels
     self.classes = np.asarray(classes)
     self.colors = np.asarray(colors)
     self.bg_class = bg_class

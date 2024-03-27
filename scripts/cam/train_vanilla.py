@@ -96,11 +96,8 @@ if __name__ == '__main__':
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
 
-  log_dir = create_directory(f'./experiments/logs/')
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
-
-  log_path = log_dir + f'{TAG}.txt'
   model_path = model_dir + f'{TAG}.pth'
 
   set_seed(SEED)
@@ -127,6 +124,7 @@ if __name__ == '__main__':
   model = Classifier(
     args.architecture,
     train_dataset.info.num_classes,
+    channels=train_dataset.info.channels,
     backbone_weights=args.backbone_weights,
     mode=args.mode,
     dilated=args.dilated,

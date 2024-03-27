@@ -26,10 +26,10 @@
 
 if [[ "`hostname`" == "sdumont"* ]]; then
   ENV=sdumont
-  WORK_DIR=$SCRATCH/pnoc-transformers
+  WORK_DIR=$SCRATCH/pnoc
 else
   ENV=local
-  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc-transformers
+  WORK_DIR=$HOME/workspace/repos/research/wsss/pnoc
 fi
 
 ## Dataset
@@ -37,6 +37,7 @@ DATASET=voc12       # Pascal VOC 2012
 # DATASET=coco14      # MS COCO 2014
 # DATASET=deepglobe   # DeepGlobe Land Cover Classification
 # DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
+# DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -48,6 +49,23 @@ export PYTHONPATH=$(pwd)
 ### Priors
 ARCH=rs101
 ARCHITECTURE=resnest101
+
+# ARCHITECTURE=swin_b
+# ARCH=swin_b_22k
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
+
+# ARCHITECTURE=swin_l
+# ARCH=swin_l_22k
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
+
+# ARCHITECTURE=mit_b0
+# ARCH=mit_b0
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
+
+# ARCHITECTURE=mit_b5
+# ARCH=mit_b5
+# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
+
 TRAINABLE_STEM=true
 TRAINABLE_BONE=true
 TRAINABLE_STAGE4=true
@@ -403,30 +421,9 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
-LR=0.001
-WD=0.01
-
-# ARCHITECTURE=swin_b
-# ARCH=swin_b_22k
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
-
-ARCHITECTURE=swin_l
-ARCH=swin_l_22k
-PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_large_patch4_window7_224_22k.pth
-
-# ARCHITECTURE=mit_b0
-# ARCH=mit_b0
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b0.pth
-
-# ARCHITECTURE=mit_b5
-# ARCH=mit_b5
-# PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
-
-OC_ARCHITECTURE=$ARCHITECTURE
-
 LABELSMOOTHING=0.1
 AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
-AUG="ra"
+AUG=ra
 
 EID=r1  # Experiment ID
 
@@ -436,9 +433,9 @@ train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
-# BATCH=16
-# ACCUMULATE_STEPS=2
-LABELSMOOTHING=0.1
+BATCH=16
+ACCUMULATE_STEPS=2
+# LABELSMOOTHING=0
 
 
 AUGMENT=colorjitter  # default:colorjitter, cityscapes:clahe, deepglobe:none
@@ -454,7 +451,7 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
 # DOMAIN=$DOMAIN_VALID     inference_priors
