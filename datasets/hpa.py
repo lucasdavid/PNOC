@@ -74,6 +74,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       sample_ids=sample_ids,
     )
     self.sample_labels = self.load_sample_labels(self.domain)
+    self.subfolder = "test" if self.domain == "test" else "train"
 
   _sample_info: Dict[str, Tuple[np.ndarray, np.ndarray]] = None  # {train: (<ids shape=N dtype=str>, <labels shape=(N, 19) dtype=float>)}
 
@@ -105,10 +106,10 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
   def load_sample_labels(self, domain) -> List[str]:
     ids, targets = self.load_sample_info(domain)
     return dict(zip(ids, targets))
-  
+
   def get_image(self, sample_id) -> Image.Image:
     colors = ('red','green','blue','yellow')
-    image = [cv2.imread(os.path.join(self.root_dir, self.domain, f'{sample_id}_{c}.png'), cv2.IMREAD_GRAYSCALE) for c in colors]
+    image = [cv2.imread(os.path.join(self.root_dir, self.subfolder, f'{sample_id}_{c}.png'), cv2.IMREAD_GRAYSCALE) for c in colors]
     image = np.stack(image, axis=-1)
     image = Image.fromarray(image)
     return image
