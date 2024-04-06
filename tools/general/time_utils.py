@@ -33,3 +33,44 @@ class Timer:
       self.tik()
 
     return duration
+
+
+class BlockTimer:
+  _TRACKERS = {}
+
+  def __init__(self, title: str = None, enabled: bool = True):
+    self.title = title or "TimeTracker"
+    self.enabled = enabled
+    self.runs = 0
+    self._time_total = 0
+    self._start_e = None
+
+  def __enter__(self):
+    if self.enabled:
+      self._start_e = time.time()
+    return self
+
+  def __exit__(self, exc_type, exc, exc_tb):
+    if self.enabled:
+      self._time_total += time.time() - self._start_e
+      self._start_e = None
+      self.runs += 1
+
+  def description(self) -> str:
+    # return f"Block U2PL repeated 10 times, taking 0.421 seconds on average."
+    return f"Block {self.title} repeated {self.runs} times, taking {self._time_total / max(1, self.runs):.3f} seconds on average."
+
+  @classmethod
+  def scope(cls, name, enabled: bool = True):
+    if name in cls._TRACKERS:
+      tracker = cls._TRACKERS[name]
+    else:
+      tracker = cls(name)
+      cls._TRACKERS[name]
+
+    tracker.enabled = enabled
+    return tracker
+
+  @classmethod
+  def trackers(cls):
+    return cls._TRACKERS

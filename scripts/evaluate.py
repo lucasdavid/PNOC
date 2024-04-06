@@ -63,7 +63,7 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
         try:
           with Image.open(png_file) as y_pred:
             y_pred = np.asarray(y_pred)
-        except UnidentifiedImageError:
+        except (UnidentifiedImageError, FileNotFoundError):
           corrupted.append(image_id)
           continue
 
