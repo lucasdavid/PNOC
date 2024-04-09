@@ -63,14 +63,14 @@ class BlockTimer:
   @classmethod
   def scope(cls, name, enabled: bool = True):
     if name in cls._TRACKERS:
-      tracker = cls._TRACKERS[name]
+      t = cls._TRACKERS[name]
     else:
-      tracker = cls(name)
-      cls._TRACKERS[name]
+      t = cls(name)
+      cls._TRACKERS[name] = t
 
-    tracker.enabled = enabled
-    return tracker
+    t.enabled = enabled
+    return t
 
   @classmethod
   def trackers(cls):
-    return cls._TRACKERS
+    return list(cls._TRACKERS.values())
