@@ -63,7 +63,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
     sample_ids: List[str] = None,
   ):
     images_dir = images_dir or os.path.join(root_dir, domain or "train")
-    masks_dir = masks_dir or os.path.join(root_dir, "SegmentationClass")
+    masks_dir = masks_dir or os.path.join(root_dir, "cell_masks")
     self.root_dir = root_dir
 
     super().__init__(
@@ -75,6 +75,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
     )
     self.sample_labels = self.load_sample_labels(self.domain)
     self.subfolder = "test" if self.domain == "test" else "train"
+    self.masks_format = "npz"
 
   _sample_info: Dict[str, Tuple[np.ndarray, np.ndarray]] = None  # {train: (<ids shape=N dtype=str>, <labels shape=(N, 19) dtype=float>)}
 
@@ -110,9 +111,22 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
   def get_image(self, sample_id) -> Image.Image:
     colors = ('red','green','blue','yellow')
     image = [cv2.imread(os.path.join(self.root_dir, self.subfolder, f'{sample_id}_{c}.png'), cv2.IMREAD_GRAYSCALE) for c in colors]
-    image = np.stack(image, axis=-1)
+    try:
+      image = np.stack(image, axis=-1)
+    except Exception as error:
+      print(f"Error stacking sample {sample_id} ({[i.shape for i in image]})")
+      raise
     image = Image.fromarray(image)
     return image
+
+  def get_mask_path(self, sample_id) -> str:
+    return os.path.join(self.masks_dir, sample_id + '.npz')
+
+  def get_mask(self, sample_id):
+    mask_path = self.get_mask_path(sample_id)
+    mask = np.load(mask_path)["arr_0"]
+    mask = Image.fromarray(mask)
+    return mask
 
   def get_label(self, sample_id: str) -> np.ndarray:
     label = self.sample_labels[sample_id]

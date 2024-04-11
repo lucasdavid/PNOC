@@ -9,7 +9,6 @@ from tqdm import tqdm
 import datasets
 import wandb
 from core.networks import *
-from core.training import priors_validation_step
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -20,6 +19,10 @@ from tools.ai.torch_utils import *
 from tools.general import wandb_utils
 from tools.general.io_utils import *
 from tools.general.time_utils import *
+from core.training import (
+  priors_validation_step,
+  classification_validation_step,
+)
 
 parser = argparse.ArgumentParser()
 
@@ -49,6 +52,7 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
+parser.add_argument('--validate_priors', default=False, type=str2bool)
 parser.add_argument('--validate_max_steps', default=None, type=int)
 parser.add_argument('--validate_thresholds', default=None, type=str)
 
@@ -211,16 +215,21 @@ if __name__ == '__main__':
     if do_validation:
       model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
-        metric_results = priors_validation_step(
-          model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
-        )
+        if args.validate_priors:
+          metric_results = priors_validation_step(
+            model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+          )
+        else:
+          metric_results = classification_validation_step(
+            model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
+          )
       metric_results["iteration"] = step + 1
       model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))
 
-      if metric_results["miou"] > miou_best:
+      if args.validate_priors and metric_results["miou"] > miou_best:
         miou_best = metric_results["miou"]
         for k in ("threshold", "miou", "iou"):
           wandb.run.summary[f"val/best_{k}"] = metric_results[k]

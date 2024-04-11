@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=16:00:00
+#SBATCH --time=48:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -33,11 +33,11 @@ else
 fi
 
 ## Dataset
-DATASET=voc12       # Pascal VOC 2012
+# DATASET=voc12       # Pascal VOC 2012
 # DATASET=coco14      # MS COCO 2014
 # DATASET=deepglobe   # DeepGlobe Land Cover Classification
 # DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
-# DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
+DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -47,8 +47,11 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ### Priors
-ARCH=rs101
-ARCHITECTURE=resnest101
+# ARCH=rs101
+# ARCHITECTURE=resnest101
+
+ARCH=rs269
+ARCHITECTURE=resnest269
 
 # ARCHITECTURE=swin_b
 # ARCH=swin_b_22k
@@ -79,6 +82,8 @@ EPOCHS=15
 BATCH=32
 ACCUMULATE_STEPS=1
 
+LR=0.001
+
 LR_ALPHA_SCRATCH=10.0
 LR_ALPHA_BIAS=2.0
 LR_ALPHA_OC=1.0
@@ -94,6 +99,7 @@ LR_ALPHA_OC=1.0
 
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
+VALIDATE_PRIORS=false
 
 ## Augmentation
 AUGMENT=randaugment  # clahe_collorjitter_mixup_cutmix_cutormixup
@@ -170,6 +176,7 @@ train_vanilla() {
     --domain_train $DOMAIN_TRAIN \
     --domain_valid $DOMAIN_VALID \
     --validate $PERFORM_VALIDATION \
+    --validate_priors $VALIDATE_PRIORS \
     --validate_max_steps $VALIDATE_MAX_STEPS \
     --validate_thresholds $VALIDATE_THRESHOLDS \
     --device $DEVICE \
@@ -422,8 +429,8 @@ evaluate_priors() {
 }
 
 LABELSMOOTHING=0.1
-AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
-AUG=ra
+AUGMENT=none  # default:randaugment, cityscapes:clahe
+AUG=none
 
 EID=r1  # Experiment ID
 
