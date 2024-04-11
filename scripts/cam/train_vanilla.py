@@ -165,7 +165,8 @@ if __name__ == '__main__':
   train_timer = Timer()
   miou_best = -1
 
-  for step in tqdm(range(step_init, step_max), 'Training', mininterval=2.0, ncols=60):
+  tqdm_bar = tqdm(range(step_init, step_max), 'Training', mininterval=2.0, ncols=80)
+  for step in tqdm_bar:
     _, images, labels = train_iterator.get()
 
     with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
@@ -188,8 +189,10 @@ if __name__ == '__main__':
     do_logging = (step + 1) % step_log == 0
     do_validation = args.validate and (step + 1) % step_val == 0
 
+    loss, class_loss = train_meter.get(clear=True)
+    tqdm_bar.set_description(f"[Epoch={epoch} Loss={loss:.5f}] ")
+
     if do_logging:
-      loss, class_loss = train_meter.get(clear=True)
       learning_rate = float(get_learning_rate_from_optimizer(optimizer))
 
       data = {

@@ -110,13 +110,12 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
   def get_image(self, sample_id) -> Image.Image:
     colors = ('red','green','blue','yellow')
-    image = [cv2.imread(os.path.join(self.root_dir, self.subfolder, f'{sample_id}_{c}.png'), cv2.IMREAD_GRAYSCALE) for c in colors]
-    try:
-      image = np.stack(image, axis=-1)
-    except Exception as error:
-      print(f"Error stacking sample {sample_id} ({[i.shape for i in image]})")
-      raise
+    images = [Image.open(os.path.join(self.root_dir, self.subfolder, f'{sample_id}_{c}.png')) for c in colors]
+    image = np.stack([np.array(image) for image in images], axis=-1)
     image = Image.fromarray(image)
+
+    for i in images: i.close()
+
     return image
 
   def get_mask_path(self, sample_id) -> str:

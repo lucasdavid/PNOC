@@ -132,10 +132,15 @@ class Normalize:
       image.close()
 
     norm_image = np.empty_like(x, np.float32)
+    channels = x.shape[-1]
 
     norm_image[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
     norm_image[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
     norm_image[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
+
+    if channels > 3:
+      for i in range(3, channels):
+        norm_image[..., i] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
 
     return norm_image
 
@@ -166,10 +171,15 @@ class Normalize_For_Segmentation:
       mask.close()
 
     z = np.empty_like(x)
+    channels = x.shape[-1]
 
     z[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
     z[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
     z[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
+
+    if channels > 3:
+      for i in range(3, channels):
+        z[..., i] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
 
     data['image'] = z
     data['mask'] = y
@@ -200,7 +210,7 @@ class Top_Left_Crop_For_Segmentation:
   def __init__(self, crop_size):
     self.bg_value = 0
     self.crop_size = crop_size
-    
+
   def __call__(self, data):
     image, mask = data['image'], data['mask']
 
@@ -209,7 +219,7 @@ class Top_Left_Crop_For_Segmentation:
     cw = min(self.crop_size, w)
     crop_shape = (self.crop_size, self.crop_size, c)
     mask_shape = (self.crop_size, self.crop_size)
-    
+
     cropped_image = np.ones(crop_shape, image.dtype) * self.bg_value
     cropped_image[:ch, :cw] = image[:ch, :cw]
 
@@ -261,7 +271,7 @@ class RandomCrop:
     self.with_bbox = with_bbox
     self.crop_size = crop_size
     self.channels_last = channels_last
-    
+
   def __call__(self, x):
     if self.channels_last:
       h, w, c = x.shape

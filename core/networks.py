@@ -27,7 +27,7 @@ def group_norm(features):
 
 #######################################################################
 
-def patch_conv_in_channels(model, layer_name, new_in_channels):
+def patch_conv_in_channels(model, layer_name, new_in_channels, copying_channel=0):
   layer = getattr(model, layer_name)  # layer = model.conv1
   # new_layer = layer.clone().detach()
 
@@ -48,14 +48,12 @@ def patch_conv_in_channels(model, layer_name, new_in_channels):
     padding=cv.padding,
     bias=cv.bias).requires_grad_()
 
-  copy_weights = 0
-
   with torch.no_grad():
     new_cv.weight[:, :cv.in_channels, :, :] = cv.weight.data
 
     for i in range(new_in_channels - cv.in_channels):
         channel = cv.in_channels + i
-        new_cv.weight[:, channel:channel+1, :, :] = cv.weight[:, copy_weights:copy_weights+1, : :].data
+        new_cv.weight[:, channel:channel+1, :, :] = cv.weight[:, copying_channel:copying_channel+1, : :].data
   new_cv.weight = nn.Parameter(new_cv.weight)
 
   if isinstance(layer, nn.Sequential):
