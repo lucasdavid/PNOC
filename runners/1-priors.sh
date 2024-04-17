@@ -71,8 +71,8 @@ ARCH=rs101
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/mit_b5.pth
 
 TRAINABLE_STEM=true
-TRAINABLE_BONE=true
 TRAINABLE_STAGE4=true
+TRAINABLE_BONE=true
 DILATED=false
 MODE=normal
 PRETRAINED_WEIGHTS=imagenet
@@ -80,7 +80,7 @@ PRETRAINED_WEIGHTS=imagenet
 # Training
 OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
-BATCH=32
+BATCH=16
 ACCUMULATE_STEPS=1
 
 LR_ALPHA_SCRATCH=10.0
@@ -95,6 +95,10 @@ LR_ALPHA_OC=1.0
 # LR=0.00001
 # WD=0.01
 # =========================
+
+EMA_ENABLED=false
+EMA_WARMUP=128
+EMA_STEPS=32
 
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
@@ -155,6 +159,9 @@ train_vanilla() {
     --lr_alpha_bias $LR_ALPHA_BIAS \
     --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
+    --ema $EMA_ENABLED \
+    --ema_warmup $EMA_WARMUP \
+    --ema_steps $EMA_STEPS \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
@@ -425,7 +432,7 @@ EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-# train_vanilla
+train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -433,14 +440,11 @@ BATCH=16
 ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0
 
-
 AUGMENT=none  # default:colorjitter, cityscapes:clahe, deepglobe:none
 AUG=no
 
 OC_NAME="$ARCH"
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
-
-LR=0.01
 
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH-lr$LR-$EID"
 # train_puzzle

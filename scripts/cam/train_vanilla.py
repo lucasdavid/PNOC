@@ -1,5 +1,6 @@
 import argparse
 import os
+from functools import partial
 
 import numpy as np
 import torch
@@ -62,6 +63,10 @@ parser.add_argument('--label_smoothing', default=0, type=float)
 parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "lion"])
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
+parser.add_argument('--ema', default=False, type=str2bool)
+parser.add_argument('--ema_steps', default=32, type=int)
+parser.add_argument('--ema_warmup', default=32, type=int)
+parser.add_argument('--ema_decay', default=0.999, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -103,6 +108,7 @@ if __name__ == '__main__':
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
   model_path = model_dir + f'{TAG}.pth'
+  ema_model_path = model_dir + f'{TAG}.ema.pth'
 
   set_seed(SEED)
 
@@ -158,6 +164,11 @@ if __name__ == '__main__':
     alpha_bias=args.lr_alpha_bias,
   )
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
+
+  if args.ema:
+    my_ema_avg_fn = partial(ema_avg_fun, optimizer=optimizer, decay=args.ema_decay, warmup=args.ema_warmup)
+    ema_model = torch.optim.swa_utils.AveragedModel(model, avg_fn=my_ema_avg_fn)
+
   log_opt_params("Vanilla", param_names)
 
   # Train
@@ -181,7 +192,13 @@ if __name__ == '__main__':
     if (step + 1) % args.accumulate_steps == 0:
       scaler.step(optimizer)
       scaler.update()
-      optimizer.zero_grad()  # set_to_none=False  # TODO: Try it with True and check performance.
+      optimizer.zero_grad()
+
+      if args.ema:
+        if (optimizer.global_step < args.ema_warmup
+            or optimizer.global_step % args.ema_steps == 0):
+          with torch.no_grad():
+            ema_model.update_parameters(model)
 
     train_meter.update({'loss': loss.item(), 'class_loss': class_loss.item()})
 
@@ -238,6 +255,10 @@ if __name__ == '__main__':
           wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
       save_model(model, model_path, parallel=GPUS_COUNT > 1)
+
+  if args.ema:
+    torch.optim.swa_utils.update_bn(train_loader, ema_model)
+    save_model(ema_model, ema_model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()

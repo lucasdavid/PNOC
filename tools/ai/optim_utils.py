@@ -60,7 +60,7 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
 
   if algorithm == "sgd":
     return PolyOptimizer(params, lr=lr, max_step=max_step, **kwargs)
-  
+
   if algorithm == "momentum":
     return PolyOptimizer(params, lr=lr, max_step=max_step, momentum=0.9, nesterov=True, **kwargs)
 
@@ -85,3 +85,11 @@ def linear_schedule(step, max_step, a_0=0., a_n=1.0, schedule=1.0, constraint=mi
   rate = a_0 + (a_n - a_0) * step / (max_step * schedule)
   rate = constraint(rate, a_n)
   return rate
+
+
+def ema_avg_fun(avg_p, p, count, optimizer, decay=0.999, warmup=0):
+  if optimizer.global_step < warmup:
+    return p  # Copy params from model to EMA.
+
+  ema_decay = min(1 - 1 / (1 + optimizer.global_step), decay)
+  return ema_decay * avg_p + (1-ema_decay) * p

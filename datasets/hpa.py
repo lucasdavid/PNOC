@@ -87,13 +87,19 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       with open(os.path.join(self.root_dir, "sample_submission.csv")) as f:
         test_ids = np.asarray([l.strip().split(",")[0] for l in f.readlines()])
 
+      print(f"train_info: {train_info.shape}")
+
       train_targets = np.zeros((len(train_info), 19))
       test_targets = np.zeros((len(test_ids), 19))
       for i, l in enumerate(train_info["Label"]):
         train_targets[i, list(map(int, l.split("|")))] = 1.
 
+      train_ids = train_info.ID.values
       train_ids, valid_ids, train_targets, valid_targets = train_test_split(
-        train_info.ID.values, train_targets, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
+        train_ids, train_targets, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
+
+      print(f"train: {len(train_ids)}")
+      print(f"valid: {len(valid_ids)}")
 
       self._sample_info = {
         "train": (train_ids, train_targets),
