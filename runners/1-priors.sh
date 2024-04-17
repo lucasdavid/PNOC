@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -47,11 +47,12 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ### Priors
-# ARCH=rs101
-# ARCHITECTURE=resnest101
 
-ARCH=rs269
-ARCHITECTURE=resnest269
+ARCHITECTURE=resnest101
+ARCH=rs101
+
+# ARCH=rs269
+# ARCHITECTURE=resnest269
 
 # ARCHITECTURE=swin_b
 # ARCH=swin_b_22k
@@ -81,8 +82,6 @@ OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
 BATCH=32
 ACCUMULATE_STEPS=1
-
-LR=0.001
 
 LR_ALPHA_SCRATCH=10.0
 LR_ALPHA_BIAS=2.0
@@ -375,6 +374,7 @@ train_pnoc() {
     --oc-train-interval-steps $OC_TRAIN_INT_STEPS \
     --oc-persist $OC_PERSIST \
     --validate $PERFORM_VALIDATION \
+    --validate_priors $VALIDATE_PRIORS \
     --validate_max_steps $VALIDATE_MAX_STEPS \
     --validate_thresholds $VALIDATE_THRESHOLDS \
     --dataset $DATASET \
@@ -401,17 +401,6 @@ inference_priors() {
     --device $DEVICE
 }
 
-inference_lpcam() {
-  echo "=================================================================="
-  echo "[LPCam:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
-
-  CUDA_VISIBLE_DEVICES=$DEVICES \
-    $PY scripts/lpcam/inference.py \
-    --tag $TAG --dataset $DATASET --domain $DOMAIN --data_dir $DATA_DIR \
-    --architecture $ARCHITECTURE --dilated $DILATED --mode $MODE --device $DEVICE
-}
-
 evaluate_priors() {
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
   CUDA_VISIBLE_DEVICES="" \
@@ -430,13 +419,13 @@ evaluate_priors() {
 
 LABELSMOOTHING=0.1
 AUGMENT=none  # default:randaugment, cityscapes:clahe
-AUG=none
+AUG=no
 
 EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-train_vanilla
+# train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -445,11 +434,13 @@ ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0
 
 
-AUGMENT=colorjitter  # default:colorjitter, cityscapes:clahe, deepglobe:none
-AUG=cj
+AUGMENT=none  # default:colorjitter, cityscapes:clahe, deepglobe:none
+AUG=no
 
 OC_NAME="$ARCH"
 OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
+
+LR=0.01
 
 # TAG="puzzle/$DATASET-$ARCH-p-b$BATCH-lr$LR-$EID"
 # train_puzzle

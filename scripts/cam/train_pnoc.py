@@ -68,7 +68,7 @@ parser.add_argument('--accumulate_steps', default=1, type=int)
 parser.add_argument('--mixed_precision', default=False, type=str2bool)
 parser.add_argument('--amp_min_scale', default=None, type=float)
 parser.add_argument('--validate', default=True, type=str2bool)
-parser.add_argument('--validate_priors', default=False, type=str2bool)
+parser.add_argument('--validate_priors', default=True, type=str2bool)
 parser.add_argument('--validate_max_steps', default=None, type=int)
 parser.add_argument('--validate_thresholds', default=None, type=str)
 
@@ -279,7 +279,7 @@ if __name__ == '__main__':
 
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
-  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment)
+  tt, tv = datasets.get_classification_transforms(args.min_image_size, args.max_image_size, args.image_size, args.augment, ts.classification_info.normalize_stats)
   train_dataset = datasets.ClassificationDataset(ts, transform=tt)
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
   train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
@@ -299,12 +299,13 @@ if __name__ == '__main__':
   cgnet = Classifier(
     args.architecture,
     train_dataset.info.num_classes,
+    channels=train_dataset.info.channels,
+    backbone_weights=args.backbone_weights,
     mode=args.mode,
     dilated=args.dilated,
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
-    backbone_weights=args.backbone_weights,
   )
   if args.restore:
     print(f'Restoring weights from {args.restore}')
@@ -316,11 +317,12 @@ if __name__ == '__main__':
   ocnet = Classifier(
     args.oc_architecture,
     train_dataset.info.num_classes,
+    channels=train_dataset.info.channels,
+    backbone_weights=args.backbone_weights,
     mode="fix",
     trainable_stem=args.trainable_stem,
     trainable_stage4=args.trainable_stage4,
     trainable_backbone=args.trainable_backbone,
-    backbone_weights=args.backbone_weights,
   )
   ocnet.load_state_dict(torch.load(args.oc_pretrained, map_location=torch.device('cpu')))
 
@@ -425,7 +427,7 @@ if __name__ == '__main__':
           )
         else:
           metric_results = classification_validation_step(
-            model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
+            cgnet, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
           )
       metric_results["iteration"] = step + 1
       cgnet.train()

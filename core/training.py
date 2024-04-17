@@ -49,7 +49,7 @@ def classification_validation_step(
 
       if step == 0:
         inputs = to_numpy(inputs)
-        wandb_utils.log_cams(ids, inputs, targets, cams, preds, classes=info.classes)
+        wandb_utils.log_cams(ids, inputs, targets, cams, preds, classes=info.classes, normalize_stats=info.normalize_stats)
 
       if max_steps and step >= max_steps:
         break

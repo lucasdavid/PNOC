@@ -46,7 +46,9 @@ COLORS = [
   [88, 81, 165], [25, 77, 72], [9, 148, 115], [208, 197, 79], [175, 192, 82], [99, 216, 177], [29, 147, 147],
   [142, 167, 32], [193, 9, 185], [127, 32, 31], [202, 151, 163], [203, 114, 183], [224, 224, 192],
 ]
-
+NORMALIZE_STATS = (
+  (0.485, 0.456, 0.406, 0.485),
+  (0.229, 0.224, 0.225, 0.229))
 
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
   NAME = "hpa-single-cell-classification"
@@ -153,6 +155,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       colors=colors,
       bg_class=bg_class,
       void_class=void_class,
+      normalize_stats=NORMALIZE_STATS,
     )
 
 

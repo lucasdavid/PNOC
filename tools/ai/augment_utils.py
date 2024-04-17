@@ -132,15 +132,10 @@ class Normalize:
       image.close()
 
     norm_image = np.empty_like(x, np.float32)
-    channels = x.shape[-1]
+    channels = norm_image.shape[-1]
 
-    norm_image[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
-    norm_image[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
-    norm_image[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
-
-    if channels > 3:
-      for i in range(3, channels):
-        norm_image[..., i] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
+    for i in range(channels):
+      norm_image[..., i] = (x[..., i] / 255. - self.mean[i]) / self.std[i]
 
     return norm_image
 
@@ -173,13 +168,8 @@ class Normalize_For_Segmentation:
     z = np.empty_like(x)
     channels = x.shape[-1]
 
-    z[..., 0] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
-    z[..., 1] = (x[..., 1] / 255. - self.mean[1]) / self.std[1]
-    z[..., 2] = (x[..., 2] / 255. - self.mean[2]) / self.std[2]
-
-    if channels > 3:
-      for i in range(3, channels):
-        z[..., i] = (x[..., 0] / 255. - self.mean[0]) / self.std[0]
+    for i in range(channels):
+      z[..., i] = (x[..., i] / 255. - self.mean[i]) / self.std[i]
 
     data['image'] = z
     data['mask'] = y

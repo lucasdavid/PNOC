@@ -18,16 +18,18 @@ def setup(name, config, job_type="train", tags=None):
   return wb_run
 
 
-def cams_to_wb_images(images, cams):
+def cams_to_wb_images(images, cams, normalize_stats=None):
   samples = min(len(images), 8)
-  stats = imagenet_stats()
   cams = cams.max(-1)
+
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   wb_images, wb_cams = [], []
 
   for b in range(samples):
-    image = denormalize(images[b], *stats)
-    img = image[..., ::-1]
+    image = denormalize(images[b], *normalize_stats)
+    img = image[..., ::-1][..., :3]
     cam = colormap(cams[b], img.shape)
     cam = cv2.addWeighted(img, 0.5, cam, 0.5, 0)
     cam = cam[..., ::-1]
@@ -38,10 +40,12 @@ def cams_to_wb_images(images, cams):
   return wb_images, wb_cams
 
 
-def masks_to_wb_images(images, masks, preds, classes, void_class=0):
+def masks_to_wb_images(images, masks, preds, classes, void_class=0, normalize_stats=None):
   indices = dict(enumerate(classes.tolist()))
   samples = min(len(images), 8)
-  stats = imagenet_stats()
+
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   if classes[0] != "background":
     # Wandb does not show class 0. Increase indices by 1
@@ -57,7 +61,7 @@ def masks_to_wb_images(images, masks, preds, classes, void_class=0):
   masks[pixel_ignore] = void_class
 
   return [
-    wandb.Image(denormalize(images[b], *stats), masks={
+    wandb.Image(denormalize(images[b], *normalize_stats), masks={
       "ground_truth": {
         "mask_data": masks[b],
         "class_labels": {i: indices[i] for i in np.unique(masks.ravel()).tolist()},
@@ -78,11 +82,12 @@ def log_cams(
   cams,
   predictions,
   classes,
+  normalize_stats=None,
   oc_predictions=None,
   tag="val",
   commit=False,
 ):
-  wb_images, wb_cams = cams_to_wb_images(images, cams)
+  wb_images, wb_cams = cams_to_wb_images(images, cams, normalize_stats=normalize_stats)
   wb_targets = _predictions_to_names(targets, classes)
   wb_predics = _predictions_to_names(predictions, classes)
   wb_oc_pred = _predictions_to_names(oc_predictions, classes)
@@ -110,11 +115,14 @@ def log_masks(
   masks,
   preds,
   classes,
+  normalize_stats=None,
   void_class=0,
   tag="val",
   commit=False,
 ):
-  wb_images = masks_to_wb_images(images, masks, preds, classes, void_class)
+  wb_images = masks_to_wb_images(
+    images, masks, preds, classes, void_class,
+    normalize_stats=normalize_stats)
   wb_targets = _predictions_to_names(targets, classes)
 
   columns = ("Id", "Image", "Labels")

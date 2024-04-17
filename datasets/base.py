@@ -24,6 +24,7 @@ class DatasetInfo:
       colors: List[Tuple[int, int, int]],
       bg_class: Optional[int],
       void_class: Optional[int],
+      normalize_stats: Optional[Tuple[int]] = None,
   ):
     self.num_classes = num_classes
     self.channels = channels
@@ -31,6 +32,7 @@ class DatasetInfo:
     self.colors = np.asarray(colors)
     self.bg_class = bg_class
     self.void_class = void_class
+    self.normalize_stats = normalize_stats
 
     self.class_ids = {c: i for i, c in enumerate(classes)}
     self.color_ids = self.colors[:, 0] * 256**2 + self.colors[:, 1] * 256 + self.colors[:, 2]

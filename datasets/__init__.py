@@ -69,8 +69,10 @@ def get_classification_transforms(
   max_size,
   crop_size,
   augment,
+  normalize_stats = None,
 ):
-  mean, std = imagenet_stats()
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   tt = []
   tv = []
@@ -88,13 +90,13 @@ def get_classification_transforms(
     tt += [transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)]
   if 'randaugment' in augment:
     tt += [RandAugmentMC(n=2, m=10)]
-  tt += [Normalize(mean, std)]
+  tt += [Normalize(*normalize_stats)]
   if 'cutmix' not in augment:
     tt += [RandomCrop(crop_size)]  # This will happen inside CutMix.
   tt += [Transpose()]
 
   tv += [
-    Normalize_For_Segmentation(mean, std),
+    Normalize_For_Segmentation(*normalize_stats),
     Top_Left_Crop_For_Segmentation(crop_size),  # image=(534,512) crop_size=512 --> (512,512)
     Transpose_For_Segmentation()
   ]
@@ -107,14 +109,16 @@ def get_affinity_transforms(
   max_image_size,
   crop_size,
   overcrop: bool = True,
+  normalize_stats = None,
 ):
-  mean, std = imagenet_stats()
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   tt = transforms.Compose(
     [
       RandomResize_For_Segmentation(min_image_size, max_image_size, overcrop=overcrop),
       RandomHorizontalFlip_For_Segmentation(),
-      Normalize_For_Segmentation(mean, std),
+      Normalize_For_Segmentation(*normalize_stats),
       RandomCrop_For_Segmentation(crop_size),
       Transpose_For_Segmentation(),
       ResizeMask(crop_size // 4),
@@ -130,8 +134,10 @@ def get_segmentation_transforms(
   crop_size,
   augment,
   overcrop: bool = True,
+  normalize_stats = None,
 ) -> Tuple[transforms.Compose]:
-  mean, std = imagenet_stats()
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   tt = [
     RandomResize_For_Segmentation(min_size, max_size, overcrop=overcrop),
@@ -149,13 +155,13 @@ def get_segmentation_transforms(
     tv += [CLAHE()]
 
   tt += [
-    Normalize_For_Segmentation(mean, std),
+    Normalize_For_Segmentation(*normalize_stats),
     RandomCrop_For_Segmentation(crop_size),
     Transpose_For_Segmentation(),
   ]
 
   tv += [
-    Normalize_For_Segmentation(mean, std),
+    Normalize_For_Segmentation(*normalize_stats),
     Top_Left_Crop_For_Segmentation(crop_size),
     Transpose_For_Segmentation(),
   ]
@@ -166,8 +172,10 @@ def get_segmentation_transforms(
 def get_ccam_transforms(
   image_size,
   crop_size,
+  normalize_stats = None,
 ):
-  u, s = imagenet_stats()
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
 
   size = [image_size, image_size]
   resize = Resize_For_Segmentation(
@@ -178,7 +186,7 @@ def get_ccam_transforms(
   tt = transforms.Compose(
     [
       resize,
-      Normalize_For_Segmentation(u, s, mdtype=np.float32),
+      Normalize_For_Segmentation(*normalize_stats, mdtype=np.float32),
       RandomCrop_For_Segmentation(crop_size, ignore_value=0., labels_last=False),
       Transpose_For_Segmentation(),
       random_hflip_fn,
@@ -187,8 +195,9 @@ def get_ccam_transforms(
 
   tv = transforms.Compose([
     resize,
-    Normalize_For_Segmentation(u, s),
+    Normalize_For_Segmentation(*normalize_stats),
     Transpose_For_Segmentation(),
   ])
 
   return tt, tv
+
