@@ -63,6 +63,7 @@ parser.add_argument('--label_smoothing', default=0, type=float)
 parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "lion"])
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
+parser.add_argument('--class_weight', default=None, type=str)
 parser.add_argument('--ema', default=False, type=str2bool)
 parser.add_argument('--ema_steps', default=32, type=int)
 parser.add_argument('--ema_warmup', default=32, type=int)
@@ -101,6 +102,7 @@ if __name__ == '__main__':
     args.mixed_precision = False
   if args.validate_thresholds:
     THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
+  CLASS_WEIGHT = list(map(float, args.class_weight.split(","))) if args.class_weight and args.class_weight != "none" else None
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -155,7 +157,7 @@ if __name__ == '__main__':
     model = torch.nn.DataParallel(model)
 
   # Loss, Optimizer
-  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
+  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(weight=CLASS_WEIGHT, reduction='none').to(DEVICE)
 
   optimizer = get_optimizer(
     args.lr, args.wd, int(step_max // args.accumulate_steps), param_groups,

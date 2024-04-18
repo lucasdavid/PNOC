@@ -81,6 +81,7 @@ parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "l
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--lr_alpha_oc', default=1., type=float)
+parser.add_argument('--class_weight', default=None, type=str)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -267,6 +268,7 @@ if __name__ == '__main__':
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
   if args.validate_thresholds:
     THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
+  CLASS_WEIGHT = list(map(float, args.class_weight.split(","))) if args.class_weight and args.class_weight != "none" else None
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -339,7 +341,7 @@ if __name__ == '__main__':
     ocnet = torch.nn.DataParallel(ocnet)
 
   # Loss, Optimizer
-  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(reduction='none').to(DEVICE)
+  class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(weight=CLASS_WEIGHT, reduction='none').to(DEVICE)
 
   if args.re_loss == 'L1_Loss':
     r_loss_fn = L1_Loss

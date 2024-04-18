@@ -83,6 +83,8 @@ EPOCHS=15
 BATCH=16
 ACCUMULATE_STEPS=1
 
+CLASS_WEIGHT=none
+
 LR_ALPHA_SCRATCH=10.0
 LR_ALPHA_BIAS=2.0
 LR_ALPHA_OC=1.0
@@ -157,6 +159,7 @@ train_vanilla() {
     --optimizer $OPTIMIZER \
     --lr_alpha_scratch $LR_ALPHA_SCRATCH \
     --lr_alpha_bias $LR_ALPHA_BIAS \
+    --class_weight $CLASS_WEIGHT \
     --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
     --ema $EMA_ENABLED \
@@ -345,6 +348,7 @@ train_pnoc() {
     --lr_alpha_scratch $LR_ALPHA_SCRATCH \
     --lr_alpha_bias $LR_ALPHA_BIAS \
     --lr_alpha_oc   $LR_ALPHA_OC \
+    --class_weight $CLASS_WEIGHT \
     --optimizer $OPTIMIZER \
     --batch_size $BATCH \
     --accumulate_steps $ACCUMULATE_STEPS \
@@ -447,6 +451,7 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+CLASS_WEIGHT=0.1,1.0,0.5,1.0,1.0,1.0,1.0,0.5,1.0,1.0,1.0,10.0,1.0,0.5,0.5,5.0,0.2,0.5,1.0
 LABELSMOOTHING=0.1
 AUGMENT=none  # default:randaugment, cityscapes:clahe
 AUG=no
@@ -455,7 +460,7 @@ EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-# train_vanilla
+train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -475,15 +480,15 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-# train_pnoc
+TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
+train_pnoc
+
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
+# DOMAIN=$DOMAIN_VALID evaluate_classifier
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
 # DOMAIN=$DOMAIN_VALID     inference_priors
 # DOMAIN=$DOMAIN_VALID_SEG inference_priors
-DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
-DOMAIN=$DOMAIN_VALID evaluate_classifier
-
 
 # CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
 # CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
