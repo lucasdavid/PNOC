@@ -390,6 +390,29 @@ train_pnoc() {
     --data_dir $DATA_DIR;
 }
 
+evaluate_classifier() {
+  echo "=================================================================="
+  echo "[Evaluate:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+  echo "=================================================================="
+
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,domain:$DOMAIN" \
+  CUDA_VISIBLE_DEVICES=$DEVICES \
+    $PY scripts/cam/evaluate.py \
+    --architecture $ARCHITECTURE \
+    --dilated $DILATED \
+    --mode $MODE \
+    --tag $TAG \
+    --dataset $DATASET \
+    --data_dir $DATA_DIR \
+    --domain $DOMAIN \
+    --image_size $IMAGE_SIZE \
+    --min_image_size $MIN_IMAGE_SIZE \
+    --max_image_size $MAX_IMAGE_SIZE \
+    --mixed_precision $MIXED_PRECISION \
+    --save_preds experiments/predictions/$TAG-$DOMAIN-logit.npz \
+    --device $DEVICE
+}
+
 inference_priors() {
   echo "=================================================================="
   echo "[Inference:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
@@ -432,7 +455,7 @@ EID=r1  # Experiment ID
 
 TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
 TAG_VANILLA=$TAG
-train_vanilla
+# train_vanilla
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -452,12 +475,15 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
+# train_pnoc
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
 # DOMAIN=$DOMAIN_VALID     inference_priors
 # DOMAIN=$DOMAIN_VALID_SEG inference_priors
+DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
+DOMAIN=$DOMAIN_VALID evaluate_classifier
+
 
 # CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
 # CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors

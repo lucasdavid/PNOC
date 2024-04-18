@@ -57,18 +57,19 @@ except KeyError:
 GPUS = GPUS.split(",")
 GPUS_COUNT = len(GPUS)
 
-normalize_fn = Normalize(*datasets.imagenet_stats())
-
-
 def run(args):
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
   info = ds.classification_info
   print(f'{TAG} dataset={args.dataset} num_classes={info.num_classes}')
 
+  norm_stats = info.normalize_stats
+  normalize_fn = Normalize(*norm_stats)
+
   model = Classifier(
     args.architecture,
     info.num_classes,
+    channels=info.channels,
     mode=args.mode,
     dilated=args.dilated,
   )
@@ -80,24 +81,28 @@ def run(args):
 
   if args.resize:
     resize = transforms.Resize((args.resize, args.resize))
+  else:
+    resize = None
 
   if GPUS_COUNT > 1:
-    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, resize, scales, PREDS_DIR, DEVICE), join=True)
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, (resize, normalize_fn), scales, PREDS_DIR, DEVICE), join=True)
   else:
-    _work(0, model, dataset, resize, scales, PREDS_DIR, DEVICE)
+    _work(0, model, dataset, (resize, normalize_fn), scales, PREDS_DIR, DEVICE)
 
 
 def _work(
     process_id: int,
     model: Classifier,
     dataset: List[datasets.PathsDataset],
-    resize: Optional[transforms.Resize],
+    transforms: Tuple[Optional[transforms.Resize]],
     scales: List[float],
     preds_dir: str,
     device: str,
 ):
   dataset = dataset[process_id]
   data_source = dataset.dataset.data_source
+
+  resize, normalize_fn = transforms
 
   if process_id == 0:
     dataset = tqdm(dataset, mininterval=2.0)
@@ -115,35 +120,40 @@ def _work(
 
       original_size = image.size    # 2048
 
-      if resize:
-        # Some datasets (e.g., cityscapes) have large
-        # images and must be resized before inference.
-        image = resize(image)
+      try:
+        if resize:
+          # Some datasets (e.g., cityscapes) have large
+          # images and must be resized before inference.
+          image = resize(image)
 
-        W, H = original_size
+          W, H = original_size
 
-        strided_size = get_strided_size((H, W), 4)
-        strided_up_size = get_strided_up_size((H, W), 16)
-      else:
-        W, H = image.size
+          strided_size = get_strided_size((H, W), 4)
+          strided_up_size = get_strided_up_size((H, W), 16)
+        else:
+          W, H = image.size
 
-        strided_size = get_strided_size((H, W), 4)
-        strided_up_size = get_strided_up_size((H, W), 16)
+          strided_size = get_strided_size((H, W), 4)
+          strided_up_size = get_strided_up_size((H, W), 16)
 
-      cams = [forward_tta(model, image, scale, device) for scale in scales]
+        cams = [forward_tta(model, image, scale, normalize_fn, device) for scale in scales]
 
-      cams_st = [resize_tensor(c.unsqueeze(0), strided_size)[0] for c in cams]
-      cams_st = torch.sum(torch.stack(cams_st), dim=0)
+        cams_st = [resize_tensor(c.unsqueeze(0), strided_size)[0] for c in cams]
+        cams_st = torch.sum(torch.stack(cams_st), dim=0)
 
-      cams_hr = [resize_tensor(cams.unsqueeze(0), strided_up_size)[0] for cams in cams]
-      cams_hr = torch.sum(torch.stack(cams_hr), dim=0)[:, :H, :W]
+        cams_hr = [resize_tensor(cams.unsqueeze(0), strided_up_size)[0] for cams in cams]
+        cams_hr = torch.sum(torch.stack(cams_hr), dim=0)[:, :H, :W]
 
-      keys = torch.nonzero(torch.from_numpy(label))[:, 0]
-      cams_st = cams_st[keys]
-      cams_st /= F.adaptive_max_pool2d(cams_st, (1, 1)) + 1e-5
-      cams_hr = cams_hr[keys]
-      cams_hr /= F.adaptive_max_pool2d(cams_hr, (1, 1)) + 1e-5
-      keys = np.pad(keys + 1, (1, 0), mode='constant')
+        keys = torch.nonzero(torch.from_numpy(label))[:, 0]
+        cams_st = cams_st[keys]
+        cams_st /= F.adaptive_max_pool2d(cams_st, (1, 1)) + 1e-5
+        cams_hr = cams_hr[keys]
+        cams_hr /= F.adaptive_max_pool2d(cams_hr, (1, 1)) + 1e-5
+        keys = np.pad(keys + 1, (1, 0), mode='constant')
+
+      except torch.cuda.OutOfMemoryError as error:
+        print(image_id, error, file=sys.stderr)
+        continue
 
       try:
         np.save(npy_path, {"keys": keys, "cam": cams_st.cpu(), "hr_cam": cams_hr.cpu().numpy()})
@@ -153,7 +163,7 @@ def _work(
         raise
 
 
-def forward_tta(model, ori_image, scale, DEVICE):
+def forward_tta(model, ori_image, scale, normalize_fn, DEVICE):
   W, H = ori_image.size
 
   # Preprocessing
