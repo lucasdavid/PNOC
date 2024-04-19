@@ -33,11 +33,11 @@ else
 fi
 
 ## Dataset
-DATASET=voc12       # Pascal VOC 2012
+# DATASET=voc12       # Pascal VOC 2012
 # DATASET=coco14      # MS COCO 2014
 # DATASET=deepglobe   # DeepGlobe Land Cover Classification
 # DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
-# DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
+DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
@@ -446,9 +446,10 @@ evaluate_priors() {
     --num_workers $WORKERS_INFER;
 }
 
+CLASS_WEIGHT=0.1,1.0,0.5,1.0,1.0,1.0,1.0,0.5,1.0,1.0,1.0,10.0,1.0,0.5,0.5,5.0,0.2,0.5,1.0
 LABELSMOOTHING=0.1
-AUGMENT=randaugment  # default:randaugment, cityscapes:clahe
-AUG=ra
+AUGMENT=none  # default:randaugment, cityscapes:clahe
+AUG=no
 
 EID=r1  # Experiment ID
 
@@ -475,16 +476,16 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # train_poc
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
-train_pnoc
+# train_pnoc
 
 # DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
 # DOMAIN=$DOMAIN_VALID evaluate_classifier
 
-DOMAIN=$DOMAIN_TRAIN     inference_priors
-DOMAIN=$DOMAIN_VALID     inference_priors
-DOMAIN=$DOMAIN_VALID_SEG inference_priors
+# DOMAIN=$DOMAIN_TRAIN     inference_priors
+# DOMAIN=$DOMAIN_VALID     inference_priors
+# DOMAIN=$DOMAIN_VALID_SEG inference_priors
 
-CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
-CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
-CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID     TAG=$TAG@train@scale=0.5,1.0,1.5,2.0 evaluate_priors
+# CRF_T=0  DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
+# CRF_T=10 DOMAIN=$DOMAIN_VALID_SEG TAG=$TAG@val@scale=0.5,1.0,1.5,2.0   evaluate_priors
