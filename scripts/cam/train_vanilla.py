@@ -121,8 +121,8 @@ if __name__ == '__main__':
   valid_dataset = datasets.SegmentationDataset(vs, transform=tv)
   train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
 
-  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True, drop_last=True)
-  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True)
+  train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True, pin_memory=True, shuffle=True)
+  valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers, drop_last=True, pin_memory=True)
   train_iterator = datasets.Iterator(train_loader)
   log_dataset(args.dataset, train_dataset, tt, tv)
 
@@ -235,18 +235,19 @@ if __name__ == '__main__':
       )
 
     if do_validation:
-      model.eval()
+      eval_model = model if not args.ema or optimizer.global_step < args.ema_warmup else ema_model
+      eval_model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         if args.validate_priors:
           metric_results = priors_validation_step(
-            model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+            eval_model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
           )
         else:
           metric_results = classification_validation_step(
-            model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
+            eval_model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
           )
       metric_results["iteration"] = step + 1
-      model.train()
+      eval_model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))
@@ -259,7 +260,7 @@ if __name__ == '__main__':
       save_model(model, model_path, parallel=GPUS_COUNT > 1)
 
   if args.ema:
-    torch.optim.swa_utils.update_bn(train_loader, ema_model)
+    # ema_update_bn(ema_model, train_dataset, args.batch_size, args.num_workers, DEVICE)
     save_model(ema_model, ema_model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)

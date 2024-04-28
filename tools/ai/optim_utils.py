@@ -93,3 +93,17 @@ def ema_avg_fun(avg_p, p, count, optimizer, decay=0.999, warmup=0):
 
   ema_decay = min(1 - 1 / (1 + optimizer.global_step), decay)
   return ema_decay * avg_p + (1-ema_decay) * p
+
+
+def ema_update_bn(model: torch.nn.Module, dataset: "datasets.ClassificationDataset", batch_size: int, num_workers: int = 1, device=None):
+  class _ImageDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset):
+      self.dataset = dataset
+    def __getitem__(self, index):
+      _, image, _ = super().__getitem__(index)
+      return image
+  
+  _dataset = _ImageDataset(dataset)
+  _loader = torch.utils.data.DataLoader(_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True, drop_last=True, pin_memory=True)
+
+  return torch.optim.swa_utils.update_bn(_loader, model, device=device)
