@@ -75,7 +75,7 @@ PRETRAINED_WEIGHTS=imagenet
 # Training
 OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
-BATCH=16
+BATCH=32
 ACCUMULATE_STEPS=1
 
 CLASS_WEIGHT=none
@@ -94,7 +94,7 @@ LR_ALPHA_OC=1.0
 # =========================
 
 EMA_ENABLED=false
-EMA_WARMUP=128
+EMA_WARMUP=613
 EMA_STEPS=32
 
 MIXED_PRECISION=true
@@ -452,7 +452,7 @@ AUG=ra
 
 EID=r1  # Experiment ID
 
-TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
+TAG=vanilla/$DATASET-${ARCH}ls-lr$LR-cwb-noema-$EID
 TAG_VANILLA=$TAG
 train_vanilla
 
@@ -476,9 +476,6 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 train_pnoc
-
-# DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
-# DOMAIN=$DOMAIN_VALID evaluate_classifier
 
 DOMAIN=$DOMAIN_TRAIN     inference_priors
 DOMAIN=$DOMAIN_VALID     inference_priors

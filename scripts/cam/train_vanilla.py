@@ -102,7 +102,11 @@ if __name__ == '__main__':
     args.mixed_precision = False
   if args.validate_thresholds:
     THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
-  CLASS_WEIGHT = list(map(float, args.class_weight.split(","))) if args.class_weight and args.class_weight != "none" else None
+
+  if args.class_weight and args.class_weight != "none":
+    CLASS_WEIGHT = torch.Tensor(list(map(float, args.class_weight.split(",")))).to(DEVICE)
+  else:
+    CLASS_WEIGHT = None
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
@@ -235,16 +239,16 @@ if __name__ == '__main__':
       )
 
     if do_validation:
-      eval_model = model if not args.ema or optimizer.global_step < args.ema_warmup else ema_model
-      eval_model.eval()
+      valid_model = model if not args.ema or optimizer.global_step < args.ema_warmup else ema_model
+      valid_model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         if args.validate_priors:
           metric_results = priors_validation_step(
-            eval_model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+            valid_model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
           )
         else:
           metric_results = classification_validation_step(
-            eval_model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
+            valid_model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
           )
       metric_results["iteration"] = step + 1
       eval_model.train()
@@ -265,3 +269,4 @@ if __name__ == '__main__':
 
   print(TAG)
   wb_run.finish()
+

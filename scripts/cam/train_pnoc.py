@@ -268,7 +268,10 @@ if __name__ == '__main__':
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
   if args.validate_thresholds:
     THRESHOLDS = list(map(float, args.validate_thresholds.split(",")))
-  CLASS_WEIGHT = list(map(float, args.class_weight.split(","))) if args.class_weight and args.class_weight != "none" else None
+  if args.class_weight and args.class_weight != "none":
+    CLASS_WEIGHT = torch.Tensor(list(map(float, args.class_weight.split(",")))).to(DEVICE)
+  else:
+    CLASS_WEIGHT = None
 
   wb_run = wandb_utils.setup(TAG, args)
   log_config(vars(args), TAG)
