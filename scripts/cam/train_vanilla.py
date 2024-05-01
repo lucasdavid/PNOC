@@ -251,7 +251,7 @@ if __name__ == '__main__':
             valid_model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
           )
       metric_results["iteration"] = step + 1
-      eval_model.train()
+      valid_model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))
@@ -269,4 +269,3 @@ if __name__ == '__main__':
 
   print(TAG)
   wb_run.finish()
-
