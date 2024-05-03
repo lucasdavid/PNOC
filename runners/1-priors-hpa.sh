@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=24:00:00
+#SBATCH --time=14:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -75,7 +75,7 @@ PRETRAINED_WEIGHTS=imagenet
 # Training
 OPTIMIZER=sgd  # sgd,lion
 EPOCHS=15
-BATCH=16
+BATCH=32
 ACCUMULATE_STEPS=1
 
 CLASS_WEIGHT=none
@@ -93,9 +93,10 @@ LR_ALPHA_OC=1.0
 # WD=0.01
 # =========================
 
-EMA_ENABLED=false
+EMA_ENABLED=true
 EMA_WARMUP=1
 EMA_STEPS=1
+EMA_DECAY=0.99
 
 MIXED_PRECISION=true
 PERFORM_VALIDATION=true
@@ -160,6 +161,7 @@ train_vanilla() {
     --ema $EMA_ENABLED \
     --ema_warmup $EMA_WARMUP \
     --ema_steps $EMA_STEPS \
+    --ema_decay $EMA_DECAY \
     --mixed_precision $MIXED_PRECISION \
     --architecture $ARCHITECTURE \
     --dilated $DILATED \
@@ -453,9 +455,12 @@ AUG=no
 
 EID=r1  # Experiment ID
 
-TAG=vanilla/$DATASET-$ARCH-lr$LR-$EID
+TAG=vanilla/$DATASET-$ARCH-lr$LR-cwb-ema$EMA_DECAY-$EID
 TAG_VANILLA=$TAG
 train_vanilla
+
+DOMAIN=$DOMAIN_VALID evaluate_classifier
+DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
@@ -477,9 +482,6 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 
 TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_pnoc
-
-# DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
-# DOMAIN=$DOMAIN_VALID evaluate_classifier
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
 # DOMAIN=$DOMAIN_VALID     inference_priors
