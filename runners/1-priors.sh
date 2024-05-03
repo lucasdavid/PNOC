@@ -94,7 +94,7 @@ LR_ALPHA_OC=1.0
 # =========================
 
 EMA_ENABLED=false
-EMA_WARMUP=613
+EMA_WARMUP=1
 EMA_STEPS=32
 
 MIXED_PRECISION=true

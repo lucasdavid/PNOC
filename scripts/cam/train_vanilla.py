@@ -1,4 +1,5 @@
 import argparse
+from copy import deepcopy
 import os
 from functools import partial
 
@@ -66,8 +67,8 @@ parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--class_weight', default=None, type=str)
 parser.add_argument('--ema', default=False, type=str2bool)
 parser.add_argument('--ema_steps', default=32, type=int)
-parser.add_argument('--ema_warmup', default=32, type=int)
-parser.add_argument('--ema_decay', default=0.999, type=float)
+parser.add_argument('--ema_warmup', default=1, type=int)
+parser.add_argument('--ema_decay', default=0.99, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -114,7 +115,6 @@ if __name__ == '__main__':
   data_dir = create_directory(f'./experiments/data/')
   model_dir = create_directory('./experiments/models/')
   model_path = model_dir + f'{TAG}.pth'
-  ema_model_path = model_dir + f'{TAG}.ema.pth'
 
   set_seed(SEED)
 
@@ -134,6 +134,7 @@ if __name__ == '__main__':
   step_log = int(step_val * args.print_ratio)
   step_init = args.first_epoch * step_val
   step_max = args.max_epoch * step_val
+  ema_warmup_steps = args.ema_warmup * int(step_val // args.accumulate_steps)
   print(f"Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}")
 
   # Network
@@ -153,12 +154,25 @@ if __name__ == '__main__':
   log_model("Vanilla", model, args)
 
   param_groups, param_names = model.get_parameter_groups(with_names=True)
-  model = model.to(DEVICE)
   model.train()
+
+  if args.ema:
+    # my_ema_avg_fn = partial(ema_avg_fun, optimizer=optimizer, decay=args.ema_decay, warmup=args.ema_warmup)
+    # ema_model = torch.optim.swa_utils.AveragedModel(model, avg_fn=my_ema_avg_fn)
+    ema_model = deepcopy(model)
+    for p in ema_model.parameters():
+      p.requires_grad = False
+
+    ema_model = model.to(DEVICE)
+  
+  model = model.to(DEVICE)
 
   if GPUS_COUNT > 1:
     print(f"GPUs={GPUS_COUNT}")
     model = torch.nn.DataParallel(model)
+
+    if args.ema:
+      ema_model = torch.nn.DataParallel(ema_model)
 
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(weight=CLASS_WEIGHT, reduction='none').to(DEVICE)
@@ -170,10 +184,6 @@ if __name__ == '__main__':
     alpha_bias=args.lr_alpha_bias,
   )
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
-
-  if args.ema:
-    my_ema_avg_fn = partial(ema_avg_fun, optimizer=optimizer, decay=args.ema_decay, warmup=args.ema_warmup)
-    ema_model = torch.optim.swa_utils.AveragedModel(model, avg_fn=my_ema_avg_fn)
 
   log_opt_params("Vanilla", param_names)
 
@@ -201,10 +211,15 @@ if __name__ == '__main__':
       optimizer.zero_grad()
 
       if args.ema:
-        if (optimizer.global_step < args.ema_warmup
-            or optimizer.global_step % args.ema_steps == 0):
-          with torch.no_grad():
-            ema_model.update_parameters(model)
+        with torch.no_grad():
+
+          if optimizer.global_step+1 <= ema_warmup_steps:
+            for t_params, s_params in zip(ema_model.parameters(), model.parameters()):
+              t_params.copy_(s_params)
+          else:
+            ema_decay = min(1 - 1 / (1 + optimizer.global_step - ema_warmup_steps), args.ema_decay)
+            for t_params, s_params in zip(ema_model.parameters(), model.parameters()):
+              t_params.copy_(ema_decay * t_params + (1 - ema_decay) * s_params)
 
     train_meter.update({'loss': loss.item(), 'class_loss': class_loss.item()})
 
@@ -239,7 +254,7 @@ if __name__ == '__main__':
       )
 
     if do_validation:
-      valid_model = model if not args.ema or optimizer.global_step < args.ema_warmup else ema_model
+      valid_model = model if not args.ema or optimizer.global_step+1 <= ema_warmup_steps else ema_model
       valid_model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         if args.validate_priors:
@@ -261,11 +276,7 @@ if __name__ == '__main__':
         for k in ("threshold", "miou", "iou"):
           wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
-      save_model(model, model_path, parallel=GPUS_COUNT > 1)
-
-  if args.ema:
-    # ema_update_bn(ema_model, train_dataset, args.batch_size, args.num_workers, DEVICE)
-    save_model(ema_model, ema_model_path, parallel=GPUS_COUNT > 1)
+      save_model(valid_model, model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()
