@@ -83,6 +83,9 @@ def get_classification_transforms(
     tt += [RandomResize(min_size, max_size)]
     tv += [Resize_For_Segmentation(crop_size)]  # image=(500,480) crop_size=512 --> (534,512)
   tt += [RandomHorizontalFlip()]
+  if "qnorm" in augment:
+    tt += [QuantileChannelIndependentNormalization()]
+    tv += [QuantileChannelIndependentNormalization()]
   if "clahe" in augment:
     tt += [CLAHE()]
     tv += [CLAHE()]
@@ -200,4 +203,3 @@ def get_ccam_transforms(
   ])
 
   return tt, tv
-

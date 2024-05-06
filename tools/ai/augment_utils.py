@@ -397,10 +397,16 @@ class CLAHE:
     else:
       from_pil = False
 
-    x = cv2.cvtColor(x, cv2.COLOR_RGB2Lab)
+    channels = x.shape[-1]
+
+    if channels == 3:
+      x = cv2.cvtColor(x, cv2.COLOR_RGB2Lab)
+
     # 0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
     x[:, :, 0] = self.clahe.apply(x[:, :, 0])
-    x = cv2.cvtColor(x, cv2.COLOR_Lab2RGB)
+
+    if channels == 3:
+      x = cv2.cvtColor(x, cv2.COLOR_Lab2RGB)
 
     if from_pil:
       x = Image.fromarray(x)
@@ -410,6 +416,40 @@ class CLAHE:
     else:
       data = x
 
+    return data
+
+
+class QuantileChannelIndependentNormalization:
+
+  def __init__(self, q_min=0.00, q_max=0.99, valid_variances=25):
+    self.q_min = q_min
+    self.q_max = q_max
+    self.valid_variances = valid_variances
+
+  def __call__(self, data):
+    if isinstance(data, dict):
+      x = data["image"]
+    else:
+      x = data
+
+    from_pil = isinstance(x, Image.Image)
+    if from_pil:
+      with x:
+        x = np.array(x)
+    odtype = x.dtype
+    x = x.astype("float32")
+    if self.q_min:
+      x_min_ = np.quantile(x, self.q_min, axis=(0, 1), keepdims=True)
+      x -= x_min_
+    x_max_ = np.quantile(x, self.q_max, axis=(0, 1), keepdims=True)
+    valid_mask = (x_max_ != 0) & (x_max_ >= self.valid_variances)
+    x = np.divide(x, x_max_, out=x.copy(), where=valid_mask)
+    x = np.clip(x, 0, 1)
+    x *= 255
+    x = x.astype("uint8")
+    if from_pil: x = Image.fromarray(x)
+    if isinstance(data, dict): data["image"] = x
+    else: data = x
     return data
 
 
