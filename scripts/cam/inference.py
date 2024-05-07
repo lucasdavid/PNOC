@@ -48,6 +48,7 @@ parser.add_argument('--weights', default='', type=str)
 parser.add_argument('--domain', default='train', type=str)
 parser.add_argument('--resize', default=None, type=int)
 parser.add_argument('--scales', default='0.5,1.0,1.5,2.0', type=str)
+parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
 
 try:
@@ -60,11 +61,10 @@ GPUS_COUNT = len(GPUS)
 def run(args):
   ds = datasets.custom_data_source(args.dataset, args.data_dir, args.domain)
   dataset = datasets.PathsDataset(ds, ignore_bg_images=args.exclude_bg_images)
+  transform = transforms.Compose(
+    datasets.get_inference_transforms(args.augment, ds.classification_info.normalize_stats))
   info = ds.classification_info
   print(f'{TAG} dataset={args.dataset} num_classes={info.num_classes}')
-
-  norm_stats = info.normalize_stats
-  normalize_fn = Normalize(*norm_stats)
 
   model = Classifier(
     args.architecture,
@@ -85,9 +85,9 @@ def run(args):
     resize = None
 
   if GPUS_COUNT > 1:
-    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, (resize, normalize_fn), scales, PREDS_DIR, DEVICE), join=True)
+    multiprocessing.spawn(_work, nprocs=GPUS_COUNT, args=(model, dataset, (resize, transform), scales, PREDS_DIR, DEVICE), join=True)
   else:
-    _work(0, model, dataset, (resize, normalize_fn), scales, PREDS_DIR, DEVICE)
+    _work(0, model, dataset, (resize, transform), scales, PREDS_DIR, DEVICE)
 
 
 def _work(
@@ -102,7 +102,7 @@ def _work(
   dataset = dataset[process_id]
   data_source = dataset.dataset.data_source
 
-  resize, normalize_fn = transforms
+  resize, transform = transforms
 
   if process_id == 0:
     dataset = tqdm(dataset, mininterval=2.0)
@@ -118,7 +118,9 @@ def _work(
       image = data_source.get_image(image_id)
       label = data_source.get_label(image_id)
 
-      original_size = image.size    # 2048
+      W, H = image.size
+      strided_size = get_strided_size((H, W), 4)
+      strided_up_size = get_strided_up_size((H, W), 16)
 
       try:
         if resize:
@@ -126,17 +128,7 @@ def _work(
           # images and must be resized before inference.
           image = resize(image)
 
-          W, H = original_size
-
-          strided_size = get_strided_size((H, W), 4)
-          strided_up_size = get_strided_up_size((H, W), 16)
-        else:
-          W, H = image.size
-
-          strided_size = get_strided_size((H, W), 4)
-          strided_up_size = get_strided_up_size((H, W), 16)
-
-        cams = [forward_tta(model, image, scale, normalize_fn, device) for scale in scales]
+        cams = [forward_tta(model, image, scale, transform, device) for scale in scales]
 
         cams_st = [resize_tensor(c.unsqueeze(0), strided_size)[0] for c in cams]
         cams_st = torch.sum(torch.stack(cams_st), dim=0)
@@ -163,13 +155,13 @@ def _work(
         raise
 
 
-def forward_tta(model, ori_image, scale, normalize_fn, DEVICE):
+def forward_tta(model, ori_image, scale, transform, DEVICE):
   W, H = ori_image.size
 
   # Preprocessing
   x = copy.deepcopy(ori_image)
   x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.BICUBIC)
-  x = normalize_fn(x)
+  x = transform(x)
   x = x.transpose((2, 0, 1))
   x = torch.from_numpy(x)
   xf = x.flip(-1)

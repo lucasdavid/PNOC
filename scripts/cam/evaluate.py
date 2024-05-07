@@ -31,7 +31,7 @@ parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
 parser.add_argument('--max_image_size', default=640, type=int)
-parser.add_argument('--resize', default=None, type=int)
+parser.add_argument('--augment', default='', type=str)
 
 parser.add_argument('--architecture', default='resnet50', type=str)
 parser.add_argument('--mode', default='normal', type=str)  # fix
@@ -49,7 +49,7 @@ def main(args):
   SEED = args.seed
   DEVICE = args.device if torch.cuda.is_available() else "cpu"
   SIZE = args.image_size
-  AUG = "none"
+  AUG = args.augment
 
   if DEVICE == "cpu":
     args.mixed_precision = False

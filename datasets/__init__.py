@@ -107,6 +107,23 @@ def get_classification_transforms(
   return tuple(map(transforms.Compose, (tt, tv)))
 
 
+def get_inference_transforms(augment, normalize_stats = None):
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
+
+  ti = []
+
+  if "qnorm" in augment:
+    ti += [QuantileChannelIndependentNormalization()]
+
+  ti += [
+    Normalize(*normalize_stats),
+    Transpose(),
+  ]
+
+  return ti
+
+
 def get_affinity_transforms(
   min_image_size,
   max_image_size,

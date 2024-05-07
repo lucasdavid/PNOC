@@ -142,10 +142,10 @@ CRF_GT=0.7
 
 train_vanilla() {
   echo "=================================================================="
-  echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
+    echo "[train $TAG_VANILLA] started at $(date +'%Y-%m-%d %H:%M:%S')."
+    echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,aug:$AUG" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,aug:$AUG" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-vanilla" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_vanilla.py \
@@ -191,15 +191,15 @@ train_vanilla() {
 
 train_occse() {
   echo "=================================================================="
-  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
+    echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+    echo "=================================================================="
 
-  # default OC-CSE parameters <https://github.com/KAIST-vilab/OC-CSE>
-  MODE=fix
-  TRAINABLE_STEM=false
-  DILATED=true
+# default OC-CSE parameters <https://github.com/KAIST-vilab/OC-CSE>
+    MODE=fix
+    TRAINABLE_STEM=false
+    DILATED=true
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,oc-cse" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,oc-cse" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-occse" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_occse.py \
@@ -241,10 +241,10 @@ train_occse() {
 
 train_puzzle() {
   echo "=================================================================="
-  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
+    echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+    echo "=================================================================="
 
-  CUDA_VISIBLE_DEVICES=$DEVICES \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
     WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,puzzle" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-p \
     $PY scripts/cam/train_puzzle.py \
@@ -282,10 +282,10 @@ train_puzzle() {
 
 train_poc() {
   echo "=================================================================="
-  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
+    echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+    echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,poc" \
+    WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,poc" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-poc" \
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/cam/train_poc.py \
@@ -331,10 +331,10 @@ train_poc() {
 
 train_pnoc() {
   echo "=================================================================="
-  echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
-  echo "=================================================================="
+    echo "[train $TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
+    echo "=================================================================="
 
-  CUDA_VISIBLE_DEVICES=$DEVICES \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
     WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,pnoc" \
     WANDB_RUN_GROUP=$DATASET-$ARCH-pnoc-ow$OW_INIT-$OW-$OW_SCHEDULE-c$OC_TRAIN_MASK_T \
     $PY scripts/cam/train_pnoc.py \
@@ -396,22 +396,23 @@ evaluate_classifier() {
   echo "[Evaluate:$TAG] started at $(date +'%Y-%m-%d %H:%M:%S')."
   echo "=================================================================="
 
-  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,domain:$DOMAIN" \
+  WANDB_TAGS="$DATASET,$ARCH,lr:$LR,wd:$WD,ls:$LABELSMOOTHING,b:$BATCH,aug:$AUG,ac:$ACCUMULATE_STEPS,domain:$DOMAIN" \
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    $PY scripts/cam/evaluate.py \
-    --architecture $ARCHITECTURE \
-    --dilated $DILATED \
-    --mode $MODE \
-    --tag $TAG \
-    --dataset $DATASET \
-    --data_dir $DATA_DIR \
-    --domain $DOMAIN \
-    --image_size $IMAGE_SIZE \
-    --min_image_size $MIN_IMAGE_SIZE \
-    --max_image_size $MAX_IMAGE_SIZE \
-    --mixed_precision $MIXED_PRECISION \
-    --save_preds experiments/predictions/$TAG-$DOMAIN-logit.npz \
-    --device $DEVICE
+  $PY scripts/cam/evaluate.py \
+  --architecture $ARCHITECTURE \
+  --dilated $DILATED \
+  --mode $MODE \
+  --tag $TAG \
+  --dataset $DATASET \
+  --data_dir $DATA_DIR \
+  --domain $DOMAIN \
+  --image_size $IMAGE_SIZE \
+  --min_image_size $MIN_IMAGE_SIZE \
+  --max_image_size $MAX_IMAGE_SIZE \
+  --augment $AUGMENT \
+  --mixed_precision $MIXED_PRECISION \
+  --save_preds experiments/predictions/$TAG-$DOMAIN-logit.npz \
+  --device $DEVICE
 }
 
 inference_priors() {
@@ -420,42 +421,43 @@ inference_priors() {
   echo "=================================================================="
 
   CUDA_VISIBLE_DEVICES=$DEVICES \
-    $PY scripts/cam/inference.py \
-    --architecture $ARCHITECTURE \
-    --dilated $DILATED \
-    --mode $MODE \
-    --tag $TAG \
-    --dataset $DATASET \
-    --domain $DOMAIN \
-    --resize $INF_IMAGE_SIZE \
-    --data_dir $DATA_DIR \
-    --device $DEVICE
+  $PY scripts/cam/inference.py \
+  --architecture $ARCHITECTURE \
+  --dilated $DILATED \
+  --mode $MODE \
+  --tag $TAG \
+  --dataset $DATASET \
+  --domain $DOMAIN \
+  --resize $INF_IMAGE_SIZE \
+  --augment $AUGMENT \
+  --data_dir $DATA_DIR \
+  --device $DEVICE
 }
 
 evaluate_priors() {
   WANDB_TAGS="$DATASET,$ARCH,lr:$LR,ls:$LABELSMOOTHING,b:$BATCH,ac:$ACCUMULATE_STEPS,domain:$DOMAIN,crf:$CRF_T-$CRF_GT" \
   CUDA_VISIBLE_DEVICES="" \
   $PY scripts/evaluate.py \
-    --experiment_name $TAG \
-    --dataset $DATASET \
-    --domain $DOMAIN \
-    --data_dir $DATA_DIR \
-    --min_th $MIN_TH \
-    --max_th $MAX_TH \
-    --crf_t $CRF_T \
-    --crf_gt_prob $CRF_GT \
-    --mode npy \
-    --num_workers $WORKERS_INFER;
+  --experiment_name $TAG \
+  --dataset $DATASET \
+  --domain $DOMAIN \
+  --data_dir $DATA_DIR \
+  --min_th $MIN_TH \
+  --max_th $MAX_TH \
+  --crf_t $CRF_T \
+  --crf_gt_prob $CRF_GT \
+  --mode npy \
+  --num_workers $WORKERS_INFER;
 }
 
-CLASS_WEIGHT=0.1,1.0,0.5,1.0,1.0,1.0,1.0,0.5,1.0,1.0,1.0,10.0,1.0,0.5,0.5,5.0,0.2,0.5,1.0
+# CLASS_WEIGHT=0.1,1.0,0.5,1.0,1.0,1.0,1.0,0.5,1.0,1.0,1.0,10.0,1.0,0.5,0.5,5.0,0.2,0.5,1.0
 LABELSMOOTHING=0.1
 AUGMENT=none  # default:randaugment, cityscapes:clahe
-AUG=no
+AUG=none
 
 EID=r1  # Experiment ID
 
-TAG=vanilla/$DATASET-$ARCH-lr$LR-cwb-ema$EMA_DECAY-$EID
+TAG=vanilla/$DATASET-$ARCH-lr$LR-ema$EMA_DECAY-$EID
 TAG_VANILLA=$TAG
 train_vanilla
 
