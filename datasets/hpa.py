@@ -52,6 +52,13 @@ NORMALIZE_STATS = (
 
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
   NAME = "hpa-single-cell-classification"
+  DEFAULT_SPLIT = "train_val"
+  DOMAINS = {
+    "train": "train_aug",
+    "valid": "valid",
+    "test": "test",
+  }
+
   VALIDATION_SPLIT = 0.1
   SEED = 1838339744
 
@@ -86,31 +93,32 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       train_info = pd.read_csv(os.path.join(self.root_dir, "train.csv"))
       public_info = pd.read_csv(os.path.join(self.root_dir, "publichpa.csv"))
       with open(os.path.join(self.root_dir, "sample_submission.csv")) as f:
-        test_ids = np.asarray([l.strip().split(",")[0] for l in f.readlines()])
+        ids_test = np.asarray([l.strip().split(",")[0] for l in f.readlines()])
 
-      train_targets = np.zeros((len(train_info), 19))
+      y_train = np.zeros((len(train_info), 19))
       for i, l in enumerate(train_info["Label"]):
-        train_targets[i, list(map(int, l.split("|")))] = 1.
+        y_train[i, list(map(int, l.split("|")))] = 1.
 
-      public_targets = np.zeros((len(public_info), 19))
+      y_pub = np.zeros((len(public_info), 19))
       for i, l in enumerate(public_info["Label"]):
-        public_targets[i, list(map(int, l.split("|")))] = 1.
+        y_pub[i, list(map(int, l.split("|")))] = 1.
 
-      test_targets = np.zeros((len(test_ids), 19))
+      y_test = np.zeros((len(ids_test), 19))
 
-      train_ids = train_info.ID.values
-      public_ids = public_info.ID.values
-      train_ids, valid_ids, train_targets, valid_targets = train_test_split(
-        train_ids, train_targets, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
+      ids_train = train_info.ID.values
+      ids_pub = public_info.ID.values
+      ids_train, ids_val, y_train, y_val = train_test_split(
+        ids_train, y_train, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
 
-      train_aug_ids = np.concatenate((train_ids, public_ids), 0)
-      train_aug_targets = np.concatenate((train_targets, public_targets), axis=0)
+      cat = lambda *x: np.concatenate(x, 0)
 
       self._sample_info = {
-        "train_aug": (train_aug_ids, train_aug_targets),
-        "train": (train_ids, train_targets),
-        "valid": (valid_ids, valid_targets),
-        "test": (test_ids, test_targets),
+        "train": (ids_train, y_train),
+        "valid": (ids_val, y_val),
+        "train_val": (cat(ids_train, ids_val), cat(y_train, y_val)),
+        "train_aug": (cat(ids_train, ids_pub), cat(y_train, y_pub)),
+        "train_aug_val": (cat(ids_train, ids_pub, ids_val), cat(y_train, y_pub, y_val)),
+        "test": (ids_test, y_test),
       }
 
     return self._sample_info[domain]
