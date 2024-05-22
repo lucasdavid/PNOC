@@ -67,7 +67,7 @@ if [[ $DATASET == cityscapes ]]; then
   WD=0.0001
 fi
 if [[ $DATASET == hpa-single-cell-classification ]]; then
-  DOMAIN_TRAIN=train
+  DOMAIN_TRAIN=train_aug
   DOMAIN_VALID=train
   DOMAIN_VALID_SEG="valid"
   DOMAIN_TEST="test"

@@ -84,24 +84,30 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
   def load_sample_info(self, domain: str):
     if self._sample_info is None:
       train_info = pd.read_csv(os.path.join(self.root_dir, "train.csv"))
+      public_info = pd.read_csv(os.path.join(self.root_dir, "publichpa.csv"))
       with open(os.path.join(self.root_dir, "sample_submission.csv")) as f:
         test_ids = np.asarray([l.strip().split(",")[0] for l in f.readlines()])
 
-      print(f"train_info: {train_info.shape}")
-
       train_targets = np.zeros((len(train_info), 19))
-      test_targets = np.zeros((len(test_ids), 19))
       for i, l in enumerate(train_info["Label"]):
         train_targets[i, list(map(int, l.split("|")))] = 1.
 
+      public_targets = np.zeros((len(public_info), 19))
+      for i, l in enumerate(public_info["Label"]):
+        public_targets[i, list(map(int, l.split("|")))] = 1.
+
+      test_targets = np.zeros((len(test_ids), 19))
+
       train_ids = train_info.ID.values
+      public_ids = public_info.ID.values
       train_ids, valid_ids, train_targets, valid_targets = train_test_split(
         train_ids, train_targets, test_size=self.VALIDATION_SPLIT, random_state=self.SEED)
 
-      print(f"train: {len(train_ids)}")
-      print(f"valid: {len(valid_ids)}")
+      train_aug_ids = np.concatenate((train_ids, public_ids), 0)
+      train_aug_targets = np.concatenate((train_targets, public_targets), axis=0)
 
       self._sample_info = {
+        "train_aug": (train_aug_ids, train_aug_targets),
         "train": (train_ids, train_targets),
         "valid": (valid_ids, valid_targets),
         "test": (test_ids, test_targets),
@@ -131,9 +137,12 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
   def get_mask(self, sample_id):
     mask_path = self.get_mask_path(sample_id)
-    mask = np.load(mask_path)["arr_0"]
-    mask = Image.fromarray(mask)
-    return mask
+    if os.path.exists(mask_path):
+      mask = np.load(mask_path)["arr_0"]
+      mask = Image.fromarray(mask)
+      return mask
+    else:
+      return np.full((32, 32), 255, dtype="uint8")
 
   def get_label(self, sample_id: str) -> np.ndarray:
     label = self.sample_labels[sample_id]

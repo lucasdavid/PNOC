@@ -4,7 +4,7 @@
 #SBATCH -p sequana_gpu_shared
 #SBATCH -J priors
 #SBATCH -o /scratch/lerdl/lucas.david/logs/%j-priors.out
-#SBATCH --time=14:00:00
+#SBATCH --time=24:00:00
 
 # Copyright 2023 Lucas Oliveira David
 #
@@ -50,8 +50,8 @@ export PYTHONPATH=$(pwd)
 
 # ARCHITECTURE=resnest101
 # ARCH=rs101
-ARCH=rs269
 ARCHITECTURE=resnest269
+ARCH=rs269
 # ARCHITECTURE=swin_b
 # ARCH=swin_b_22k
 # PRETRAINED_WEIGHTS=./experiments/models/pretrained/swin_base_patch4_window7_224_22k.pth
@@ -106,7 +106,7 @@ VALIDATE_PRIORS=false
 AUGMENT=randaugment  # clahe_collorjitter_mixup_cutmix_cutormixup
 AUG=ra
 CUTMIX=0.5
-MIXUP=1.0
+MIXUP=0.5
 LABELSMOOTHING=0
 
 ## OC-CSE
@@ -452,12 +452,12 @@ evaluate_priors() {
 
 # CLASS_WEIGHT=0.1,1.0,0.5,1.0,1.0,1.0,1.0,0.5,1.0,1.0,1.0,10.0,1.0,0.5,0.5,5.0,0.2,0.5,1.0
 LABELSMOOTHING=0.1
-AUGMENT=none  # default:randaugment, cityscapes:clahe
-AUG=none
+AUGMENT=qnorm_mixup  # default:randaugment, cityscapes:clahe
+AUG=qnorm-mixup
 
 EID=r1  # Experiment ID
 
-TAG=vanilla/$DATASET-$ARCH-lr$LR-ema$EMA_DECAY-$EID
+TAG=vanilla/$DATASET-taug-$ARCH-lr$LR-ema-$AUG-$EID
 TAG_VANILLA=$TAG
 train_vanilla
 
@@ -466,6 +466,7 @@ DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
 
 # MODE=fix
 # TRAINABLE_STAGE4=false
+LR=0.08
 BATCH=16
 ACCUMULATE_STEPS=2
 # LABELSMOOTHING=0
@@ -482,8 +483,11 @@ OC_PRETRAINED=experiments/models/$TAG_VANILLA.pth
 # TAG="poc/$DATASET-$ARCH-poc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_poc
 
-TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
+# TAG="pnoc/$DATASET-$ARCH-pnoc-b$BATCH-lr$LR-ls@$OC_NAME-$EID"
 # train_pnoc
+
+# DOMAIN=$DOMAIN_VALID evaluate_classifier
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_classifier
 
 # DOMAIN=$DOMAIN_TRAIN     inference_priors
 # DOMAIN=$DOMAIN_VALID     inference_priors
