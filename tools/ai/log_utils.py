@@ -21,11 +21,17 @@ def log_config(args, title=None, print_fn=print):
   print_fn(margin)
 
 
-def log_dataset(name, dataset, tt, tv):
+def log_dataset(name, dataset, tt, tv, info=None):
+  if info is None:
+    class _unknown_info():
+      def __init__(self):
+        self.num_classes = "?"
+    info = getattr(dataset, "info", _unknown_info())
+
   print(
     f"Dataset {name}\n"
     f"  samples={len(dataset)}"
-    f"  classes={dataset.info.num_classes}\n"
+    f"  classes={info.num_classes}\n"
     f"  train transforms={tt}\n"
     f"  valid transforms={tv}\n\n"
   )
