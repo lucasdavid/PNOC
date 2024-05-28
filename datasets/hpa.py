@@ -150,7 +150,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       mask = Image.fromarray(mask)
       return mask
     else:
-      return np.full((32, 32), 255, dtype="uint8")
+      return Image.fromarray(np.full((32, 32), 255, dtype="uint8"))
 
   def get_label(self, sample_id: str) -> np.ndarray:
     label = self.sample_labels[sample_id]
