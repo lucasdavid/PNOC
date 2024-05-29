@@ -52,7 +52,7 @@ NORMALIZE_STATS = (
 
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
   NAME = "hpa-single-cell-classification"
-  DEFAULT_SPLIT = "train_val"
+  DEFAULT_SPLIT = "train"
   DOMAINS = {
     "train": "train_aug",
     "valid": "valid",
