@@ -33,8 +33,8 @@ else
 fi
 
 # Dataset
-DATASET=voc12  # Pascal VOC 2012
-# DATASET=coco14  # MS COCO 2014
+# DATASET=voc12  # Pascal VOC 2012
+DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
 . $WORK_DIR/runners/config/env.sh
@@ -64,7 +64,7 @@ LR=0.001
 
 CAMS_MODE=npy
 FG_T=0.4
-# BG_T=0.1
+BG_T=0.05
 
 INF_FG_T=0.2
 CRF_T=10
@@ -131,10 +131,10 @@ ccamh_training() {
     --image_size $IMAGE_SIZE \
     --cams_dir $CAMS_DIR \
     --fg_threshold $FG_T \
+    --bg_threshold $BG_T \
     --cams_mode $CAMS_MODE \
     --dataset $DATASET \
     --data_dir $DATA_DIR
-  # --bg_threshold    $BG_T                \
 }
 
 ccamh_inference() {

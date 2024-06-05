@@ -72,7 +72,7 @@ parser.add_argument('--hint_w', type=float, default=1.0)
 
 parser.add_argument('--cams_mode', type=str, choices=["npy", "png"], default="npy")
 parser.add_argument('--fg_threshold', type=float, default=0.4)
-# parser.add_argument('--bg_threshold', type=float, default=0.1)
+parser.add_argument('--bg_threshold', type=float, default=0.05)
 
 import cv2
 
