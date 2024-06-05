@@ -198,9 +198,11 @@ class SaliencyDataset(SegmentationDataset):
 
   def __getitem__(self, index):
     sample_id, image, label, mask = super().__getitem__(index)
-    unknown = mask == 255
-    mask = (mask != self.info.bg_class).astype("uint8")
-    mask[unknown] = 255
+
+    unknown_pixels = mask == 255
+    foregr_pixels = mask != self.info.bg_class
+    mask = foregr_pixels.astype("uint8")
+    mask[unknown_pixels] = 255
 
     return sample_id, image, label, mask
 

@@ -62,6 +62,7 @@ ALPHA=0.25
 HINT_W=1.0
 LR=0.001
 
+CAMS_MODE=npy
 FG_T=0.4
 # BG_T=0.1
 
@@ -130,6 +131,7 @@ ccamh_training() {
     --image_size $IMAGE_SIZE \
     --cams_dir $CAMS_DIR \
     --fg_threshold $FG_T \
+    --cams_mode $CAMS_MODE \
     --dataset $DATASET \
     --data_dir $DATA_DIR
   # --bg_threshold    $BG_T                \
@@ -219,10 +221,10 @@ evaluate_saliency_detection() {
 ## ================================================
 ## Pascal VoC 2012
 ##
-ARCHITECTURE=resnest101
-ARCH=rs101
-CAMS_DIR=experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@train/cams
-PRIORS_TAG=rs101u2pl@rs101p
+# ARCHITECTURE=resnest101
+# ARCH=rs101
+# CAMS_DIR=experiments/predictions/u2pl/voc12-rs101-lr0.007-m0.9-b32-classmix-ls-sdefault-u1-c1-r1@train/cams
+# PRIORS_TAG=rs101u2pl@rs101p
 
 # ARCHITECTURE=resnest269
 # ARCH=rs269
@@ -236,13 +238,18 @@ INF_FG_T=0.5
 ## MS COCO 2014
 ##
 # FG_T=0.3
-# LR=0.0005
-# CAMS_DIR=experiments/predictions/pnoc/coco-rs269-pnoc-b16-lr0.05-ls@rs269-lsra-r1@train@scale=0.5,1.0,1.5,2.0
-# PRIORS_TAG=rs269pnoc@rs269-rals-r1
+LR=0.0005
+
+CAMS_DIR=experiments/predictions/u2pl/coco14-640-rs269-lr0.007-m0.9-b32-colorjitter_classmix-default-bg0.05-fg0.35-u1-c1@rs269pnoc-r1@train/pseudos-t0.4-c10
+CAMS_MODE=png
+PRIORS_TAG=rs269u2pl@rs269pnoc-r1
 ## ================================================
 
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
+
 PN_TAG=$DATASET-pn@ccamh-$ARCH-fg$FG_T@$PRIORS_TAG
+PN_ID=run-0
+PN_CKPT=$WORK_DIR/poolnet/results/$PN_ID/models/epoch_9.pth
 
 ccamh_training
 ccamh_inference
@@ -250,9 +257,6 @@ ccamh_pseudo_masks_crf
 
 ## PoolNet Training and Inference
 ## ==============================
-
-PN_CKPT=$WORK_DIR/poolnet/results/run-0/models/epoch_9.pth
-
 SAL_PRIORS_DIR=$WORK_DIR/experiments/predictions/$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0@t=$INF_FG_T@crf=$CRF_T
 
 poolnet_training
@@ -261,6 +265,11 @@ poolnet_inference
 cp $PN_CKPT $WORK_DIR/experiments/models/saliency/$PN_TAG.pth
 
 mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
+
+## Cleanup model checkpoints so next run doesn't change the PN_ID.
+## If this line is commented, you must manually remove this directory
+## or set PN_ID to the next integer before running this script.
+# rm -rf $WORK_DIR/poolnet/results/$PN_ID
 
 ## Evaluation
 ## ==============================

@@ -70,6 +70,7 @@ parser.add_argument('--augment', default='', type=str)
 parser.add_argument('--alpha', type=float, default=0.25)
 parser.add_argument('--hint_w', type=float, default=1.0)
 
+parser.add_argument('--cams_mode', type=str, choices=["npy", "png"], default="npy")
 parser.add_argument('--fg_threshold', type=float, default=0.4)
 # parser.add_argument('--bg_threshold', type=float, default=0.1)
 
@@ -110,13 +111,15 @@ if __name__ == '__main__':
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.cams_dir, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
-  train_dataset = datasets.CAMsDataset(ts, transform=tt)
+  train_dataset = datasets.CAMsDataset(ts, transform=tt) if args.cams_mode == "npy" else datasets.SaliencyDataset(ts, transform=tt)
   valid_dataset = datasets.SaliencyDataset(vs, transform=tv)
   # TODO: test mixup and cutmix in C2AM
   # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
   train_loader = DataLoader(train_dataset, batch_size=BATCH_TRAIN, num_workers=args.num_workers, shuffle=True, drop_last=True)
   valid_loader = DataLoader(valid_dataset, batch_size=BATCH_VALID, num_workers=args.num_workers, drop_last=True)
   log_dataset(args.dataset, train_dataset, tt, tv)
+
+  print("Foreground hints threshold:", args.fg_threshold, '(unused, as png cams are being loaded)' if args.cams_mode == "png" else "")
 
   step_valid = len(train_loader)
   step_log = int(step_valid * args.print_ratio)
@@ -177,7 +180,11 @@ if __name__ == '__main__':
         cam_hints = F.interpolate(cam_hints, ccams.shape[2:], mode='bicubic')  # B1HW -> B1hw
 
         # Using foreground cues:
-        fg_likely = (cam_hints >= args.fg_threshold).to(DEVICE)
+        if args.cams_mode == "npy":
+          fg_likely = (cam_hints >= args.fg_threshold).to(DEVICE)
+        else:
+          fg_likely = (cam_hints != 0) & (cam_hints != 255).to(DEVICE)
+
         # loss_h := -log(sigmoid(output[fg_likely]))
         output_fg = ccams[fg_likely]
 
