@@ -210,6 +210,7 @@ def get_ccam_transforms(
       RandomCrop_For_Segmentation(crop_size, ignore_value=0., labels_last=False),
       Transpose_For_Segmentation(),
       random_hflip_fn,
+      at_least_3d,
     ]
   )
 

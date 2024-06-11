@@ -120,6 +120,15 @@ def random_hflip_fn(data):
   return data
 
 
+def at_least_3d(data, axis=0):
+  for k in ("image", "mask"):
+    if k in data:
+      t = data[k]
+      if len(t.shape) < 3:
+        data[k] = np.expand_dims(t, axis)
+  return data
+
+
 class Normalize:
 
   def __init__(self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
