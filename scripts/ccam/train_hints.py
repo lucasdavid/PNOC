@@ -183,7 +183,7 @@ if __name__ == '__main__':
         if args.cams_mode == "npy":
           fg_likely = (cam_hints >= args.fg_threshold).to(DEVICE)
         else:
-          fg_likely = (cam_hints != 0) & (cam_hints != 255).to(DEVICE)
+          fg_likely = ((cam_hints != 0) & (cam_hints != 255)).to(DEVICE)
 
         # loss_h := -log(sigmoid(output[fg_likely]))
         output_fg = ccams[fg_likely]
