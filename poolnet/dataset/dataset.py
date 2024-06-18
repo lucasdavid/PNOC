@@ -23,7 +23,7 @@ class VOCImageDataTrain(data.Dataset):
   def __init__(self, data_root, pseudo_root):
     self.sal_root = data_root
     self.pseudo_root = pseudo_root
-    self.sal_list = load_img_id_list('./dataset/train_aug.txt')
+    self.sal_list = load_img_id_list('../data/voc12/train_aug.txt')
 
   def __getitem__(self, item):
     # sal data loading
@@ -45,9 +45,10 @@ class VOCImageDataTrain(data.Dataset):
 
 class VOCImageDataTest(data.Dataset):
 
-  def __init__(self, data_root):
+  def __init__(self, data_root, train_list):
     self.sal_root = data_root
-    self.sal_list = load_img_id_list('./dataset/train_aug.txt')
+    self.train_list = train_list
+    self.sal_list = load_img_id_list(f'../data/voc12/{train_list}.txt')
 
   def __getitem__(self, item):
     # sal data loading
@@ -194,7 +195,7 @@ def get_custom_loader(config, mode='train', pin=False):
     dataset = (
       VOCImageDataTrain(config.train_root, config.pseudo_root)
       if mode == 'train'
-      else VOCImageDataTest(config.test_root)
+      else VOCImageDataTest(config.test_root, config.train_list)
     )
   elif config.dataset == "coco14":
     dataset = (

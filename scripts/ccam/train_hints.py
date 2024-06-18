@@ -111,7 +111,13 @@ if __name__ == '__main__':
   ts = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_train, masks_dir=args.cams_dir, split="train")
   vs = datasets.custom_data_source(args.dataset, args.data_dir, args.domain_valid, split="valid")
   tt, tv = datasets.get_ccam_transforms(int(args.image_size * 1.15), args.image_size)
-  train_dataset = datasets.CAMsDataset(ts, transform=tt) if args.cams_mode == "npy" else datasets.SaliencyDataset(ts, transform=tt)
+  if args.cams_mode == "npy":
+    train_dataset = datasets.CAMsDataset(ts, transform=tt)
+    interp = "bicubic"
+  else:
+    train_dataset = datasets.SaliencyDataset(ts, transform=tt)
+    interp = "nearest"
+
   valid_dataset = datasets.SaliencyDataset(vs, transform=tv)
   # TODO: test mixup and cutmix in C2AM
   # train_dataset = datasets.apply_augmentation(train_dataset, args.augment, args.image_size, args.cutmix_prob, args.mixup_prob)
@@ -177,7 +183,8 @@ if __name__ == '__main__':
         loss3 = criterion[2](bg_feats)
 
         # CAM Hints
-        cam_hints = F.interpolate(cam_hints, ccams.shape[2:], mode='bicubic')  # B1HW -> B1hw
+        hints_dtype = cam_hints.dtype
+        cam_hints = F.interpolate(cam_hints.float(), ccams.shape[2:], mode=interp).to(hints_dtype)
 
         # Using foreground cues:
         if args.cams_mode == "npy":

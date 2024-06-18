@@ -26,7 +26,7 @@ parser.add_argument('--seed', default=0, type=int)
 parser.add_argument('--num_workers', default=24, type=int)
 parser.add_argument('--dataset', default='voc12', choices=datasets.DATASOURCES)
 parser.add_argument('--data_dir', default='/data1/xjheng/dataset/VOC2012/', type=str)
-parser.add_argument('--exclude_bg_images', default=True, type=str2bool)
+parser.add_argument('--exclude_bg_images', default=False, type=str2bool)
 
 ###############################################################################
 # Inference parameters
@@ -60,21 +60,26 @@ def _work(process_id, dataset, args):
       continue
 
     image = data_source.get_image(image_id)
+    label = data_source.get_label(image_id)
 
-    pack = np.load(ccam_dir + image_id + '.npy', allow_pickle=True).item()
-    cams = pack['hr_cam']
-
-    if args.activation == 'relu':
-      cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
-      cams = np.argmax(cams, axis=0)
-
-      if args.crf_t > 0:
-        cams = crf_inference_label(np.asarray(image), cams, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
+    if label.sum() == 0:
+      W, H = image.size
+      cams = np.zeros((H, W))
     else:
-      cams = np.concatenate((1 - cams, cams))
+      pack = np.load(ccam_dir + image_id + '.npy', allow_pickle=True).item()
+      cams = pack['hr_cam']
 
-      if args.crf_t > 0:
-        cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_t, gt_prob=args.crf_gt_prob), axis=0)
+      if args.activation == 'relu':
+        cams = np.pad(cams, ((1, 0), (0, 0), (0, 0)), mode='constant', constant_values=args.threshold)
+        cams = np.argmax(cams, axis=0)
+
+        if args.crf_t > 0:
+          cams = crf_inference_label(np.asarray(image), cams, n_labels=2, t=args.crf_t, gt_prob=args.crf_gt_prob)
+      else:
+        cams = np.concatenate((1 - cams, cams))
+
+        if args.crf_t > 0:
+          cams = np.argmax(crf_inference(np.asarray(image), cams, t=args.crf_t, gt_prob=args.crf_gt_prob), axis=0)
 
     imageio.imwrite(png_path, (cams * 255).clip(0, 255).astype(np.uint8))
 
