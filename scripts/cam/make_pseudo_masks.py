@@ -36,8 +36,7 @@ parser.add_argument("--threshold", default=0.25, type=float)
 parser.add_argument("--ignore_bg_cam", default=False, type=str2bool)
 
 
-def compare(dataset: datasets.PathsDataset, classes, start, step):
-  compared = 0
+def worker(dataset: datasets.PathsDataset, start, step):
   corrupted = []
 
   steps = range(start, len(dataset), step)
@@ -78,9 +77,13 @@ def compare(dataset: datasets.PathsDataset, classes, start, step):
         if not sal_file:
           cam = np.pad(cam, ((1, 0), (0, 0), (0, 0)), mode="constant", constant_values=args.threshold)
         else:
-          sal = load_saliency_file(sal_file, args.sal_mode)
-          bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
-          cam = np.concatenate((bg, cam), axis=0)
+          try:
+            sal = load_saliency_file(sal_file, args.sal_mode)
+            bg = ((sal < args.sal_threshold).astype(float) if args.sal_threshold else (1 - sal))
+            cam = np.concatenate((bg, cam), axis=0)
+          except UnidentifiedImageError:
+            corrupted.append(image_id)
+            continue
 
       prob = cam
       cam = np.argmax(cam, axis=0)
@@ -114,23 +117,14 @@ def compare(dataset: datasets.PathsDataset, classes, start, step):
         os.remove(out_file)
       raise
 
+  if corrupted:
+    print(f"Corrupted file ids: {corrupted}.")
+
 
 def run(args, dataset: datasets.PathsDataset):
-  classes = dataset.info.classes.tolist()
-  bg_class = classes[dataset.info.bg_class]
-
-  columns = ["threshold", *classes, "overall", "foreground"]
-  report_iou = []
-
-  index_ = miou_ = None
-  threshold_ = fp_ = 0.
-  iou_ = {}
-  miou_history = []
-  fp_history = []
-
   p_list = []
   for i in range(args.num_workers):
-    p = multiprocessing.Process(target=compare, args=(dataset, classes, i, args.num_workers))
+    p = multiprocessing.Process(target=worker, args=(dataset, i, args.num_workers))
     p.start()
     p_list.append(p)
   for p in p_list:
@@ -146,7 +140,7 @@ if __name__ == "__main__":
 
   if not os.path.exists(PRED_DIR) or not os.listdir(PRED_DIR):
     raise ValueError(f"Predictions cannot be found at `{PRED_DIR}`. Directory does not exist or is empty.")
-  
+
   if os.path.exists(OUT_DIR) and os.listdir(OUT_DIR):
     raise ValueError(f"Output directory `{PRED_DIR}` already exists, and contains files. Directory must not exist or be empty.")
   os.makedirs(OUT_DIR, exist_ok=True)
