@@ -33,7 +33,7 @@ else
 fi
 
 # Dataset
-DATASET=voc12 # Pascal VOC 2012
+DATASET=voc12  # Pascal VOC 2012
 # DATASET=coco14  # MS COCO 2014
 # DATASET=deepglobe # DeepGlobe Land Cover Classification
 
@@ -89,6 +89,7 @@ LABELSMOOTHING=0 # 0.1
 # Infrastructure
 MIXED_PRECISION=true
 
+EVAL_MODE=png
 CRF_T=10
 CRF_GT=1
 MIN_TH=0.20
@@ -160,20 +161,22 @@ evaluate_masks() {
   # dCRF is not re-applied during evaluation (crf_t=0)
 
   CUDA_VISIBLE_DEVICES="" \
-    WANDB_TAGS="$DATASET,domain:$DOMAIN_VALID,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,opt:$OPTIMIZER,ls:$LABELSMOOTHING,aug:$AUGMENT,mode:$MODE,crf:$CRF_T-$CRF_GT" \
+    WANDB_TAGS="$DATASET,domain:$DOMAIN_VALID,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,opt:$OPTIMIZER,ls:$LABELSMOOTHING,aug:$AUG,mode:$MODE,crf:$CRF_T-$CRF_GT" \
     WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
     $PY scripts/evaluate.py \
     --experiment_name $TAG \
-    --pred_dir $SEGM_PRED_DIR \
     --dataset $DATASET \
     --domain $DOMAIN \
     --data_dir $DATA_DIR \
+    --pred_dir $SEGM_PRED_DIR \
+    --crf_t 0 \
+    --crf_gt_prob $CRF_GT \
+    --mode $EVAL_MODE \
     --min_th $MIN_TH \
     --max_th $MAX_TH \
-    --crf_gt_prob $CRF_GT \
     --num_workers $WORKERS_INFER \
-    --crf_t 0 \
-    --mode png
+    --force_align true \
+    --verbose 2
 }
 
 ## 4.1 DeepLabV3+ Training
@@ -181,6 +184,7 @@ evaluate_masks() {
 
 LABELSMOOTHING=0.1
 AUGMENT=colorjitter # colorjitter_randaug_cutmix_mixup_cutormixup
+AUG=cj
 
 ## For supervised segmentation:
 PRIORS_TAG=sup
@@ -199,9 +203,22 @@ segm_training
 SEGM_PRED_DIR=./experiments/predictions/$TAG@crf=$CRF_T
 DOMAIN=$DOMAIN_VALID     segm_inference
 DOMAIN=$DOMAIN_VALID_SEG segm_inference
-# # DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
+DOMAIN=$DOMAIN_TEST SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
 # 4.3. Evaluation
 #
-DOMAIN=$DOMAIN_VALID     evaluate_masks
-DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# DOMAIN=$DOMAIN_VALID     evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+
+# TAG=segmentation/coco-481-d2-u2pl-rs269-sam
+# EVAL_MODE=png
+# ARCHITECTURE=deeplabv2
+# ARCH=dv2
+# IMAGE_SIZE=481
+# BATCH_SIZE=10
+# LABELSMOOTHING=0
+# AUGMENT=none
+# AUG=no
+# DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG/logit CRF_T=0 evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG/logit CRF_T=10 evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG SEGM_PRED_DIR=./experiments/predictions/$TAG CRF_T=0 evaluate_masks

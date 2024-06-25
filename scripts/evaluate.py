@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import sys
 
+import cv2
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
@@ -37,6 +38,7 @@ parser.add_argument("--min_th", default=0.05, type=float)
 parser.add_argument("--max_th", default=0.81, type=float)
 parser.add_argument("--step_th", default=0.05, type=float)
 parser.add_argument("--ignore_bg_cam", default=False, type=str2bool)
+parser.add_argument("--force_align", default=True, type=str2bool)
 
 
 def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
@@ -91,11 +93,13 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
 
       elif args.mode == "deeplab-pytorch":
         cam, keys, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
+        prob = prob[keys, :, :]
 
       elif args.mode == "deeplab-pytorch-threshold":
         cam, keys, prob = load_dlv2_seg_file(npy_file, sizes=y_true.shape)
         prob[0, ...] = args.threshold
         cam = prob.argmax(0)
+        prob = prob[keys, :, :]
 
       if args.crf_t:
         with dataset.data_source.get_image(image_id) as img:
@@ -109,6 +113,12 @@ def compare(dataset: datasets.PathsDataset, classes, start, step, TP, P, T):
             cam = crf_inference_label(img, cam, n_labels=max(len(keys), 2), t=args.crf_t, gt_prob=args.crf_gt_prob)
 
       y_pred = keys[cam]
+
+      if args.force_align and y_pred.shape != y_true.shape:
+        H, W = y_true.shape
+        if args.verbose > 2:
+          print(f"Prediction shape {y_pred.shape} diverges from ground-truth {y_true.shape} for sample {image_id}.")
+        y_pred = cv2.resize(y_pred, (W, H), interpolation=cv2.INTER_NEAREST)
 
       for i in range(len(classes)):
         P[i].acquire()
