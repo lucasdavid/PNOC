@@ -162,12 +162,10 @@ def forward_tta(model, ori_image, scale, transform, DEVICE):
   x = copy.deepcopy(ori_image)
   x = x.resize((round(W * scale), round(H * scale)), resample=PIL.Image.BICUBIC)
   x = transform(x)
-  x = x.transpose((2, 0, 1))
   x = torch.from_numpy(x)
   xf = x.flip(-1)
   images = torch.stack([x, xf])
   images = images.to(DEVICE)
-
   _, features = model(images, with_cam=True)
   cams = F.relu(features)
   cams = cams[0] + cams[1].flip(-1)
