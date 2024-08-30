@@ -46,7 +46,7 @@ export PYTHONPATH=$(pwd)
 
 ## Architecture
 ARCHITECTURE=deeplabv3p
-ARCH=rs269
+ARCH=d3p_rs269
 BACKBONE=resnest269
 PRETRAINED_WEIGHTS=imagenet
 
@@ -68,7 +68,7 @@ PRETRAINED_WEIGHTS=imagenet
 
 GROUP_NORM=true
 DILATED=false
-MODE=fix
+MODE=normal
 TRAIN_STEM=false
 TRAIN_BONE=true
 
@@ -76,14 +76,14 @@ OPTIMIZER=momentum
 # LR=0.01 # SegFormer
 # WD=0.01
 WD=4e-05
-# LR=0.007 # voc12
-LR=0.004  # coco14
+LR=0.007 # voc12
+# LR=0.004  # coco14
 # LR=0.01  # deepglobe
 
 EPOCHS=15
 
-BATCH_SIZE=16
-ACCUMULATE_STEPS=2
+BATCH_SIZE=32
+ACCUMULATE_STEPS=1
 
 AUGMENT=none # colorjitter_randaug_cutmix_mixup_cutormixup
 AUG=no
@@ -101,7 +101,7 @@ MIN_TH=0.20
 MAX_TH=0.81
 
 # RESTORE=/path/to/weights
-# RESTORE_STRICT=true
+RESTORE_STRICT=true
 
 segm_training() {
   echo "================================================="
@@ -113,6 +113,48 @@ segm_training() {
     CUDA_VISIBLE_DEVICES=$DEVICES \
     $PY scripts/segmentation/train.py \
     --tag $TAG \
+    --optimizer $OPTIMIZER \
+    --lr $LR \
+    --max_epoch $EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --accumulate_steps $ACCUMULATE_STEPS \
+    --mixed_precision $MIXED_PRECISION \
+    --architecture $ARCHITECTURE \
+    --backbone $BACKBONE \
+    --trainable-stem $TRAIN_STEM \
+    --trainable-backbone $TRAIN_BONE \
+    --dilated $DILATED \
+    --mode $MODE \
+    --backbone_weights $PRETRAINED_WEIGHTS \
+    --use_gn $GROUP_NORM \
+    --image_size $IMAGE_SIZE \
+    --min_image_size $MIN_IMAGE_SIZE \
+    --max_image_size $MAX_IMAGE_SIZE \
+    --augment "$AUGMENT" \
+    --cutmix_prob $CUTMIX \
+    --mixup_prob $MIXUP \
+    --label_smoothing $LABELSMOOTHING \
+    --dataset $DATASET \
+    --data_dir $DATA_DIR \
+    --masks_dir "$MASKS_DIR" \
+    --domain_train $DOMAIN_TRAIN \
+    --domain_valid $DOMAIN_VALID_SEG \
+    --num_workers $WORKERS_TRAIN
+}
+
+
+segm_evaluate() {
+  echo "================================================="
+  echo "Semantic Segmentation Evaluation $TAG"
+  echo "================================================="
+
+  WANDB_TAGS="$DATASET,$ARCH,segmentation,b:$BATCH_SIZE,gn,lr:$LR,opt:$OPTIMIZER,ls:$LABELSMOOTHING,aug:$AUG,mode:$MODE" \
+    WANDB_RUN_GROUP="$DATASET-$ARCH-segmentation" \
+    CUDA_VISIBLE_DEVICES=$DEVICES \
+    $PY scripts/segmentation/evaluate.py \
+    --tag $TAG \
+    --restore $RESTORE \
+    --restore_strict $RESTORE_STRICT \
     --optimizer $OPTIMIZER \
     --lr $LR \
     --max_epoch $EPOCHS \
@@ -198,11 +240,14 @@ AUG=cj
 # MASKS_DIR=""
 
 ## For custom masks (pseudo masks from WSSS):
-# PRIORS_TAG=pnoc-rals-r4-ccamh-rw
+PRIORS_TAG=pnoc-rals-r4-ccamh-rw
 # MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
 TAG=segmentation/$DATASET-$IMAGE_SIZE-$ARCH-ls-lr$LR-b$BATCH_SIZE-$MODE-$AUG-$PRIORS_TAG
 segm_training
+
+# RESTORE=experiments/models/$TAG.pth
+# segm_evaluate
 
 # 4.2 DeepLabV3+ Inference
 #
@@ -214,6 +259,6 @@ DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$
 
 # 4.3. Evaluation
 #
-DOMAIN=$DOMAIN_VALID     evaluate_masks
-DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+# DOMAIN=$DOMAIN_VALID     evaluate_masks
+# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
 
