@@ -25,6 +25,7 @@ Label 	Name 	Description
 
 import os
 import cv2
+import sys
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -36,7 +37,6 @@ from sklearn.model_selection import train_test_split
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "hpa-single-cell-classification")
-CHANNELS = ('red','green','blue','yellow')
 CLASSES = [
   "background", "Nucleoplasm", "Nuclearmembrane", "Nucleoli", "Nucleolifibrillar", "Nuclearspeckles", "Nuclearbodies", "Endoplasmic",
   "Golgi", "Intermediate", "Actin", "Microtubules", "Mitotic", "Centrosome", "Plasma",
@@ -51,17 +51,20 @@ NORMALIZE_STATS = (
   (0.485, 0.456, 0.406, 0.485),
   (0.229, 0.224, 0.225, 0.229))
 
+CHANNELS = ("red", "green", "blue", "yellow")
+IMG_FORMATS = ("png", "jpg")
+
+
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
   NAME = "hpa-single-cell-classification"
   DEFAULT_SPLIT = "train"
+  VALIDATION_SPLIT = 0.1
+  SEED = 1838339744
   DOMAINS = {
     "train": "train_aug",
     "valid": "valid",
     "test": "test",
   }
-
-  VALIDATION_SPLIT = 0.1
-  SEED = 1838339744
 
   def __init__(
     self,
@@ -89,7 +92,8 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
   _sample_info: Dict[str, Tuple[np.ndarray, np.ndarray]] = None  # {train: (<ids shape=N dtype=str>, <labels shape=(N, 19) dtype=float>)}
 
-  def load_sample_info(self, domain: str):
+  @property
+  def sample_info(self):
     if self._sample_info is None:
       train_info = pd.read_csv(os.path.join(self.root_dir, "train.csv"))
       public_info = pd.read_csv(os.path.join(self.root_dir, "publichpa.csv"))
@@ -122,33 +126,43 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
         "test": (ids_test, y_test),
       }
 
-    return self._sample_info[domain]
+    return self._sample_info
 
   def get_sample_ids(self, domain) -> List[str]:
-    return self.load_sample_info(domain)[0]
+    return self.sample_info[domain][0]
 
   def load_sample_labels(self, domain) -> List[str]:
-    ids, targets = self.load_sample_info(domain)
+    ids, targets = self.sample_info[domain]
     return dict(zip(ids, targets))
 
   def get_image(self, sample_id) -> Image.Image:
-    path = os.path.join(self.root_dir, self.subfolder, sample_id)
-    ext = "png" if os.path.exists(f"{path}_{CHANNELS[0]}.png") else "jpg"
-    images = [Image.open(f"{path}_{c}.{ext}") for c in CHANNELS]
-    image = np.stack([self._ensure_grayscale(np.asarray(image)) for image in images], axis=-1)
-    image = Image.fromarray(image)
-
-    for i in images: i.close()
+    try:
+      path_prefix = os.path.join(self.root_dir, self.subfolder, sample_id)
+      for fmt in IMG_FORMATS:
+        path_first = f"{path_prefix}_{CHANNELS[0]}.{fmt}"
+        if os.path.exists(path_first):
+          images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
+          image = np.stack([self._ensure_grayscale(np.array(image), fmt) for image in images], axis=-1)
+          image = Image.fromarray(image)
+          for i in images: i.close()
+          break
+    except IndexError as error:
+      print(sample_id, error, file=sys.stderr)
+      raise
 
     return image
   
-  def _ensure_grayscale(self, img):
+  def _ensure_grayscale(self, x, image_fmt):
+    dtype = x.dtype
     if len(x.shape) == 2:
       return x
-    return x.mean(-1)
+    if x.shape[-1] == 1:
+      return x[..., 0]
+    x = x.astype("float32").mean(-1).astype(dtype)
+    return x
 
   def get_mask_path(self, sample_id) -> str:
-    return os.path.join(self.masks_dir, sample_id + '.npz')
+    return os.path.join(self.masks_dir, sample_id + ".npz")
 
   def get_mask(self, sample_id):
     mask_path = self.get_mask_path(sample_id)
