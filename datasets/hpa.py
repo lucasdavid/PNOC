@@ -36,6 +36,7 @@ from sklearn.model_selection import train_test_split
 from . import base
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "hpa-single-cell-classification")
+CHANNELS = ('red','green','blue','yellow')
 CLASSES = [
   "background", "Nucleoplasm", "Nuclearmembrane", "Nucleoli", "Nucleolifibrillar", "Nuclearspeckles", "Nuclearbodies", "Endoplasmic",
   "Golgi", "Intermediate", "Actin", "Microtubules", "Mitotic", "Centrosome", "Plasma",
@@ -131,14 +132,20 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
     return dict(zip(ids, targets))
 
   def get_image(self, sample_id) -> Image.Image:
-    colors = ('red','green','blue','yellow')
-    images = [Image.open(os.path.join(self.root_dir, self.subfolder, f'{sample_id}_{c}.png')) for c in colors]
-    image = np.stack([np.array(image) for image in images], axis=-1)
+    path = os.path.join(self.root_dir, self.subfolder, sample_id)
+    ext = "png" if os.path.exists(f"{path}_{CHANNELS[0]}.png") else "jpg"
+    images = [Image.open(f"{path}_{c}.{ext}") for c in CHANNELS]
+    image = np.stack([self._ensure_grayscale(np.asarray(image)) for image in images], axis=-1)
     image = Image.fromarray(image)
 
     for i in images: i.close()
 
     return image
+  
+  def _ensure_grayscale(self, img):
+    if len(x.shape) == 2:
+      return x
+    return x.mean(-1)
 
   def get_mask_path(self, sample_id) -> str:
     return os.path.join(self.masks_dir, sample_id + '.npz')
