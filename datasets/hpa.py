@@ -25,7 +25,6 @@ Label 	Name 	Description
 
 import os
 import cv2
-import sys
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -142,25 +141,16 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
         path_first = f"{path_prefix}_{CHANNELS[0]}.{fmt}"
         if os.path.exists(path_first):
           images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
-          image = np.stack([self._ensure_grayscale(np.array(image), fmt) for image in images], axis=-1)
-          image = Image.fromarray(image)
+          image = np.stack([np.asarray(image) for image in images], axis=-1)
+          image = Image.fromarray(image, "RGBA")
           for i in images: i.close()
           break
     except IndexError as error:
-      print(sample_id, error, file=sys.stderr)
+      print(sample_id, error)
       raise
 
     return image
   
-  def _ensure_grayscale(self, x, image_fmt):
-    dtype = x.dtype
-    if len(x.shape) == 2:
-      return x
-    if x.shape[-1] == 1:
-      return x[..., 0]
-    x = x.astype("float32").mean(-1).astype(dtype)
-    return x
-
   def get_mask_path(self, sample_id) -> str:
     return os.path.join(self.masks_dir, sample_id + ".npz")
 
