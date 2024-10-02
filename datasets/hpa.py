@@ -142,7 +142,7 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
         last_fmt_known = fmt_ix == len(IMG_FORMATS)-1
         if os.path.exists(path_first) or last_fmt_known:
           images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
-          image = np.stack([np.asarray(image) for image in images], axis=-1)
+          image = np.stack([self._img2arr(i) for i in images], axis=-1)
           image = Image.fromarray(image, "RGBA")
           for i in images: i.close()
           break
@@ -151,6 +151,12 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
       raise
 
     return image
+
+  def _img2arr(self, img) -> np.ndarray:
+    x = np.asarray(img)
+    if x.dtype == np.uint16:
+        x = ((x.astype("float32") / 65536)*255).astype("uint8")
+    return x
   
   def get_mask_path(self, sample_id) -> str:
     return os.path.join(self.masks_dir, sample_id + ".npz")
