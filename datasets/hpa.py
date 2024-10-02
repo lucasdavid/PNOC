@@ -137,16 +137,17 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
   def get_image(self, sample_id) -> Image.Image:
     try:
       path_prefix = os.path.join(self.root_dir, self.subfolder, sample_id)
-      for fmt in IMG_FORMATS:
+      for fmt_ix, fmt in enumerate(IMG_FORMATS):
         path_first = f"{path_prefix}_{CHANNELS[0]}.{fmt}"
-        if os.path.exists(path_first):
+        last_fmt_known = fmt_ix == len(IMG_FORMATS)-1
+        if os.path.exists(path_first) or last_fmt_known:
           images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
           image = np.stack([np.asarray(image) for image in images], axis=-1)
           image = Image.fromarray(image, "RGBA")
           for i in images: i.close()
           break
     except IndexError as error:
-      print(sample_id, error)
+      print(sample_id, f"{path_prefix}_{CHANNELS[0]}.{IMG_FORMATS[0]}", error)
       raise
 
     return image

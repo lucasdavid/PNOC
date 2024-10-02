@@ -25,14 +25,33 @@ elif [[ $ENV == sdumont_nvidia ]]; then
   DATA_DIR=$SCRATCH/datasets
   BUILD_DIR=$SCRATCH/single-stage/build
 
-  PIP=pip
   PY=python
+  PIP=pip
   DEVICE=cuda
   DEVICES=0,1
   GPUS=all
   WORKERS_TRAIN=8
   WORKERS_INFER=8
   DATASETS_DIR=$SCRATCH/datasets
+elif [[ $ENV == cenapad ]]; then
+  
+  echo "Loading modules cudnn/8.2.0.53-11.3-gcc-9.3.0 python/3.8.11-gcc-9.4.0 git/2.31.1-gcc-9.4.0"
+  module load cudnn/8.2.0.53-11.3-gcc-9.3.0; module load python/3.8.11-gcc-9.4.0; module load git/2.31.1-gcc-9.4.0
+
+  DATA_DIR=$SCRATCH/datasets
+  BUILD_DIR=$SCRATCH/build
+
+  ### CENAPAD Lovelace
+  PY=python
+  PIP=pip
+  DEVICE=cuda
+  DEVICES=0
+  WORKERS_TRAIN=8
+  WORKERS_INFER=32
+  DATASETS_DIR=$SCRATCH/datasets
+
+  export OMP_NUM_THREADS=16
+
 else
   ### Local
   PY=python
