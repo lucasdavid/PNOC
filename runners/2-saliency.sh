@@ -234,12 +234,9 @@ PRIORS_TAG=rs269pnoc@rs269-rals-r1
 ## ================================================
 ## Cityscapes
 ##
-IMAGE_SIZE=768
-ARCH=rs101
-ARCHITECTURE=resnest101
-FG_T=0.2
-CAMS_DIR=experiments/predictions/pnoc/cityscapes-rs101-pnoc-b32-lr0.05-ls@rs101-r1@train@scale=0.5,1.0,1.5,2.0
-PRIORS_TAG=rs101pnoc@rs101
+# FG_T=0.2
+# CAMS_DIR=experiments/predictions/pnoc/cityscapes-rs101-pnoc-b32-lr0.05-ls@rs101-r1@train@scale=0.5,1.0,1.5,2.0
+# PRIORS_TAG=rs101pnoc@rs101
 
 CCAMH_TAG=saliency/$DATASET-ccamh-$ARCH-fg$FG_T-lr$LR-b$BATCH_SIZE@$PRIORS_TAG
 PN_TAG=$DATASET-pn@ccamh-$ARCH-fg$FG_T@$PRIORS_TAG
@@ -252,19 +249,16 @@ ccamh_pseudo_masks_crf
 ## ==============================
 
 PN_CKPT=$WORK_DIR/poolnet/results/run-2/models/epoch_9.pth
-
 SAL_PRIORS_DIR=$WORK_DIR/experiments/predictions/$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0@t=$INF_FG_T@crf=$CRF_T
 
 poolnet_training
 poolnet_inference
 
 cp $PN_CKPT $WORK_DIR/experiments/models/saliency/$PN_TAG.pth
-
 mv $WORK_DIR/poolnet/results/$PN_TAG $WORK_DIR/experiments/predictions/saliency/
 
 ## Evaluation
 ## ==============================
 
 CRF_T=10 TAG=$CCAMH_TAG@train@scale=0.5,1.0,1.5,2.0 DOMAIN=$DOMAIN_VALID evaluate_saliency_detection
-
 CRF_T=0  TAG=saliency/$PN_TAG DOMAIN=$DOMAIN_VALID evaluate_saliency_detection

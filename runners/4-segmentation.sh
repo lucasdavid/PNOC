@@ -241,7 +241,7 @@ AUG=cj
 
 ## For custom masks (pseudo masks from WSSS):
 PRIORS_TAG=pnoc-rals-r4-ccamh-rw
-# MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
+MASKS_DIR=./experiments/predictions/rw/$DATASET-an@ccamh@rs269-pnoc-ls-r4@rs269-rals@beta=10@exp_times=8@rw@crf=1
 
 TAG=segmentation/$DATASET-$IMAGE_SIZE-$ARCH-ls-lr$LR-b$BATCH_SIZE-$MODE-$AUG-$PRIORS_TAG
 segm_training
@@ -258,7 +258,7 @@ DOMAIN=$DOMAIN_VALID_SEG segm_inference
 DOMAIN=$DOMAIN_TEST      SEGM_PRED_DIR=./experiments/predictions/$TAG@test@crf=$CRF_T segm_inference
 
 # 4.3. Evaluation
-#
-# DOMAIN=$DOMAIN_VALID     evaluate_masks
-# DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
+
+DOMAIN=$DOMAIN_VALID     evaluate_masks
+DOMAIN=$DOMAIN_VALID_SEG evaluate_masks
 
