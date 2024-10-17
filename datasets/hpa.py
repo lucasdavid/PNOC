@@ -142,8 +142,8 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
         last_fmt_known = fmt_ix == len(IMG_FORMATS)-1
         if os.path.exists(path_first) or last_fmt_known:
           images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
-          sizes = max(i.size for i in images)
-          image = np.stack([self._img2arr(i, sizes) for i in images], axis=-1)
+          # sizes = max(i.size for i in images)
+          image = np.stack([np.asarray(i) for i in images], axis=-1)
           image = Image.fromarray(image, "RGBA")
           for i in images: i.close()
           break
