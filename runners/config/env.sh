@@ -38,6 +38,8 @@ elif [[ $ENV == cenapad ]]; then
   echo "Loading modules cudnn/8.2.0.53-11.3-gcc-9.3.0 python/3.8.11-gcc-9.4.0"
   module load cudnn/8.2.0.53-11.3-gcc-9.3.0; module load python/3.8.11-gcc-9.4.0
 
+  # cudnn/8.4.0.27-11.6-gcc-9.4.0
+
   DATA_DIR=$SCRATCH/datasets
   BUILD_DIR=$SCRATCH/build
 
@@ -55,6 +57,8 @@ elif [[ $ENV == cenapad-umagpu ]]; then
 
   echo "Loading modules cudnn/8.2.0.53-11.3-gcc-9.3.0 python/3.8.11-gcc-9.4.0"
   module load cudnn/8.2.0.53-11.3-gcc-9.3.0; module load python/3.8.11-gcc-9.4.0
+
+  # cudnn/8.4.0.27-11.6-gcc-9.4.0
 
   DATA_DIR=$SCRATCH/datasets
   BUILD_DIR=$SCRATCH/build

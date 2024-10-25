@@ -80,4 +80,6 @@ if [[ $DATASET == hpa-single-cell-classification ]]; then
 
   LR=0.1
   WD=0.0001
+
+  VALIDATE_MAX_STEPS=188  # too many valid samples
 fi
