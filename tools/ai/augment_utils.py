@@ -77,7 +77,7 @@ class Resize_For_Segmentation:
 
     self.image_size = image_size
     self.resize_x = resize_x or transforms.Resize(self.image_size)
-    self.resize_y = resize_y or transforms.Resize(self.image_size, interpolation=Image.NEAREST)
+    self.resize_y = resize_y or transforms.Resize(self.image_size, interpolation=transforms.InterpolationMode.NEAREST)
 
   def __call__(self, data):
     image, mask = data['image'], data['mask']

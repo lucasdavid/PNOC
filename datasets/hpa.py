@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 
 from PIL import Image
+from skimage import io
 from sklearn.model_selection import train_test_split
 
 from . import base
@@ -141,11 +142,9 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
         path_first = f"{path_prefix}_{CHANNELS[0]}.{fmt}"
         last_fmt_known = fmt_ix == len(IMG_FORMATS)-1
         if os.path.exists(path_first) or last_fmt_known:
-          images = [Image.open(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
-          # sizes = max(i.size for i in images)
-          image = np.stack([np.asarray(i) for i in images], axis=-1)
+          image = [io.imread(f"{path_prefix}_{c}.{fmt}") for c in CHANNELS]
+          image = np.stack(image, axis=-1)
           image = Image.fromarray(image, "RGBA")
-          for i in images: i.close()
           break
     except Exception as error:
       print(sample_id, f"{path_prefix}_{CHANNELS[0]}.{IMG_FORMATS[0]}", error)
@@ -153,14 +152,6 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
     return image
 
-  def _img2arr(self, img, sizes) -> np.ndarray:
-    if img.size != sizes:
-        img = img.resize(sizes, resample=Image.Resampling.BICUBIC)
-    x = np.asarray(img)
-    if x.dtype == np.uint16:
-        x = ((x.astype("float32") / 65536)*255).astype("uint8")
-    return x
-  
   def get_mask_path(self, sample_id) -> str:
     return os.path.join(self.masks_dir, sample_id + ".npz")
 
@@ -204,3 +195,4 @@ class HPASingleCellClassificationDataSource(base.CustomDataSource):
 
 
 base.DATASOURCES[HPASingleCellClassificationDataSource.NAME] = HPASingleCellClassificationDataSource
+

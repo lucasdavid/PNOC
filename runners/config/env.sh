@@ -14,7 +14,7 @@ if [[ $ENV == sdumont ]]; then
 
   # export OMP_NUM_THREADS=4
   nodeset -e $SLURM_JOB_NODELIST
-  module load sequana/current
+  # module load sequana/current
   module load gcc/7.4_sequana python/3.8.2_sequana cudnn/8.2_cuda-11.1_sequana
 elif [[ $ENV == sdumont_nvidia ]]; then
   nodeset -e $SLURM_JOB_NODELIST
