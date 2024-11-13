@@ -8,7 +8,7 @@ if [[ $ENV == sdumont ]]; then
   PIP=pip3.8
   DEVICE=cuda
   DEVICES=0,1,2,3
-  WORKERS_TRAIN=8
+  WORKERS_TRAIN=16
   WORKERS_INFER=48
   DATASETS_DIR=$SCRATCH/datasets
 
@@ -30,8 +30,8 @@ elif [[ $ENV == sdumont_nvidia ]]; then
   DEVICE=cuda
   DEVICES=0,1
   GPUS=all
-  WORKERS_TRAIN=8
-  WORKERS_INFER=8
+  WORKERS_TRAIN=16
+  WORKERS_INFER=16
   DATASETS_DIR=$SCRATCH/datasets
 elif [[ $ENV == cenapad ]]; then
   
