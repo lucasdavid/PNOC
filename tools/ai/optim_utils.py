@@ -2,6 +2,8 @@ import torch
 
 from .torch_utils import *
 
+OPTIMIZERS_NAMES = ["sgd", "momentum", "lion", "lamb"]
+
 
 class PolyOptimizerMixin:
 
@@ -34,7 +36,16 @@ class PolyAdamW(PolyOptimizerMixin, torch.optim.AdamW):
   ...
 
 
-def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch=10., alpha_bias=2., **kwargs):
+def get_optimizer(
+    lr, wd, max_step, param_groups,
+    algorithm="sgd",
+    alpha_scratch=10.,
+    alpha_bias=2.,
+    betas=None,
+    momentum: float = None,
+    nesterov: bool = None,
+    **kwargs,
+):
   params = [
     {
       'params': param_groups[0],
@@ -59,10 +70,14 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
   ]
 
   if algorithm == "sgd":
-    return PolyOptimizer(params, lr=lr, max_step=max_step, **kwargs)
+    if momentum is None: momentum = 0
+    if nesterov is None: nesterov = False
+    return PolyOptimizer(params, lr=lr, max_step=max_step, momentum=momentum, nesterov=nesterov, **kwargs)
 
   if algorithm == "momentum":
-    return PolyOptimizer(params, lr=lr, max_step=max_step, momentum=0.9, nesterov=True, **kwargs)
+    if momentum is None: momentum = 0.9
+    if nesterov is None: nesterov = True
+    return PolyOptimizer(params, lr=lr, max_step=max_step, momentum=momentum, nesterov=nesterov, **kwargs)
 
   elif algorithm == "adamw":
     return PolyAdamW(params, lr=lr, max_step=max_step, **kwargs)
@@ -72,8 +87,14 @@ def get_optimizer(lr, wd, max_step, param_groups, algorithm="sgd", alpha_scratch
     class LionPolyOptimizer(PolyOptimizerMixin, Lion):
       ...
 
-    return LionPolyOptimizer(params, lr=lr, max_step=max_step, betas=(0.9, 0.99), **kwargs)
+    return LionPolyOptimizer(params, lr=lr, max_step=max_step, betas=betas or (0.9, 0.999), **kwargs)
 
+  elif algorithm == "lamb":
+    import torch_optimizer
+    class LambPolyOptimizer(PolyOptimizerMixin, torch_optimizer.Lamb):
+      ...
+
+    return LambPolyOptimizer(params, lr=lr, max_step=max_step, betas=betas or (0.9, 0.999), **kwargs)
   else:
     raise NotImplementedError(f"Optimizer {algorithm} not implemented.")
 

@@ -61,7 +61,7 @@ parser.add_argument('--validate_thresholds', default=None, type=str)
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
-parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "lion"])
+parser.add_argument('--optimizer', default="sgd", choices=OPTIMIZERS_NAMES)
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--class_weight', default=None, type=str)
@@ -182,6 +182,7 @@ if __name__ == '__main__':
     algorithm=args.optimizer,
     alpha_scratch=args.lr_alpha_scratch,
     alpha_bias=args.lr_alpha_bias,
+    start_step=int(step_init // args.accumulate_steps),
   )
   scaler = torch.cuda.amp.GradScaler(enabled=args.mixed_precision)
 

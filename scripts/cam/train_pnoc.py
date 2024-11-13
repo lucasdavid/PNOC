@@ -77,7 +77,7 @@ parser.add_argument('--wd', default=1e-4, type=float)
 parser.add_argument('--label_smoothing', default=0, type=float)
 parser.add_argument('--max_grad_norm', default=None, type=float)
 parser.add_argument('--max_grad_norm_oc', default=None, type=float)
-parser.add_argument('--optimizer', default="sgd", choices=["sgd", "momentum", "lion"])
+parser.add_argument('--optimizer', default="sgd", choices=OPTIMIZERS_NAMES)
 parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--lr_alpha_oc', default=1., type=float)
@@ -351,8 +351,20 @@ if __name__ == '__main__':
   else:
     r_loss_fn = L2_Loss
 
-  cgopt = get_optimizer(args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
-  ocopt = get_optimizer(args.lr * args.lr_alpha_oc, args.wd, int(step_max // args.accumulate_steps), oc_param_groups, algorithm=args.optimizer, alpha_scratch=args.lr_alpha_scratch, alpha_bias=args.lr_alpha_bias)
+  cgopt = get_optimizer(
+    args.lr, args.wd, int(step_max // args.accumulate_steps), cg_param_groups,
+    algorithm=args.optimizer,
+    alpha_scratch=args.lr_alpha_scratch,
+    alpha_bias=args.lr_alpha_bias,
+    start_step=int(step_init // args.accumulate_steps),
+  )
+  ocopt = get_optimizer(
+    args.lr * args.lr_alpha_oc, args.wd, int(step_max // args.accumulate_steps), oc_param_groups,
+    algorithm=args.optimizer,
+    alpha_scratch=args.lr_alpha_scratch,
+    alpha_bias=args.lr_alpha_bias,
+    start_step=int(step_init // args.accumulate_steps),
+  )
   log_opt_params('CGNet', cg_param_names)
   log_opt_params('OCNet', oc_param_names)
 
