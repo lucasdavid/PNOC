@@ -56,7 +56,7 @@ IMG_FORMATS = ("png", "jpg")
 
 
 class HPASingleCellClassificationDataSource(base.CustomDataSource):
-  NAME = "hpa-single-cell-classification"
+  NAME = "hpa"
   DEFAULT_SPLIT = "train"
   VALIDATION_SPLIT = 0.1
   SEED = 1838339744

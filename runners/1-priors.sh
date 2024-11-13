@@ -37,7 +37,7 @@ DATASET=voc12       # Pascal VOC 2012
 # DATASET=coco14      # MS COCO 2014
 # DATASET=deepglobe   # DeepGlobe Land Cover Classification
 # DATASET=cityscapes  # Cityscapes Urban Semantic Segmentation
-# DATASET=hpa-single-cell-classification  # HPA Single Cell Classification
+# DATASET=hpa         # HPA Single Cell Classification
 
 . $WORK_DIR/runners/config/env.sh
 . $WORK_DIR/runners/config/dataset.sh
