@@ -116,9 +116,9 @@ def main(args):
           probs = torch.sigmoid(logit)
 
         sample_ids_ += [sample_ids]
-        targets_ += [to_numpy(targets)]
-        logits_ += [to_numpy(logit)]
-        probs_ += [to_numpy(probs)]
+        targets_ += [to_numpy(targets).astype("float32")]
+        logits_ += [to_numpy(logit).astype("float32")]
+        probs_ += [to_numpy(probs).astype("float32")]
 
         if step >= total_steps:
           break

@@ -37,6 +37,26 @@ def log_dataset(name, dataset, tt, tv, info=None):
   )
 
 
+def log_loader(tl, ts, check_sampler=False):
+  print(
+    f"Train Loader\n"
+    f"  steps={len(tl)}\n"
+    f"  batch={tl.batch_size}\n"
+    f"  workers={tl.num_workers}\n"
+    f"  sampler={tl.sampler}\n"
+  )
+
+  if check_sampler:
+    labels = np.asarray([ts.get_label(_id) for _id in ts.sample_ids])
+    o = labels.sum(0).astype(int)
+    s = labels[[i for i in tl.sampler], :].sum(0).astype(int)
+    print(f"Original class frequency for {len(labels)} samples: ({o.mean():.2f} {o.std():.2f})")
+    print(f" Sampled Class frequency for {len(labels)} samples: ({s.mean():.2f} {s.std():.2f})")
+
+    for n, _o, _s in zip(ts.classification_info.classes, o, s):
+      print(f"  {n:>18} (↑{_s/_o-1:4.0%}) {_s:>5}/{_o}")
+
+
 def log_model(name, model, args):
   properties = "architecture mode dilated trainable_backbone trainable_stem use_gn".split()
   config = [(p, getattr(args, p)) for p in properties if hasattr(args, p)]

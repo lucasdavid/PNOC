@@ -1,10 +1,14 @@
 import random
+from typing import Callable, Dict, Optional, Tuple, Union
 
 import cv2
 import numpy as np
 import torch
-from PIL import Image
-from torchvision import transforms
+import torch.nn.functional as F
+import torch.utils.data.sampler as sampler
+import torchvision.transforms as transforms
+import torchvision.transforms.functional as transforms_f
+from PIL import Image, ImageFilter
 
 
 def convert_OpenCV_to_PIL(image):
@@ -628,5 +632,146 @@ class CutOrMixUp(CutMix):
         batch_a = (i, x, y, m)
 
     return (i, x, y, m) if is_segm else (i, x, y)
+
+# endregion
+
+
+# region Batch Augmentations
+
+def batch_transform(
+  entry: Dict[str, torch.Tensor],
+  crop_size: Union[int, Tuple[int, int]] = (512, 512),
+  scale_size: Tuple[float, float] = (1., 1.),
+  augmentation: bool = True,
+  color: bool = True,
+  blur: bool = True,
+):
+  image, mask, logits = entry["image"], entry["mask"], entry.get("logits", None)
+
+  W, H = image.size
+
+  if not scale_size[0] == scale_size[1] == 1:  # Random rescale image
+    scale_ratio = random.uniform(scale_size[0], scale_size[1])
+    resized_size = (int(H * scale_ratio), int(W * scale_ratio))
+    image = transforms_f.resize(image, resized_size)
+    mask = transforms_f.resize(mask, resized_size, transforms.InterpolationMode.NEAREST)
+    if logits is not None:
+      logits = transforms_f.resize(logits, resized_size)
+
+  if crop_size != -1:
+    if crop_size[0] > resized_size[0] or crop_size[1] > resized_size[1]:
+      # Add padding if rescaled image size is less than crop size
+      right_pad, bottom_pad = max(crop_size[1] - resized_size[1], 0), max(crop_size[0] - resized_size[0], 0)
+      image = transforms_f.pad(image, padding=(0, 0, right_pad, bottom_pad), padding_mode='reflect')
+      mask = transforms_f.pad(mask, padding=(0, 0, right_pad, bottom_pad), fill=255, padding_mode='constant')
+      if logits is not None:
+        logits = transforms_f.pad(logits, padding=(0, 0, right_pad, bottom_pad), fill=0, padding_mode='constant')
+
+    # Random Cropping
+    i, j, h, w = transforms.RandomCrop.get_params(image, output_size=crop_size)
+    image = transforms_f.crop(image, i, j, h, w)
+    mask = transforms_f.crop(mask, i, j, h, w)
+    if logits is not None:
+      logits = transforms_f.crop(logits, i, j, h, w)
+
+  if augmentation:
+    if color and torch.rand(1) > 0.2:  # Random color jitter
+      color_transform = transforms.ColorJitter(
+        (0.75, 1.25), (0.75, 1.25), (0.75, 1.25), (-0.25, 0.25)
+      )
+      # color_transform = transforms.ColorJitter.get_params((0.75, 1.25), (0.75, 1.25), (0.75, 1.25), (-0.25, 0.25))
+      image = color_transform(image)
+
+    if blur and torch.rand(1) > 0.5:  # Random Gaussian filter
+      sigma = random.uniform(0.15, 1.15)
+      image = image.filter(ImageFilter.GaussianBlur(radius=sigma))
+
+    if torch.rand(1) > 0.5:  # Random horizontal flipping
+      image = transforms_f.hflip(image)
+      mask = transforms_f.hflip(mask)
+      if logits is not None:
+        logits = transforms_f.hflip(logits)
+
+  image = transforms_f.to_tensor(image)
+  mask = transforms_f.to_tensor(mask).long()
+  image = transforms_f.normalize(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+  entry["image"] = image
+  entry["mask"] = mask[0]
+
+  if logits is not None:
+    logits = transforms_f.to_tensor(logits)
+    entry["logits"] = logits
+
+  return entry
+
+
+def batch_mixaug_pt(
+  images,
+  labels,
+  masks,
+  *masks_tensors,
+  beta: float = 1.,
+  mix: str = "classmix",
+  k: int = 1,
+  ignore_class: Optional[int] = None,
+  bg_in_labels: bool = False,
+):
+  labels_ = labels.detach().clone()
+  tensors_ = [t.detach().clone() for t in (images, masks) + masks_tensors]
+
+  ids = np.arange(len(images), dtype="int")
+
+  for _ in range(k):
+    bids = np.asarray([np.random.choice(ids[ids != i]) for i in ids])
+
+    for ai, bi in zip(ids, bids):
+      if mix == "cutmix":
+        b_mask = generate_cutout_mask_pt(masks[bi].shape)
+        b_mask = b_mask & (masks[bi] != 255)  # adjusting for empty regions
+        b_alpha = b_mask.float().mean()
+        labels_[ai, :] = (1 - b_alpha) * labels_[ai] + b_alpha * labels[bi]
+      elif mix == "classmix":
+        b_mask, new_labels = generate_class_mask_pt(masks[bi], ignore_class)
+        b_mask = b_mask & (masks[bi] != 255)
+        if not bg_in_labels:
+          new_labels -= 1
+        labels_[ai, new_labels] = 1.
+      else:
+        raise ValueError(f"Unknown mix {mix}. Options are `cutmix` and `classmix`.")
+
+      for t_, t in zip(tensors_, masks_tensors):
+        t_[ai][..., b_mask] = t[bi][b_mask]
+
+  return images_, labels_, *tensors_
+
+
+def generate_cutout_mask_pt(img_size, ratio=2):
+  cutout_area = img_size[0] * img_size[1] / ratio
+
+  w = np.random.randint(img_size[1] / ratio + 1, img_size[1])
+  h = np.round(cutout_area / w)
+
+  x_start = np.random.randint(0, img_size[1] - w + 1)
+  y_start = np.random.randint(0, img_size[0] - h + 1)
+
+  x_end = int(x_start + w)
+  y_end = int(y_start + h)
+
+  mask = torch.zeros(img_size, dtype=torch.int32)
+  mask[y_start:y_end, x_start:x_end] = 1
+  return mask
+
+
+def generate_class_mask_pt(mask, k=None, ignore_class=None):
+  labels = torch.unique(mask)
+  labels = labels[labels != 255]
+  if ignore_class is not None:
+    labels = labels[labels != ignore_class]
+  if k is None:
+    k = max(len(labels) // 2, 1)
+  labels_select = labels[torch.randperm(len(labels))][:k]
+  b_mask  = torch.isin(mask, labels_select)
+  return b_mask, labels_select
 
 # endregion
