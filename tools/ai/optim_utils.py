@@ -2,7 +2,7 @@ import torch
 
 from .torch_utils import *
 
-OPTIMIZERS_NAMES = ["sgd", "momentum", "lion", "lamb"]
+OPTIMIZERS_NAMES = ["sgd", "momentum", "adamw", "lion", "lamb"]
 
 
 class PolyOptimizerMixin:

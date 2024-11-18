@@ -48,7 +48,7 @@ elif [[ $ENV == cenapad ]]; then
   PIP=pip
   DEVICE=cuda
   DEVICES=0,1
-  WORKERS_TRAIN=4
+  WORKERS_TRAIN=8
   WORKERS_INFER=32
   DATASETS_DIR=$SCRATCH/datasets
 
@@ -68,8 +68,8 @@ elif [[ $ENV == cenapad-umagpu ]]; then
   PIP=pip
   DEVICE=cuda
   DEVICES=0
-  WORKERS_TRAIN=2
-  WORKERS_INFER=16
+  WORKERS_TRAIN=8
+  WORKERS_INFER=32
   DATASETS_DIR=$SCRATCH/datasets
 
   # export OMP_NUM_THREADS=4
