@@ -650,7 +650,9 @@ def batch_transform(
 
   W, H = image.size
 
-  if not scale_size[0] == scale_size[1] == 1:  # Random rescale image
+  if scale_size[0] == scale_size[1] == 1:
+    resized_size = (H, W)
+  else:  # Random rescale image
     scale_ratio = random.uniform(scale_size[0], scale_size[1])
     resized_size = (int(H * scale_ratio), int(W * scale_ratio))
     image = transforms_f.resize(image, resized_size)
@@ -693,11 +695,11 @@ def batch_transform(
         logits = transforms_f.hflip(logits)
 
   image = transforms_f.to_tensor(image)
-  mask = transforms_f.to_tensor(mask).long()
+  mask = torch.as_tensor(np.array(mask), dtype=torch.int64)
   image = transforms_f.normalize(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
   entry["image"] = image
-  entry["mask"] = mask[0]
+  entry["mask"] = mask
 
   if logits is not None:
     logits = transforms_f.to_tensor(logits)
@@ -717,8 +719,9 @@ def batch_mixaug_pt(
   ignore_class: Optional[int] = None,
   bg_in_labels: bool = False,
 ):
+  tensors = (images, masks) + masks_tensors
   labels_ = labels.detach().clone()
-  tensors_ = [t.detach().clone() for t in (images, masks) + masks_tensors]
+  tensors_ = [t.detach().clone() for t in tensors]
 
   ids = np.arange(len(images), dtype="int")
 
@@ -740,10 +743,10 @@ def batch_mixaug_pt(
       else:
         raise ValueError(f"Unknown mix {mix}. Options are `cutmix` and `classmix`.")
 
-      for t_, t in zip(tensors_, masks_tensors):
-        t_[ai][..., b_mask] = t[bi][b_mask]
+      for t, t_ in zip(tensors, tensors_):
+        t_[ai][..., b_mask] = t[bi][..., b_mask]
 
-  return images_, labels_, *tensors_
+  return tensors_[0], labels_, *tensors_[1:]
 
 
 def generate_cutout_mask_pt(img_size, ratio=2):
