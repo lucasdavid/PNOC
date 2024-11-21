@@ -141,7 +141,7 @@ class ResNet(nn.Module):
     self.inplanes = planes * block.expansion
     for i in range(1, blocks):
       layers.append(block(self.inplanes, planes, dilation=dilation, batch_norm_fn=self.batch_norm_fn))
-    
+
     self.stage_features.append(self.inplanes)
     self.outplanes = self.inplanes
 
@@ -158,4 +158,4 @@ class ResNet(nn.Module):
     x3 = self.layer3(x2)
     x4 = self.layer4(x3)
 
-    return [x1, x2, x3, x4]
+    return (x1, x2, x3, x4)

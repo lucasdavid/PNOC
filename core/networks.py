@@ -101,7 +101,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
       from .backbones import swin_transformer as swin_mod
 
       model_fn = getattr(swin_mod, name)
-      model = model_fn(out_indices=(3,), **kwargs)
+      model = model_fn(in_chans=in_channels, out_indices=(3,), **kwargs)
 
       stages = (nn.Sequential(model.patch_embed, model.pos_drop), *model.layers)
 
@@ -120,6 +120,14 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
     model_fn = getattr(mix_transformer, name)
     model = model_fn(**kwargs)
 
+    if weights and weights != "imagenet":
+      print(f'loading weights from {weights}')
+      checkpoint = torch.load(weights, map_location="cpu")
+      del checkpoint["head.weight"]
+      del checkpoint["head.bias"]
+
+      model.load_state_dict(checkpoint)
+
     if channels != 3:
       patch_conv_in_channels(model.patch_embed1, "proj", channels)
 
@@ -129,14 +137,6 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
       nn.Sequential(model.patch_embed3, model.block3, model.norm3),
       nn.Sequential(model.patch_embed4, model.block4, model.norm4),
     )
-
-    if weights and weights != "imagenet":
-      print(f'loading weights from {weights}')
-      checkpoint = torch.load(weights, map_location="cpu")
-      del checkpoint["head.weight"]
-      del checkpoint["head.bias"]
-
-      model.load_state_dict(checkpoint)
 
   else:
     if 'resnet' in name:
@@ -149,9 +149,6 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
         dilations = (1, 1, 1, 2)
       model = resnet.ResNet(resnet.Bottleneck, resnet.layers_dic[name], strides=strides, dilations=dilations, batch_norm_fn=norm_fn)
 
-      if channels != 3:
-        patch_conv_in_channels(model, "conv1", channels)
-
       if weights == 'imagenet':
         print(f'loading weights from {resnet.urls_dic[name]}')
         state_dict = model_zoo.load_url(resnet.urls_dic[name])
@@ -159,6 +156,10 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
         state_dict.pop('fc.bias')
 
         model.load_state_dict(state_dict)
+
+      if channels != 3:
+        patch_conv_in_channels(model, "conv1", channels)
+
     elif 'resnest' in name:
       from .backbones.arch_resnest import resnest
       dilation = 4 if dilated else 2
@@ -166,10 +167,10 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
       pretrained = weights == "imagenet"
       model_fn = getattr(resnest, name)
       model = model_fn(pretrained=pretrained, dilated=dilated, dilation=dilation, norm_layer=norm_fn)
-      if channels != 3:
-        patch_conv_in_channels(model, "conv1", channels)
       if pretrained:
         print(f'loading weights from {resnest.resnest_model_urls[name]}')
+      if channels != 3:
+        patch_conv_in_channels(model, "conv1", channels)
 
       del model.avgpool
       del model.fc
@@ -182,7 +183,7 @@ def build_backbone(name, dilated, strides, norm_fn, weights='imagenet', channels
       if channels != 3:
         patch_conv_in_channels(model, "conv1", channels)  # FIX: conv1 is Sequential
       if pretrained:
-        print(f'loading pretrained weights')
+        print(f'loading {weights} pretrained weights')
 
       del model.avgpool
       del model.fc
