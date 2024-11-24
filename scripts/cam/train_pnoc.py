@@ -12,6 +12,7 @@ import wandb
 from core import occse
 from core.networks import *
 from core.puzzle_utils import *
+from tools.ai import ema as ema_mod
 from tools.ai.augment_utils import *
 from tools.ai.demo_utils import *
 from tools.ai.evaluate_utils import *
@@ -82,6 +83,10 @@ parser.add_argument('--lr_alpha_scratch', default=10., type=float)
 parser.add_argument('--lr_alpha_bias', default=2., type=float)
 parser.add_argument('--lr_alpha_oc', default=1., type=float)
 parser.add_argument('--class_weight', default=None, type=str)
+parser.add_argument('--ema', default=False, type=str2bool)
+parser.add_argument('--ema_steps', default=32, type=int)
+parser.add_argument('--ema_warmup', default=1, type=int)
+parser.add_argument('--ema_decay', default=0.99, type=float)
 
 parser.add_argument('--image_size', default=512, type=int)
 parser.add_argument('--min_image_size', default=320, type=int)
@@ -212,6 +217,9 @@ def train_step_cg(step, images, targets, targets_sm, ap, ao, k):
     if args.amp_min_scale and cg_scaler._scale < args.amp_min_scale:
         cg_scaler._scale = torch.as_tensor(args.amp_min_scale, dtype=cg_scaler._scale.dtype, device=cg_scaler._scale.device)
 
+    ema_mod.copy(cgnet, ema_model, cgopt.global_step,
+                 args.ema, args.ema_decay, args.ema_steps, ema_warmup_steps)
+
   occse.update_focal(
     targets,
     labels_oc,
@@ -298,6 +306,7 @@ if __name__ == '__main__':
   step_log = int(step_val * args.print_ratio)
   step_init = args.first_epoch * step_val
   step_max = args.max_epoch * step_val
+  ema_warmup_steps = args.ema_warmup * int(step_val // args.accumulate_steps)
   print(f'Iterations: first={step_init} logging={step_log} validation={step_val} max={step_max}')
 
   # Network
@@ -338,10 +347,15 @@ if __name__ == '__main__':
   cgnet.train()
   ocnet.eval()
 
+  ema_model = ema_mod.init(cgnet, DEVICE, args.ema)
+
   if GPUS_COUNT > 1:
     print(f'GPUs={GPUS_COUNT}')
     cgnet = torch.nn.DataParallel(cgnet)
     ocnet = torch.nn.DataParallel(ocnet)
+
+    if args.ema:
+      ema_model = torch.nn.DataParallel(ema_model)
 
   # Loss, Optimizer
   class_loss_fn = torch.nn.MultiLabelSoftMarginLoss(weight=CLASS_WEIGHT, reduction='none').to(DEVICE)
@@ -359,11 +373,11 @@ if __name__ == '__main__':
     start_step=int(step_init // args.accumulate_steps),
   )
   ocopt = get_optimizer(
-    args.lr * args.lr_alpha_oc, args.wd, int(step_max // args.accumulate_steps), oc_param_groups,
+    args.lr * args.lr_alpha_oc, args.wd, int(step_max // (args.accumulate_steps * args.oc_train_interval_steps)), oc_param_groups,
     algorithm=args.optimizer,
     alpha_scratch=args.lr_alpha_scratch,
     alpha_bias=args.lr_alpha_bias,
-    start_step=int(step_init // args.accumulate_steps),
+    start_step=int(step_init // (args.accumulate_steps * args.oc_train_interval_steps)),
   )
   log_opt_params('CGNet', cg_param_names)
   log_opt_params('OCNet', oc_param_names)
@@ -385,10 +399,10 @@ if __name__ == '__main__':
     train_metrics.update(metrics_values)
 
     epoch = step // step_val
-    do_logging = (step + 1) % step_log == 0
-    do_validation = args.validate and (step + 1) % step_val == 0
+    is_log_step = (step + 1) % step_log == 0
+    is_val_step = (step + 1) % step_val == 0
 
-    if do_logging:
+    if is_log_step:
       (cg_loss, c_loss, p_loss, re_loss, o_loss, ot_loss, ap, ao, ow, k) = train_metrics.get(clear=True)
 
       lr = float(get_learning_rate_from_optimizer(cgopt))
@@ -415,7 +429,7 @@ if __name__ == '__main__':
 
       wb_logs = {f"train/{k}": v for k, v in data.items()}
       wb_logs["train/epoch"] = epoch
-      wandb.log(wb_logs, commit=not do_validation)
+      wandb.log(wb_logs, commit=not (args.validate and is_val_step))
 
       print(
         '\niteration    = {iteration:,}\n'
@@ -435,19 +449,20 @@ if __name__ == '__main__':
         'choices      = {choices}\n'.format(**data)
       )
 
-    if do_validation:
-      cgnet.eval()
+    if args.validate and is_val_step:
+      valid_model = ema_mod.inference_model(cgnet, ema_model, cgopt.global_step, args.ema, ema_warmup_steps)
+      valid_model.eval()
       with torch.autocast(device_type=DEVICE, enabled=args.mixed_precision):
         if args.validate_priors:
           metric_results = priors_validation_step(
-            cgnet, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
+            valid_model, valid_loader, train_dataset.info, THRESHOLDS, DEVICE, args.validate_max_steps
           )
         else:
           metric_results = classification_validation_step(
-            cgnet, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
+            valid_model, valid_loader, train_dataset.info, DEVICE, args.validate_max_steps
           )
       metric_results["iteration"] = step + 1
-      cgnet.train()
+      valid_model.train()
 
       wandb.log({f"val/{k}": v for k, v in metric_results.items()})
       print(*(f"{metric}={value}" for metric, value in metric_results.items()))
@@ -457,9 +472,17 @@ if __name__ == '__main__':
         for k in ("threshold", "miou", "iou"):
           wandb.run.summary[f"val/best_{k}"] = metric_results[k]
 
-      save_model(cgnet, model_path, parallel=GPUS_COUNT > 1)
+    if is_val_step:
+      save_model(
+        ema_mod.inference_model(cgnet, ema_model, cgopt.global_step, args.ema, ema_warmup_steps),
+        model_path, parallel=GPUS_COUNT > 1)
+
       if args.oc_persist:
         save_model(ocnet, oc_model_path, parallel=GPUS_COUNT > 1)
+
+  save_model(
+    ema_mod.inference_model(cgnet, ema_model, cgopt.global_step, args.ema, ema_warmup_steps),
+    model_path, parallel=GPUS_COUNT > 1)
 
   print(TAG)
   wb_run.finish()
