@@ -496,8 +496,8 @@ class MixUp(AugmentedDataset):
     self.prob = prob
 
   def __getitem__(self, index):
-    batch, is_segm = self._to_segm_batch(self.dataset[index])
-    i, x, y, m = batch
+    batch = self.dataset[index]
+    i, x, *y = batch
 
     for _ in range(self.num_mix):
       r = np.random.rand(1)
@@ -506,15 +506,13 @@ class MixUp(AugmentedDataset):
 
       # Draw random sample.
       r = random.choice(range(len(self)))
-      (_, xb, yb, mb), _ = self._to_segm_batch(self.dataset[r])
+      ib, xb, *yb = self.dataset[r]
 
       alpha = np.random.beta(self.beta, self.beta)
       x = x * alpha + xb * (1. - alpha)
-      y = y * alpha + yb * (1. - alpha)
+      y = [a * alpha + b * (1. - alpha) for a, b in zip(y, yb)]
 
-      # TODO: mix int segmentation masks.
-
-    return (i, x, y, m) if is_segm else (i, x, y)
+    return i, x, *y
 
 # endregion
 
