@@ -11,6 +11,13 @@ import torchvision.transforms.functional as transforms_f
 from PIL import Image, ImageFilter
 
 
+def imagenet_stats():
+  return (
+    [0.485, 0.456, 0.406],
+    [0.229, 0.224, 0.225],
+  )
+
+
 def convert_OpenCV_to_PIL(image):
   return Image.fromarray(image[..., ::-1])
 
@@ -643,7 +650,11 @@ def batch_transform(
   augmentation: bool = True,
   color: bool = True,
   blur: bool = True,
+  normalize_stats = None,
 ):
+  if normalize_stats is None:
+    normalize_stats = imagenet_stats()
+
   image, mask, logits = entry["image"], entry["mask"], entry.get("logits", None)
 
   W, H = image.size
@@ -692,9 +703,11 @@ def batch_transform(
       if logits is not None:
         logits = transforms_f.hflip(logits)
 
+  image = np.array(image, dtype=np.float32)
   image = transforms_f.to_tensor(image)
-  mask = torch.as_tensor(np.array(mask), dtype=torch.int64)
-  image = transforms_f.normalize(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+  image = transforms_f.normalize(image, mean=normalize_stats[0], std=normalize_stats[1])
+
+  mask = torch.as_tensor(np.array(mask, dtype=np.int64))
 
   entry["image"] = image
   entry["mask"] = mask
